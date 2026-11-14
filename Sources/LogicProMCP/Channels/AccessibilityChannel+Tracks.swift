@@ -2043,6 +2043,16 @@ extension AccessibilityChannel {
         guard let indexStr = params["index"], let index = Int(indexStr) else {
             return .error("Missing or invalid 'index' parameter")
         }
+        let held = AXTrackBinding.current
+        func heldTrackIsCurrent() -> Bool { held.map { $0.currentIndex() == index } ?? true }
+        func staleTrack() -> ChannelResult {
+            .error(HonestContract.encodeStateC(
+                error: .staleTargetReference,
+                hint: "The referenced Arrange track could not be renewed at the issued index.",
+                extras: ["operation": "track.select", "requested": index, "write_attempted": false,
+                         "safe_to_retry": false, "fallback_unsafe": true]))
+        }
+        guard heldTrackIsCurrent() else { return staleTrack() }
         guard AXLogicProElements.findTrackHeader(at: index, runtime: runtime) != nil else {
             // v3.1.0 (T3) — missing track is a hard failure; no retry will
             // help. Keep legacy error-string path for ChannelResult.error so
@@ -2059,12 +2069,16 @@ extension AccessibilityChannel {
         // coordinate fallback — fail closed if every AX step is rejected).
         _ = ProcessUtils.Runtime.production.activateLogicPro()
         try? await Task.sleep(nanoseconds: 150_000_000)
+        guard heldTrackIsCurrent() else { return staleTrack() }
         var writeAttempted = false
         guard AXLogicProElements.selectTrackViaAX(
             at: index,
             runtime: runtime,
+            heldHeader: held?.header,
+            permittingWrite: heldTrackIsCurrent,
             willWrite: { writeAttempted = true }
         ) else {
+            if !writeAttempted, !heldTrackIsCurrent() { return staleTrack() }
             var extras: [String: Any] = ["requested": index]
             if writeAttempted {
                 extras.merge([
@@ -2093,7 +2107,16 @@ extension AccessibilityChannel {
         // legacy free-form text. Existing `verified:true/false` JSON path
         // stays valid because the new envelope still contains those keys.
         let verification = await verifyTrackSelection(index: index, runtime: runtime)
-        let base: [String: Any] = ["requested": index, "selected": index]
+        var base: [String: Any] = ["requested": index, "selected": index]
+        if held != nil {
+            base["write_attempted"] = writeAttempted
+            guard heldTrackIsCurrent() else {
+                if !writeAttempted { return staleTrack() }
+                return .success(HonestContract.encodeStateB(
+                    reason: .readbackUnavailable,
+                    extras: base.merging(["target_identity_lost": true, "safe_to_retry": false]) { _, next in next }))
+            }
+        }
         switch verification {
         case .verified:
             return .success(HonestContract.encodeStateA(extras: base.merging([

@@ -118,10 +118,12 @@ struct TrackDispatcher: OperationTraceDispatching {
                 case .success(let resolved):
                     let traceID = await startTraceIfEnabled(command: command)
                     let result = await withWriteBoundaryArmed(traceID) {
-                        await router.route(
-                            operation: "track.select",
-                            params: ["index": String(resolved.index)]
-                        )
+                        await AXTrackBinding.$current.withValue(resolved.binding?.physicalTrack) {
+                            await router.route(
+                                operation: "track.select",
+                                params: ["index": String(resolved.index)]
+                            )
+                        }
                     }
                     return await finalizeTrace(
                         TargetRefResolver.addEvidence(

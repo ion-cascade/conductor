@@ -195,4 +195,49 @@ struct ConductorVisibilityAndKeyboardTests {
         #expect(b.actionCalls.isEmpty)
     }
 
+    @Test func heldTrackSelectionRefusesStaleProjectWithoutUsingIndexFallback() async throws {
+        let b = FakeAXRuntimeBuilder()
+        let app = b.element(951200)
+        let window = b.element(951201)
+        let header = b.element(951202)
+        b.setRole(window, kAXWindowRole as String)
+        b.setAttribute(app, kAXWindowsAttribute as String, [window])
+        b.setAttribute(window, kAXDocumentAttribute as String, "file:///tmp/Other.logicx")
+        let runtime = b.makeLogicRuntime(appElement: app)
+        let binding = AXTrackBinding.Binding(
+            window: window, header: header, document: "file:///tmp/Fixture.logicx",
+            runtime: runtime, observedStackHeader: false, observedHeaders: [header])
+        let result = await AXTrackBinding.$current.withValue(binding) {
+            await AccessibilityChannel.defaultSelectTrack(params: ["index": "0"], runtime: runtime)
+        }
+        let payload = try #require(JSONSerialization.jsonObject(with: Data(result.message.utf8)) as? [String: Any])
+        #expect(payload["error"] as? String == "stale_target_reference")
+        #expect(payload["write_attempted"] as? Bool == false)
+        #expect(b.actionCalls.isEmpty && b.setCalls.isEmpty)
+
+        let router = ChannelRouter()
+        let mcu = IndexOnlySelectionChannel()
+        await router.register(mcu)
+        let restricted = await AXTrackBinding.$current.withValue(binding) {
+            await router.route(operation: "track.select", params: ["index": "0"])
+        }
+        #expect(!restricted.isSuccess)
+        #expect(await mcu.calls == 0)
+    }
+
+}
+
+
+private actor IndexOnlySelectionChannel: Channel {
+    nonisolated let id: ChannelID = .mcu
+    private(set) var calls = 0
+
+    func start() async throws {}
+    func stop() async {}
+    func healthCheck() async -> ChannelHealth { .healthy(detail: "index-only selection") }
+
+    func execute(operation: String, params: [String: String]) async -> ChannelResult {
+        calls += 1
+        return .success("select received")
+    }
 }

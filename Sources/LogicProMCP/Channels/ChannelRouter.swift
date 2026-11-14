@@ -408,9 +408,14 @@ actor ChannelRouter {
         debugRestriction: DebugOnlyChannel = ChannelRouter.debugOnlyChannel,
         debugPassOperations: Set<String> = ChannelRouter.debugPassOperations
     ) async -> ChannelResult {
-        guard let tableChain = Self.routingTable[operation] else {
+        guard let configuredChain = Self.routingTable[operation] else {
             return .error("Unknown operation: \(operation)")
         }
+
+        // An index-only fallback cannot carry the retained Arrange header.
+        let tableChain = AXTrackBinding.current != nil && operation == "track.select"
+            ? configuredChain.filter { $0 == .accessibility }
+            : configuredChain
 
         // Operations with empty chain don't need a channel.
         if tableChain.isEmpty {

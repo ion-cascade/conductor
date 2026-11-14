@@ -36,7 +36,7 @@ extension AXLogicProElements {
             return currentName == name
         }
         if rows.enumerated().allSatisfy({ AXValueExtractors.extractSelectedState($0.element, runtime: ax) == ($0.offset == index) }) {
-            return true
+            return current()
         }
         guard let bar: AXUIElement = AXHelpers.getAttribute(app, kAXMenuBarAttribute as String, runtime: ax),
               case .success(let top) = AXHelpers.childrenResult(bar, runtime: ax) else { return false }
