@@ -62,8 +62,14 @@ enum ControlBarDisplayMode {
 
     /// Selects the Beats display mode in the main window's control bar.
     static func selectBeats(runtime: AXLogicProElements.Runtime = .production) -> Switch {
-        guard let window = AXLogicProElements.mainWindow(runtime: runtime),
-              let popup = popup(in: window, runtime: runtime.ax) else {
+        guard let window = AXLogicProElements.mainWindow(runtime: runtime) else {
+            return .unavailable("display_mode_popup_not_found")
+        }
+        return selectBeats(in: window, runtime: runtime)
+    }
+
+    private static func selectBeats(in window: AXUIElement, runtime: AXLogicProElements.Runtime) -> Switch {
+        guard let popup = popup(in: window, runtime: runtime.ax) else {
             return .unavailable("display_mode_popup_not_found")
         }
         // Logic 13 acknowledges AXShowMenu without exposing a menu. AXPress opens the
@@ -90,6 +96,40 @@ enum ControlBarDisplayMode {
                 guard let currentWindow = AXLogicProElements.mainWindow(runtime: runtime) else { return nil }
                 return (currentWindow, popup(in: currentWindow, runtime: runtime.ax))
             })
+    }
+
+    /// A display switch is preparation for a seek in the foreground stopped project.
+    static func selectBeatsForSeek(runtime: AXLogicProElements.Runtime = .production) -> Switch {
+        guard let window = AXLogicProElements.mainWindow(runtime: runtime),
+              foregroundStoppedProject(window: window, runtime: runtime) else {
+            return .unavailable("foreground_stopped_project_unverified")
+        }
+        return selectBeats(in: window, runtime: runtime)
+    }
+
+    static func canSeek(using lease: Lease, runtime: AXLogicProElements.Runtime = .production) -> Bool {
+        guard let window = AXLogicProElements.mainWindow(runtime: runtime),
+              foregroundStoppedProject(window: window, runtime: runtime),
+              let popup = popup(in: window, runtime: runtime.ax),
+              leaseRefusal(lease, window: window, popup: popup, runtime: runtime.ax) == nil,
+              let value = title(of: popup, runtime: runtime.ax) else { return false }
+        return isBeats(value)
+    }
+
+    private static func foregroundStoppedProject(
+        window: AXUIElement, runtime: AXLogicProElements.Runtime
+    ) -> Bool {
+        let ax = runtime.ax
+        guard !Task.isCancelled, let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
+              let app = AXLogicProElements.appRoot(runtime: runtime),
+              let windows: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax),
+              windows.count == 1, CFEqual(windows[0], window),
+              let toolbar = AXLogicProElements.directLogic13Toolbar(in: window, runtime: ax),
+              let play = AXLogicProElements.directToolbarControl(AXLocalePolicy.transportPlayControl, in: toolbar, runtime: ax),
+              let record = AXLogicProElements.directToolbarControl(AXLocalePolicy.transportRecordControl, in: toolbar, runtime: ax)
+        else { return false }
+        return AXValueExtractors.extractButtonState(play, runtime: ax) == false
+            && AXValueExtractors.extractButtonState(record, runtime: ax) == false
     }
 
     static func selectBeats(

@@ -846,3 +846,82 @@ func testDisplayModeSwitchRetainsLeaseWhenChangedModeMenuDoesNotClose(_ fault: S
         == .unavailable("display_mode_beats_item_not_pressed"))
     #expect(fixture.actions.calls.map(\.action) == [kAXShowMenuAction as String, kAXCancelAction as String])
 }
+
+private actor ExactSeekReadbackChannel: Channel {
+    nonisolated let id: ChannelID = .accessibility
+    private var positions: [String]
+    private(set) var seeks: [String] = []
+
+    init(positions: [String]) { self.positions = positions }
+
+    func start() async throws {}
+    func stop() async {}
+    func healthCheck() async -> ChannelHealth { .healthy(detail: "exact seek fixture") }
+
+    func execute(operation: String, params: [String: String]) async -> ChannelResult {
+        switch operation {
+        case "transport.get_state":
+            guard !positions.isEmpty else { return .error("Readback has been exhausted") }
+            let position = positions.removeFirst()
+            let state = TransportState(position: position, positionReadback: .init(
+                value: position, observedComponents: TransportPositionComponent.allCases))
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            guard let data = try? encoder.encode(state) else { return .error("Readback could not be encoded") }
+            return .success(String(decoding: data, as: UTF8.self))
+        case "transport.goto_position":
+            seeks.append(params["position"] ?? "")
+            return .success(HonestContract.encodeStateB(reason: .readbackUnavailable,
+                extras: ["write_attempted": true]))
+        default:
+            return .error("Unexpected operation")
+        }
+    }
+}
+
+@Test(arguments: ["moved", "already_exact", "owner_lost", "restore_failed"])
+func seekLeasesExactDisplayAndReportsRestoration(scenario: String) async throws {
+    let fixture = DisplayModeFixture()
+    let target = "3.2.3.17"
+    let partial = TransportState(position: "2.1", positionReadback: .init(
+        value: "2.1", observedComponents: [.bar, .beat]))
+    let channel = ExactSeekReadbackChannel(positions: scenario == "already_exact"
+        ? [target] : ["2.1.1.1", target])
+    let router = ChannelRouter()
+    await router.register(channel)
+    let lease = ControlBarDisplayMode.Lease(
+        original: "Beats & Project", window: fixture.window, windowTitle: "Untitled - Tracks",
+        document: "file:///tmp/DisplayModeFixture.logicx", popup: fixture.popup)
+    var restorations = 0
+    let result = await TransportDispatcher.seekWithExactPositionDisplay(
+        requestedPosition: target, beforeTransport: partial,
+        router: router, cache: StateCache(), traceID: nil,
+        selectDisplay: { .switched(lease) },
+        canSeek: { $0 == lease && scenario != "owner_lost" },
+        restoreDisplay: { held in
+            #expect(held == lease)
+            restorations += 1
+            return scenario == "restore_failed" ? .refused("owner_changed") : .restored
+        }
+    )
+    let fields = try #require(result.structuredContent?.objectValue)
+    let moved = scenario == "moved" || scenario == "restore_failed"
+    #expect(restorations == 1)
+    #expect(await channel.seeks == (moved ? [target] : []))
+    #expect(fields["display_mode_restored"]?.boolValue == (scenario != "restore_failed"))
+    #expect(fields["playhead_write_attempted"]?.boolValue == moved)
+    #expect(fields["write_attempted"]?.boolValue == true)
+    if scenario == "restore_failed" {
+        #expect(result.isError == true)
+        #expect(fields["state"]?.stringValue == "B")
+        #expect(fields["verified"]?.boolValue == false)
+        #expect(fields["position_verified"]?.boolValue == true)
+    } else if scenario == "owner_lost" {
+        #expect(result.isError == true)
+        #expect(fields["state"]?.stringValue == "C")
+    } else {
+        #expect(result.isError != true)
+        #expect(fields["verified"]?.boolValue == true)
+        #expect(fields["observed"]?.stringValue == target)
+    }
+}

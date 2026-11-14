@@ -795,6 +795,27 @@ struct TransportDispatcher: OperationTraceDispatching {
         traceID: TraceID?
     ) async -> CallTool.Result {
         let beforeTransport = await liveTransportState(router: router, cache: cache)
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+           !requestedPosition.contains(":"), completeObservedMusicalPosition(beforeTransport) == nil {
+            return await seekWithExactPositionDisplay(
+                requestedPosition: requestedPosition, beforeTransport: beforeTransport,
+                router: router, cache: cache, traceID: traceID,
+                selectDisplay: { ControlBarDisplayMode.selectBeatsForSeek() },
+                canSeek: { ControlBarDisplayMode.canSeek(using: $0) },
+                restoreDisplay: { ControlBarDisplayMode.restore($0) })
+        }
+        return await performGotoPosition(
+            requestedPosition: requestedPosition, beforeTransport: beforeTransport,
+            router: router, cache: cache, traceID: traceID)
+    }
+
+    private static func performGotoPosition(
+        requestedPosition: String,
+        beforeTransport: TransportState?,
+        router: ChannelRouter,
+        cache: StateCache,
+        traceID: TraceID?
+    ) async -> CallTool.Result {
         if let unchanged = gotoPositionUnchangedResult(
             requestedPosition: requestedPosition,
             beforeTransport: beforeTransport
@@ -815,6 +836,95 @@ struct TransportDispatcher: OperationTraceDispatching {
             router: router,
             cache: cache
         )
+    }
+
+    static func seekWithExactPositionDisplay(
+        requestedPosition: String, beforeTransport: TransportState?,
+        router: ChannelRouter, cache: StateCache, traceID: TraceID?,
+        selectDisplay: () -> ControlBarDisplayMode.Switch,
+        canSeek: (ControlBarDisplayMode.Lease) -> Bool,
+        restoreDisplay: (ControlBarDisplayMode.Lease) -> ControlBarDisplayMode.Restore
+    ) async -> CallTool.Result {
+        let base: [String: Any] = ["operation": "transport.goto_position", "requested": requestedPosition]
+        func refusal(_ detail: String) -> CallTool.Result {
+            toolTextResult(HonestContract.encodeStateC(
+                error: .readbackUnavailable, hint: detail,
+                extras: base.merging(["write_attempted": false, "playhead_write_attempted": false]) { _, new in new }),
+                isError: true)
+        }
+        func restore(_ lease: ControlBarDisplayMode.Lease) -> ControlBarDisplayMode.Restore {
+            guard !Task.isCancelled, OperationTraceContext.claimDeadlineEffect("seek_display_restore") else {
+                return .refused("seek_display_restore_not_permitted")
+            }
+            return restoreDisplay(lease)
+        }
+
+        guard let components = beforeTransport?.positionReadback?.observedComponents,
+              components.contains(.bar), components.contains(.beat),
+              await recordWriteBoundary(traceID, deadlineStage: "seek_display_switch") else {
+            return refusal("The musical playhead position could not be read before seeking.")
+        }
+        let lease: ControlBarDisplayMode.Lease
+        switch selectDisplay() {
+        case .switched(let observed):
+            lease = observed
+        case .unavailable(let reason):
+            return refusal(reason)
+        case .unsettled(let possibleLease, let reason):
+            let restored = possibleLease.map(restore) == .restored
+            return toolTextResult(HonestContract.encodeStateB(reason: .readbackUnavailable, extras: base.merging([
+                "display_mode_switch_unsettled": reason, "display_mode_restored": restored,
+                "write_attempted": true, "playhead_write_attempted": false,
+            ]) { _, new in new }), isError: true)
+        }
+
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(ControlBarDisplayMode.positionComponentsTimeout))
+        var exactBefore: TransportState?
+        repeat {
+            let state = await liveTransportState(router: router, cache: cache)
+            if completeObservedMusicalPosition(state) != nil {
+                exactBefore = state
+                break
+            }
+            try? await clock.sleep(for: .seconds(ControlBarDisplayMode.positionComponentsPollInterval))
+        } while clock.now < deadline && !Task.isCancelled
+
+        let result: CallTool.Result
+        if let exactBefore, canSeek(lease) {
+            result = await performGotoPosition(
+                requestedPosition: requestedPosition, beforeTransport: exactBefore,
+                router: router, cache: cache, traceID: traceID)
+        } else {
+            result = refusal("The exact playhead position or control-bar ownership was unavailable.")
+        }
+        let restoration = restore(lease)
+        var fields: [String: Any] = [
+            "display_mode_switched_from": lease.original, "display_mode_restored": restoration == .restored,
+        ]
+        if case .refused(let reason) = restoration {
+            fields["display_mode_restore_refused"] = reason
+        }
+        let evidence: [String: Any]
+        if case .text(let raw, _, _) = result.content.first {
+            evidence = decodedJSONObject(raw) ?? ["seek_response": raw]
+        } else {
+            evidence = [:]
+        }
+        var receipt = base.merging(evidence) { _, new in new }.merging(fields) { _, new in new }
+        receipt["playhead_write_attempted"] = evidence["write_attempted"] as? Bool ?? (exactBefore != nil && evidence["state"] == nil)
+        receipt["write_attempted"] = true
+        if restoration == .restored, evidence["state"] != nil,
+           let data = try? JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys]),
+           let json = String(data: data, encoding: .utf8) {
+            return toolTextResult(json, isError: result.isError == true)
+        }
+        receipt["position_verified"] = receipt.removeValue(forKey: "verified") as? Bool ?? false
+        receipt.removeValue(forKey: "success")
+        receipt.removeValue(forKey: "state")
+        receipt.removeValue(forKey: "reason")
+        receipt["safe_to_retry"] = false
+        return toolTextResult(HonestContract.encodeStateB(reason: .readbackUnavailable, extras: receipt), isError: true)
     }
 
     static func gotoPositionUnchangedResult(
