@@ -827,7 +827,7 @@ struct Issue369StemExportTests {
         builder.setRole(exportMenu, kAXMenuRole as String)
         for leaf in [stem, unrelated] {
             builder.setRole(leaf, kAXMenuItemRole as String)
-            builder.setAttribute(leaf, kAXTitleAttribute as String, "1 Track as Audio File…")
+            builder.setAttribute(leaf, kAXTitleAttribute as String, "All Tracks as Audio Files…")
             builder.setAttribute(leaf, kAXEnabledAttribute as String, true)
         }
         builder.setChildren(menuBar, [file])
@@ -848,7 +848,8 @@ struct Issue369StemExportTests {
         let exportCandidateWasFound = surface.openExportMenu() == .available
         #expect(exportCandidateWasFound)
         #expect(surface.resolveStemLeaf() == .available)
-        surface.pickStemLeaf()
+        let actionSurface = AXSurface(runtime: builder.makeLogicRuntime(appElement: app))
+        actionSurface.pickStemLeaf()
         #expect(builder.actionCalls.last?.elementID == 7)
         #expect(builder.actionCalls.last?.action == ProjectStemExportPanelDriver.stemLeafPickAction)
 
@@ -856,12 +857,12 @@ struct Issue369StemExportTests {
         builder.setChildren(exportMenu, [])
         #expect(surface.resolveStemLeaf() == .unavailable(ProjectStemExportPanelDriver.stemLeafLabelNotMeasuredReason))
         let actionsBefore = builder.actionCalls.count
-        surface.pickStemLeaf()
+        actionSurface.pickStemLeaf()
         #expect(builder.actionCalls.count == actionsBefore)
 
         builder.setChildren(exportMenu, [stem, unrelated])
         #expect(surface.resolveStemLeaf() == .unavailable("stem_export_menu_leaf_unavailable_after_open"))
-        surface.pickStemLeaf()
+        actionSurface.pickStemLeaf()
         #expect(builder.actionCalls.count == actionsBefore)
 
     }
