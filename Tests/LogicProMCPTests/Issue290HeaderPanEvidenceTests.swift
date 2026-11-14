@@ -91,7 +91,12 @@ struct Issue290HeaderPanEvidenceTests {
         #expect(b.actionCalls.isEmpty && b.setCalls.isEmpty)
     }
 
-    @Test func namedValueIndicatorWorksWhenHelpReadsAreSuppressed() throws {
+    @Test(arguments: [
+        ("0 Pan", true), ("23 of 64, Left Channel Pan", true),
+        ("22 of 63, Right Channel Pan", true), ("0 Volume", false),
+        ("23 of 64, Left Channel Volume", false), ("64 of 63, Right Channel Pan", false)
+    ])
+    func namedValueIndicatorWorksWhenHelpReadsAreSuppressed(label: String, accepted: Bool) {
         let b = FakeAXRuntimeBuilder()
         let header = b.element(29120)
         let slider = b.element(29121)
@@ -99,7 +104,7 @@ struct Issue290HeaderPanEvidenceTests {
         b.setRole(header, kAXLayoutItemRole as String)
         b.setRole(slider, kAXSliderRole as String)
         b.setRole(indicator, kAXValueIndicatorRole as String)
-        b.setAttribute(indicator, kAXDescriptionAttribute as String, "0 Pan")
+        b.setAttribute(indicator, kAXDescriptionAttribute as String, label)
         b.setAttribute(slider, kAXMinValueAttribute as String, 0)
         b.setAttribute(slider, kAXMaxValueAttribute as String, 127)
         b.setChildren(header, [slider])
@@ -108,9 +113,7 @@ struct Issue290HeaderPanEvidenceTests {
         let selected = AXHelpers.HelpReadGuard.$current.withValue(.init(allowHelpReads: false, stop: { false })) {
             AXLogicProElements.findPanControlInHeader(header, runtime: b.makeAXRuntime(), requireIdentity: true)
         }
-        #expect(selected.map { CFEqual($0, slider) } == true)
-        b.setAttribute(indicator, kAXDescriptionAttribute as String, "0 Volume")
-        #expect(AXLogicProElements.findPanControlInHeader(header, runtime: b.makeAXRuntime(), requireIdentity: true) == nil)
+        #expect((selected.map { CFEqual($0, slider) } == true) == accepted)
     }
 
     /// A header holding volume slider A beside a group that holds slider B. With `flaky`, the
