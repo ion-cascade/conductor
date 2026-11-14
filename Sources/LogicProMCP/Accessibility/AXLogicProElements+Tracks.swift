@@ -710,6 +710,12 @@ extension AXLogicProElements {
             return .unavailable
         }
 
+        if observingExposure == nil,
+           ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+           let rail = logic13PrimaryTrackRail(in: window, runtime: runtime.ax) {
+            return enumerateTrackHeaderRows(in: rail, runtime: runtime.ax)
+        }
+
         // Preserve this shared reader's historic tolerance for an unrelated
         // subtree being mid-load. `allTrackHeadersVerifiedRead` below is the
         // fail-closed variant used by a mutation verdict.

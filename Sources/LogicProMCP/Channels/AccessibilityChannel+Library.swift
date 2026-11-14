@@ -803,6 +803,16 @@ extension AccessibilityChannel {
             requestedTrackIndex = nil
         }
 
+        let usingLogic13Browser = ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1"
+        if usingLogic13Browser, pathSegments != ["Acoustic Piano", "Studio Grand"] {
+            return .error(HonestContract.encodeStateC(
+                error: .notImplemented,
+                hint: "The Logic 13 Browser adapter supports the factory Acoustic Piano/Studio Grand patch.",
+                extras: ["operation": "track.set_instrument", "requested_path": resolvedPath,
+                         "reason": "instrument_path_unsupported", "write_attempted": false]
+            ))
+        }
+
         var targetTrackIndex = requestedTrackIndex
         var targetTrackName: Any = NSNull()
 
@@ -983,8 +993,7 @@ extension AccessibilityChannel {
             }
         }
 
-        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
-           let targetTrackIndex, resolvedPath == "Acoustic Piano/Studio Grand" {
+        if usingLogic13Browser, let targetTrackIndex {
             return await setLogic13Instrument(index: targetTrackIndex, path: resolvedPath, preset: preset, runtime: runtime)
         }
 

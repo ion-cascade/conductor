@@ -116,6 +116,7 @@ extension AccessibilityChannel {
             if current(), stopped() {
                 return .success(HonestContract.encodeStateA(extras: [
                     "operation": "track.set_instrument", "requested_path": path, "observed_patch_name": preset,
+                    "observed_track_type": TrackType.softwareInstrument.rawValue,
                     "target_track_index": index, "target_track_name": name, "write_attempted": true,
                     "verify_source": "selected_browser_row_and_bound_inspector_settings"
                 ]))

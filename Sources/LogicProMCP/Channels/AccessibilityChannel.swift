@@ -1600,8 +1600,23 @@ actor AccessibilityChannel: Channel {
             var stripElements: [AXUIElement]?
             var strips: [ChannelStripState]?
             var presentation: AXLogicProElements.MixerPresentationRead?
-            let lookup = try AXLogicProElements.mixerPopulationAreaLookup(in: window, runtime: logic,
-                requiresCompleteAbsence: true, observingExposure: exposure, checking: checkAXRead)
+            let directToolbar: AXUIElement?
+            if !wantsStrips, exposure == nil,
+               ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
+                directToolbar = AXLogicProElements.logic13ControlBarContainer(in: window, runtime: logic.ax)
+            } else {
+                directToolbar = nil
+            }
+            let lookup: (lookup: AXLogicProElements.MixerAreaLookup, binding: AXLogicProElements.MixerAreaBinding?)
+            if let directToolbar,
+               let toggle = AXLogicProElements.directToolbarControl(AXLocalePolicy.controlBarMixerToggle,
+                   in: directToolbar, runtime: logic.ax),
+               AXValueExtractors.extractButtonState(toggle, runtime: logic.ax) == false {
+                lookup = (.notFound, nil)
+            } else {
+                lookup = try AXLogicProElements.mixerPopulationAreaLookup(in: window, runtime: logic,
+                    requiresCompleteAbsence: true, observingExposure: exposure, checking: checkAXRead)
+            }
             let mixerVisible: Bool?
             switch lookup.lookup {
             case .found: mixerVisible = true
@@ -1628,8 +1643,20 @@ actor AccessibilityChannel: Channel {
                     }
                 }
             }
-            let transport = try AXLogicProElements.observedTransportActivity(in: window, runtime: logic,
-                observingExposure: exposure, checking: checkAXRead)
+            let transport: AXLogicProElements.ObservedTransportActivity?
+            if let directToolbar,
+               let play = AXLogicProElements.directToolbarControl(AXLocalePolicy.transportPlayControl,
+                   in: directToolbar, runtime: logic.ax),
+               let record = AXLogicProElements.directToolbarControl(AXLocalePolicy.transportRecordControl,
+                   in: directToolbar, runtime: logic.ax),
+               let playing = AXValueExtractors.extractButtonState(play, runtime: logic.ax),
+               let recording = AXValueExtractors.extractButtonState(record, runtime: logic.ax) {
+                transport = .init(controlBar: directToolbar, play: play, record: record,
+                    isPlaying: playing, isRecording: recording)
+            } else {
+                transport = try AXLogicProElements.observedTransportActivity(in: window, runtime: logic,
+                    observingExposure: exposure, checking: checkAXRead)
+            }
             let host = try readObservedHost(in: window, checking: checkAXRead)
             let hiddenView = wantsTracks ? readHiddenView(headers, in: window) : nil
             let singlePageEnd = wantsTracks ? try readSinglePageEnd(headers, tracks: tracks, hiddenView: hiddenView, in: window) : nil

@@ -1373,8 +1373,13 @@ extension AccessibilityChannel {
         runtime: AXHelpers.Runtime,
         site: ModalSheetScanFailureDetail.Site,
         ancestorPath: [ModalSheetScanFailureDetail.PathStep] = [],
-        elementRole: String? = nil
+        elementRole: String? = nil,
+        withinLogic13Browser: Bool = false
     ) -> SheetLookup {
+        // Logic 13's Library Browser table contains virtual patch rows, not
+        // modal hosts. Walk its enclosing groups and sibling controls, while
+        // leaving the thousands of table data rows out of the sheet census.
+        if withinLogic13Browser && elementRole == kAXTableRole as String { return .absent }
         guard maxDepth > 0 else {
             return .incomplete(
                 .descendantTraversalDepthCap,
@@ -1456,13 +1461,17 @@ extension AccessibilityChannel {
 
             // Only descend after the direct-child pass did not find a sheet.
             for (child, role, index) in nonSheetChildren {
+                let isPrimaryBrowser = ancestorPath.isEmpty && role == kAXGroupRole as String
+                    && ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1"
+                    && AXHelpers.getDescription(child, runtime: runtime) == "Browser"
                 switch findSheetDescendantLookup(
                     in: child,
                     maxDepth: maxDepth - 1,
                     runtime: runtime,
                     site: .recursiveDescendantWalk,
                     ancestorPath: ancestorPath + [.init(parentRole: elementRole, childIndex: index)],
-                    elementRole: role
+                    elementRole: role,
+                    withinLogic13Browser: withinLogic13Browser || isPrimaryBrowser
                 ) {
                 case .found(let sheet):
                     return .found(sheet)
