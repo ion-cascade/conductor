@@ -39,7 +39,9 @@ class BrokerTests(unittest.TestCase):
   ra=self.recv(fa);rb=self.recv(fb)
   self.assertEqual(ra['id'],rb['id']);self.assertEqual(ra['result']['pid'],rb['result']['pid'])
   self.assertEqual(ra['result']['value'],{'a':1});self.assertEqual(rb['result']['value'],{'b':2})
-  self.assertEqual([ra['result']['count'],rb['result']['count']],[2,3])
+  # Client reader threads may enqueue in either order; IDs and payloads must
+  # still reach the correct client and each request must execute exactly once.
+  self.assertEqual(sorted([ra['result']['count'],rb['result']['count']]),[2,3])
  def test_disconnect_after_write_never_replays_and_next_client_recovers(self):
   a,fa=self.connect();b,fb=self.connect();self.send(a,'slow',2)
   deadline=time.monotonic()+2
