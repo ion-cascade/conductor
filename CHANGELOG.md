@@ -8,9 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [0.2.0] — 2026-11-14
 
-- Verify MIDI import through MCP on Logic Pro 13, including transfer to a selected Studio Grand track and exact note readback from native SMF export.
+- Verify MIDI import through MCP on Logic Pro 13, including transfer to a selected Studio Grand track and exact note readback from native SMF export. Verify Arrange keyboard focus during the transfer and report whether the Library was restored when temporarily closed.
 - Verify short per-track exports from completed, decoded WAV or AIFF files in a private run directory. Attributing several files to several tracks remains outside the verified path.
-- Renew the export’s region inventory on the held project before planning and check the complete track population before binding a single result.
+- Resolve the stem export command within File → Export. Renew the export’s region inventory on the held project before planning and check the complete track population before binding a single result.
 - Bound Library-open track discovery and modal reads. Add verified hidden-track view control, Studio Grand selection and readback, and a bounded Save As dialog lookup.
 - Preserve the active bridge’s socket and PID when a second process tries to start. Document reconnection and startup for the Terminal-launched bridge.
 
