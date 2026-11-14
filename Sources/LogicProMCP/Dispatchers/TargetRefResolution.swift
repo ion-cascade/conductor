@@ -124,7 +124,10 @@ enum TargetRefResolver {
                 return .success(.init(index: binding.descriptor.trackIndex, reference: binding.reference, binding: binding))
             }
 
-            if let physical = binding.physicalTrack, operation == "track.rename" {
+            // These writers retain the physical carrier through their last native action.
+            // Other paths still require the older ordinal and unique-name corroboration.
+            let hasPhysicalWriter = ["track.rename", "track.select", "mixer.set_volume", "mixer.set_pan"].contains(operation)
+            if let physical = binding.physicalTrack, hasPhysicalWriter {
                 guard let index = physical.currentIndex() else {
                     return .failure(staleTargetReferenceResult(rawReference, operation: operation,
                         hint: "The retained track is no longer in its issued project/window"))
@@ -147,6 +150,10 @@ enum TargetRefResolver {
                       await validateProjectReference(params, targetRegistry: targetRegistry, operation: operation) == nil else {
                     return .failure(staleTargetReferenceResult(rawReference, operation: operation))
                 }
+                await OperationTraceContext.record(.targetResolved, attributes: [
+                    "target_ref": binding.reference.rawValue,
+                    "outcome": "resolved",
+                ])
                 return .success(Resolved(index: index, reference: binding.reference, binding: binding))
             }
             // Other writers retain their original ordinal/name semantics and every original

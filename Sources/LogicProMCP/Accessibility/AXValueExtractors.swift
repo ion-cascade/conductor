@@ -362,6 +362,8 @@ enum AXValueExtractors {
         }
         let stack = extractTrackStackState(from: header, runtime: runtime, observingChildren: observingStackChildren)
 
+        let volume = extractTrackHeaderVolume(from: header, runtime: runtime, observingExposure: observingExposure)
+        let pan = extractTrackHeaderPan(from: header, runtime: runtime, observingExposure: observingExposure)
         return TrackState(
             id: index,
             name: extractedName.name,
@@ -372,8 +374,10 @@ enum AXValueExtractors {
             isInputMonitoring: inputMonitoring,
             isSelected: selected ?? false,
             selectionReadback: selected,
-            volume: extractTrackHeaderVolume(from: header, runtime: runtime, observingExposure: observingExposure),
-            pan: extractTrackHeaderPan(from: header, runtime: runtime, observingExposure: observingExposure),
+            volume: volume ?? 0,
+            pan: pan ?? 0,
+            observedVolume: volume,
+            observedPan: pan,
             automationMode: extractTrackAutomationMode(from: header, runtime: runtime, observingExposure: observingExposure),
             color: extractTrackColor(from: header, runtime: runtime),
             liveIdentityBacked: extractedName.liveIdentityBacked,
@@ -459,34 +463,32 @@ enum AXValueExtractors {
 
     /// Real track-header volume as the public mixer contract (WS3 AC2). Reads
     /// the SAME per-track header fader the #107 write path drives, via
-    /// `extractLogicMixerFaderValue`. Returns `0.0` (the pre-fix fabricated
-    /// default) when the fader or its value is unreadable.
+    /// `extractLogicMixerFaderValue`. A missing control or value is absent.
     private static func extractTrackHeaderVolume(
         from header: AXUIElement,
         runtime: AXHelpers.Runtime,
         observingExposure: AXTrackBinding.Exposure?
-    ) -> Double {
+    ) -> Double? {
         guard let fader = AXLogicProElements.findVolumeFader(in: header, runtime: runtime, observingExposure: observingExposure),
               let contract = extractLogicMixerFaderValue(fader, runtime: runtime) else {
-            return 0.0
+            return nil
         }
         return contract
     }
 
     /// Real track-header pan as the public -1.0...1.0 contract (WS3 AC2). Uses
     /// the same `headerPanContract` mapping as the #107 write-path readback.
-    /// Returns `0.0` (center — the pre-fix fabricated default) when the pan
-    /// slider, its range, or its value is unreadable.
+    /// Unreadable pan evidence is absent.
     private static func extractTrackHeaderPan(
         from header: AXUIElement,
         runtime: AXHelpers.Runtime,
         observingExposure: AXTrackBinding.Exposure?
-    ) -> Double {
+    ) -> Double? {
         guard let slider = AXLogicProElements.findPanControlInHeader(header, runtime: runtime, observingExposure: observingExposure),
               let range = extractSliderRange(slider, runtime: runtime),
               range.max > range.min,
               let contract = headerPanContract(slider, range: range, runtime: runtime) else {
-            return 0.0
+            return nil
         }
         return contract
     }

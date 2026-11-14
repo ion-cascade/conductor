@@ -231,11 +231,13 @@ extension ResourceHandlers {
             }
         }
 
+        let recent = cacheFetchedAt > .distantPast && Date().timeIntervalSince(cacheFetchedAt) <= 5 && !axOccluded
+        let coherent = ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] == "1"
         let body: String
-        if FeatureFlags.adr002TargetRef, let targetRegistry, let targetSnapshot {
+        if coherent || targetSnapshot != nil {
             // Only rows observed live carry an identity; the file-count tiers synthesise names.
             var references: [TargetReference?] = Array(repeating: nil, count: tracksOut.count)
-            if source == "ax_live" {
+            if source == "ax_live", let targetRegistry, let targetSnapshot {
                 guard let issued = await TrackReferenceIssuance.issue(
                     for: tracksOut,
                     registry: targetRegistry,
@@ -249,11 +251,20 @@ extension ResourceHandlers {
             payload.reserveCapacity(tracksOut.count)
             for (track, reference) in zip(tracksOut, references) {
                 var object = jsonObject(track) as? [String: Any] ?? [:]
-                if ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] == "1" {
-                    object.removeValue(forKey: "pan")
+                if coherent {
+                    let currentHeader = source == "ax_live" && recent && track.liveIdentityBacked
+                    var unavailable = ["automationMode", "type"]
+                    for (key, value) in [("volume", track.observedVolume), ("pan", track.observedPan)] {
+                        if currentHeader, let value {
+                            object[key] = value
+                        } else {
+                            object.removeValue(forKey: key)
+                            unavailable.append(key)
+                        }
+                    }
                     object.removeValue(forKey: "automationMode")
                     object["type"] = "unknown"
-                    object["unavailable_fields"] = ["pan", "automationMode", "type"]
+                    object["unavailable_fields"] = unavailable
                 }
                 if let reference {
                     object["track_ref"] = reference.rawValue
@@ -270,8 +281,7 @@ extension ResourceHandlers {
         // that demonstrably has tracks. `ax_live` is the only source that saw the real thing; the
         // file-count tiers synthesise placeholder names from a count, and cold scalar feedback
         // can populate cache rows without observing their identities.
-        let recent = cacheFetchedAt > .distantPast && Date().timeIntervalSince(cacheFetchedAt) <= 5 && !axOccluded
-        if ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] == "1", source == "ax_live", !recent { source = "cache" }
+        if coherent, source == "ax_live", !recent { source = "cache" }
         let observedLive = source == "ax_live"
         let collapsedStacks = collapsedTrackStacks(in: tracksOut)
         // This legacy cache holds exposed rows, not a request-owned project population witness.

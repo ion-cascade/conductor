@@ -91,6 +91,28 @@ struct Issue290HeaderPanEvidenceTests {
         #expect(b.actionCalls.isEmpty && b.setCalls.isEmpty)
     }
 
+    @Test func namedValueIndicatorWorksWhenHelpReadsAreSuppressed() throws {
+        let b = FakeAXRuntimeBuilder()
+        let header = b.element(29120)
+        let slider = b.element(29121)
+        let indicator = b.element(29122)
+        b.setRole(header, kAXLayoutItemRole as String)
+        b.setRole(slider, kAXSliderRole as String)
+        b.setRole(indicator, kAXValueIndicatorRole as String)
+        b.setAttribute(indicator, kAXDescriptionAttribute as String, "0 Pan")
+        b.setAttribute(slider, kAXMinValueAttribute as String, 0)
+        b.setAttribute(slider, kAXMaxValueAttribute as String, 127)
+        b.setChildren(header, [slider])
+        b.setChildren(slider, [indicator])
+        b.setChildren(indicator, [])
+        let selected = AXHelpers.HelpReadGuard.$current.withValue(.init(allowHelpReads: false, stop: { false })) {
+            AXLogicProElements.findPanControlInHeader(header, runtime: b.makeAXRuntime(), requireIdentity: true)
+        }
+        #expect(selected.map { CFEqual($0, slider) } == true)
+        b.setAttribute(indicator, kAXDescriptionAttribute as String, "0 Volume")
+        #expect(AXLogicProElements.findPanControlInHeader(header, runtime: b.makeAXRuntime(), requireIdentity: true) == nil)
+    }
+
     /// A header holding volume slider A beside a group that holds slider B. With `flaky`, the
     /// group answers its children once and then answers empty, so a second walk of the header
     /// sees a different inventory than the first.

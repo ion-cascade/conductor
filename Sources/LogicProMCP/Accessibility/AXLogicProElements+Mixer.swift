@@ -2094,6 +2094,23 @@ extension AXLogicProElements {
         return observed
     }
 
+    /// Logic 13's track-header slider exposes a direct AXValueIndicator
+    /// such as “0 Pan” even during reads that suppress focus-moving AXHelp.
+    private static func hasTrackPanValueIndicator(_ slider: AXUIElement, runtime: AXHelpers.Runtime) -> Bool {
+        guard let range = AXValueExtractors.extractSliderRange(slider, runtime: runtime),
+              range.min == 0, range.max == headerPanSliderMaxValue,
+              case .success(let children) = AXHelpers.childrenResult(slider, runtime: runtime)
+        else { return false }
+        let indicators = children.filter { AXHelpers.getRole($0, runtime: runtime) == kAXValueIndicatorRole as String }
+        guard indicators.count == 1, let indicator = indicators.first else { return false }
+        return [AXHelpers.getDescription(indicator, runtime: runtime), AXHelpers.getTitle(indicator, runtime: runtime)]
+            .compactMap { $0 }.contains { label in
+                let words = label.split(whereSeparator: \.isWhitespace)
+                return label == "Pan" || (words.count == 2 && words[1] == "Pan"
+                    && Int(words[0]).map { (-64...64).contains($0) } == true)
+            }
+    }
+
     static func findPanControl(
         in strip: AXUIElement,
         runtime: AXHelpers.Runtime = .production,
@@ -2113,7 +2130,9 @@ extension AXLogicProElements {
         }
         let described = sliders.filter {
             let identity = sliderText($0, runtime: ax)
-            return identity.isPanControl && !identity.isVolumeFader
+            guard !identity.isVolumeFader else { return false }
+            return identity.isPanControl || (requireUnique && !allowElimination
+                && hasTrackPanValueIndicator($0, runtime: ax))
         }
         if requireUnique {
             guard !failures.any else { return nil }

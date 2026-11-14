@@ -109,6 +109,9 @@ struct TrackState: Sendable, Codable, Identifiable {
     var hideButtonReadback: Bool? = nil
     var volume: Double = 0.0   // dB, 0 = unity
     var pan: Double = 0.0      // -1.0 (L) to 1.0 (R)
+    /// Verified header scalars from the typed native observation. Legacy cached defaults are not evidence.
+    var observedVolume: Double? = nil
+    var observedPan: Double? = nil
     var automationMode: AutomationMode = .off
     /// Never populated. Logic exposes no colour observable to read it from: measured 2026-09-09
     /// over 1406 elements to depth 16, including the palette opened via View > Colors, there is no
