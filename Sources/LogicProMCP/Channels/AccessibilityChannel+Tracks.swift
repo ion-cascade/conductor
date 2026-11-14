@@ -2239,7 +2239,9 @@ extension AccessibilityChannel {
         // no-op (#106 sites-6/7), so trusting the return would fabricate a
         // State A on a control that never moved.
         func readValue() -> Bool? {
-            guard isCurrent(), let v = AXHelpers.getValue(button, runtime: runtime.ax) else { return nil }
+            guard isCurrent() else { return nil }
+            if held != nil { return AXValueExtractors.extractButtonState(button, runtime: runtime.ax) }
+            guard let v = AXHelpers.getValue(button, runtime: runtime.ax) else { return nil }
             if let n = v as? NSNumber { return n.boolValue }
             if let b = v as? Bool { return b }
             if let i = v as? Int { return i != 0 }
