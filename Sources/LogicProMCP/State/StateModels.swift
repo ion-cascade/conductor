@@ -593,6 +593,9 @@ struct RegionInfo: Sendable, Codable {
     var endBar: Int
     var kind: String  // "midi" | "audio" | "drummer" | "unknown"
     var rawHelp: String?  // raw AXHelp text — preserved for debugging parser misses
+    /// The region’s own AXSelected value when the bound Arrange reader could observe it.
+    /// An unavailable value stays absent in inventory JSON.
+    var isSelected: Bool? = nil
 }
 
 struct RegionInventoryPayload: Codable, Sendable {

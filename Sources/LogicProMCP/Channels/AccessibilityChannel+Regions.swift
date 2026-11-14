@@ -307,7 +307,10 @@ extension AccessibilityChannel {
                     startBar: startBar,
                     endBar: endBar,
                     kind: kind,
-                    rawHelp: help
+                    rawHelp: help,
+                    isSelected: directArrangeRead
+                        ? AXValueExtractors.extractSelectedState(item, runtime: runtime.ax)
+                        : nil
                 )
             ))
         }
