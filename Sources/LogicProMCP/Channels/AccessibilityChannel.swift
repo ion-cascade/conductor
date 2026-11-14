@@ -2053,6 +2053,12 @@ actor AccessibilityChannel: Channel {
         case "view.set_mixer_visibility":
             return await Self.defaultSetMixerVisibility(params: params, runtime: runtime.logicRuntime)
 
+        case "view.set_hidden_tracks_visibility":
+            guard let visible = params["visible"], visible == "true" || visible == "false" else {
+                return .error(HonestContract.encodeStateC(error: .invalidParams, hint: "visible must be a boolean"))
+            }
+            return await Self.setHiddenTrackViewVisibility(visible == "true", runtime: runtime.logicRuntime)
+
         // MARK: - Track reads
         case "track.get_tracks":
             // v3.1.8 (Issue #7) — AX-only at the channel layer. The v3.1.5

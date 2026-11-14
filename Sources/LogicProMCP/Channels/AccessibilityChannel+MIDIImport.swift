@@ -661,6 +661,8 @@ extension AccessibilityChannel {
                 "via": "ax_menu_import",
                 "file_open_dialog_seen": fileOpenSeen,
                 "tempo_dialog_seen": tempoSeen,
+                "write_attempted": true,
+                "safe_to_retry": false,
             ]
             if let beforeRegions {
                 extras["region_count_before"] = beforeRegions.count

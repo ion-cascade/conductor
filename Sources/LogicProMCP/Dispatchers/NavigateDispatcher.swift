@@ -7,7 +7,7 @@ struct NavigateDispatcher: OperationTraceDispatching {
 
     static let tool = Tool(
         name: "logic_navigate",
-        description: "Navigation and markers in Logic Pro. Commands: goto_bar, goto_marker, capture_markers, create_marker, delete_marker, rename_marker, zoom_to_fit, set_zoom, toggle_view. BREAKING since v3.3.0: delete_marker / rename_marker require explicit `index` (Int ≥ 0) — pre-v3.3.0 missing `index` defaulted to 0 and silently mutated marker 0; rename_marker also rejects empty `name`. Params: goto_bar -> { bar: Int }; goto_marker -> { index: Int } or { name: String }; capture_markers -> {} (explicit opt-in capture that may temporarily open Marker List; State A requires capture and UI-restoration readback); create_marker -> { name: String }; rename_marker -> { index: Int (required, ≥ 0), name: String (required, non-empty) } (independent readback required for State A); delete_marker -> { index: Int (required, ≥ 0) }; set_zoom -> { level: String, axis?: String } (in|out|fit|1..10; axis defaults to horizontal; vertical changes track height and does not support fit); toggle_view -> { view: String, visible?: Bool } (mixer|piano_roll|score|step_editor|library|inspector|automation). visible is Mixer-only and requests its observed final visibility; omitted visible preserves the legacy blind toggle.",
+        description: "Navigation and markers in Logic Pro. Commands: goto_bar, goto_marker, capture_markers, create_marker, delete_marker, rename_marker, zoom_to_fit, set_zoom, toggle_view. BREAKING since v3.3.0: delete_marker / rename_marker require explicit `index` (Int ≥ 0) — pre-v3.3.0 missing `index` defaulted to 0 and silently mutated marker 0; rename_marker also rejects empty `name`. Params: goto_bar -> { bar: Int }; goto_marker -> { index: Int } or { name: String }; capture_markers -> {} (explicit opt-in capture that may temporarily open Marker List; State A requires capture and UI-restoration readback); create_marker -> { name: String }; rename_marker -> { index: Int (required, ≥ 0), name: String (required, non-empty) } (independent readback required for State A); delete_marker -> { index: Int (required, ≥ 0) }; set_zoom -> { level: String, axis?: String } (in|out|fit|1..10; axis defaults to horizontal; vertical changes track height and does not support fit); toggle_view -> { view: String, visible?: Bool } (mixer|hidden_tracks|piano_roll|score|step_editor|library|inspector|automation). visible requests observed final visibility for mixer or hidden_tracks; hidden_tracks requires visible and controls Toggle Hide View without changing any track Hide flags. Omitted visible preserves the legacy blind toggle for other views.",
         inputSchema: commandParamsToolSchema(commandDescription: "Navigation command to execute")
     )
 
@@ -345,17 +345,20 @@ struct NavigateDispatcher: OperationTraceDispatching {
             }
             let view = stringParam(params, "view", default: "mixer")
             if params["visible"] != nil {
-                guard view == "mixer" else {
-                    return toolInvalidParamsResult("visible is supported only for the Mixer view")
+                guard view == "mixer" || view == "hidden_tracks" else {
+                    return toolInvalidParamsResult("visible is supported only for mixer and hidden_tracks views")
                 }
                 guard case .value(let visible) = strictBoolParam(params, "visible") else {
                     return toolInvalidParamsResult("visible must be a JSON boolean")
                 }
                 let traceID = await startTraceIfEnabled(command: command)
                 let result = await withWriteBoundaryArmed(traceID) {
-                    await router.route(operation: "view.set_mixer_visibility", params: ["visible": String(visible)])
+                    await router.route(operation: view == "mixer" ? "view.set_mixer_visibility" : "view.set_hidden_tracks_visibility", params: ["visible": String(visible)])
                 }
                 return await finalizeTrace(toolTextResultTreatingUnverifiedAsError(result), traceID: traceID)
+            }
+            if view == "hidden_tracks" {
+                return toolInvalidParamsResult("hidden_tracks requires explicit visible: true or false")
             }
             let operation: String
             switch view {

@@ -79,6 +79,7 @@ private struct DisplayModeFixture {
     /// `lagReads`: how many reads of the popup's value still return the previous mode after a
     /// press, as Logic 12.4 does (measured 2026-10-26).
     func runtime(
+        openingAction: String = kAXShowMenuAction as String,
         pressChangesValue: Bool = true,
         lagReads: Int = 0,
         failingPressTitle: String? = nil,
@@ -120,7 +121,7 @@ private struct DisplayModeFixture {
             },
             setAttributeHandler: nil, performActionHandler: { element, action in
                 actions.calls.append((builder.elementID(element), action))
-                if action == kAXShowMenuAction as String, CFEqual(element, popup) {
+                if action == openingAction, CFEqual(element, popup) {
                     builder.setChildren(popup, [menu])
                     if let projectChangeOnShowMenu {
                         builder.setAttribute(window, kAXDocumentAttribute as String, projectChangeOnShowMenu)
@@ -224,6 +225,21 @@ private enum DisplayModeFixtureError: Error { case notSwitched }
     #expect(fixture.value == "Beats & Project")
     let presses = fixture.actions.calls.filter { $0.action == kAXPressAction as String }.map(\.id)
     #expect(presses == [fixture.id("Beats"), fixture.id("Beats & Project")])
+}
+
+@Test func testLogic13DisplayModeOpensWithPressOnSwitchAndRestore() throws {
+    let fixture = DisplayModeFixture()
+    let action = kAXPressAction as String
+    let runtime = fixture.runtime(openingAction: action)
+    let switched = ControlBarDisplayMode.selectBeats(
+        in: fixture.popup, window: fixture.window, runtime: runtime, menuOpeningAction: action)
+    guard case .switched(let lease) = switched else { throw DisplayModeFixtureError.notSwitched }
+    #expect(fixture.value == "Beats")
+    #expect(ControlBarDisplayMode.restore(lease, window: fixture.window, popup: fixture.popup, runtime: runtime)
+        == .restored)
+    #expect(fixture.value == "Beats & Project")
+    #expect(fixture.actions.calls.filter { $0.id == fixture.builder.elementID(fixture.popup) }.map(\.action)
+        == [action, action, action])
 }
 
 @Test func testDisplayModeSwitchLeavesBeatsAlone() {

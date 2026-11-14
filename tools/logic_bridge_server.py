@@ -4,7 +4,7 @@
 A disconnected client never cancels or replays an attempted UI action. Upstream
 failure closes clients; reconnect must acquire fresh references in a new session.
 """
-import fcntl, json, os, queue, select, signal, socket, stat, subprocess, sys, threading, time
+import fcntl, json, os, queue, select, signal, socket, stat, subprocess, sys, tempfile, threading, time
 from pathlib import Path
 
 MAX_LINE = 2 * 1024 * 1024
@@ -180,37 +180,70 @@ def main():
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     if root.is_symlink() or root.stat().st_uid != os.getuid() or root.stat().st_mode & 0o077:
         raise SystemExit('bridge directory must be owned by user and inaccessible to others')
-    lock = open(root/'bridge.lock', 'a+')
-    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    path = root/'bridge.sock'
+    with (root / 'bridge.lock').open('a+') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SystemExit('another bridge already owns this directory')
+        serve_locked(root)
+
+
+def serve_locked(root):
+    path = root / 'bridge.sock'
+    pid_path = root / 'bridge.pid'
     if path.exists() or path.is_symlink():
         info = path.lstat()
-        if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid(): raise SystemExit('refusing to replace non-owned socket path')
+        if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
+            raise SystemExit('refusing to replace non-owned socket path')
         path.unlink()
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    old = os.umask(0o177)
-    try: server.bind(str(path))
-    finally: os.umask(old)
-    os.chmod(path, 0o600)
-    server.listen(MAX_CLIENTS)
-    server.settimeout(.25)
-    exe = Path(os.environ.get('LOGIC_MCP_EXECUTABLE', str(Path.home()/'Projects/logic-pro-mcp/local-bin/LogicProMCP')))
-    p = subprocess.Popen([str(exe)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr, bufsize=0,
-                         env=dict(os.environ, LOGIC_PRO_BUNDLE_ID='com.apple.logic10'))
-    broker = Broker(p)
-    signal.signal(signal.SIGTERM, lambda *_: broker.stopped.set())
-    signal.signal(signal.SIGINT, lambda *_: broker.stopped.set())
-    print('shared bridge ready', flush=True)
-    try:
-        while not broker.stopped.is_set():
-            try: conn, _ = server.accept()
-            except socket.timeout: continue
-            broker.accept(conn)
-    finally:
-        broker.close(); server.close()
-        if p.poll() is None: p.terminate()
-        try: p.wait(5)
-        except subprocess.TimeoutExpired: p.kill(); p.wait()
-        if path.exists() and stat.S_ISSOCK(path.lstat().st_mode): path.unlink()
+    pid_path.unlink(missing_ok=True)
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+        old = os.umask(0o177)
+        try:
+            server.bind(str(path))
+        finally:
+            os.umask(old)
+        process = None
+        broker = None
+        try:
+            os.chmod(path, 0o600)
+            server.listen(MAX_CLIENTS)
+            server.settimeout(.25)
+            executable = Path(os.environ.get(
+                'LOGIC_MCP_EXECUTABLE', str(Path.home() / 'Projects/logic-pro-mcp/local-bin/LogicProMCP')))
+            process = subprocess.Popen(
+                [str(executable)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=sys.stderr, bufsize=0, env=dict(os.environ, LOGIC_PRO_BUNDLE_ID='com.apple.logic10'))
+            broker = Broker(process)
+            signal.signal(signal.SIGTERM, lambda *_: broker.stopped.set())
+            signal.signal(signal.SIGINT, lambda *_: broker.stopped.set())
+            with tempfile.NamedTemporaryFile(mode='w', dir=root, prefix='bridge-pid-', delete=False) as receipt:
+                temporary_path = Path(receipt.name)
+                receipt.write(f'{os.getpid()}\n')
+            try:
+                temporary_path.replace(pid_path)
+            finally:
+                temporary_path.unlink(missing_ok=True)
+            print('shared bridge ready', flush=True)
+            while not broker.stopped.is_set():
+                try:
+                    connection, _ = server.accept()
+                except socket.timeout:
+                    continue
+                broker.accept(connection)
+        finally:
+            if broker is not None:
+                broker.close()
+            if process is not None:
+                if process.poll() is None:
+                    process.terminate()
+                try:
+                    process.wait(5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+            pid_path.unlink(missing_ok=True)
+            path.unlink(missing_ok=True)
+
 
 if __name__ == '__main__': main()

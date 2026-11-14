@@ -97,9 +97,9 @@ enum ProjectExportExecutor {
         /// Production route: private output namespace plus complete-file
         /// evidence, including exports too short to expose a progress window.
         var driveIsolatedStemExport: (@Sendable (String, Int) async -> ProjectIsolatedStemExportResult)? = nil
-        /// Set only from a fresh complete native population acquisition bound
-        /// to this project and its planned subjects. A cached count is not proof.
-        var isolatedSubjectBindingVerified = false
+        /// Acquire after project-open and before Export. A Boolean captured
+        /// before opening a project would outlive the track population it proved.
+        var verifyIsolatedSubjectBinding: (@Sendable (String, [ProjectExportStemSubject]) async -> Bool)? = nil
 
         static func live() -> Options {
             Options(

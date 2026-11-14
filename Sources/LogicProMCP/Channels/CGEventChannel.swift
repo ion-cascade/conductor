@@ -143,25 +143,29 @@ actor CGEventChannel: Channel {
     /// same values read on the main thread, a detached thread and a detached task (2-Set Korean,
     /// false), so the channel's actor can call it.
     static func readCurrentInputSource() -> InputSourceReading? {
-        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
-              let rawCapable = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsASCIICapable) else {
-            return nil
+        return NativeInputSources.withExclusiveAccess {
+            guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+                  let rawCapable = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsASCIICapable) else {
+                return nil
+            }
+            let capable = CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(rawCapable).takeUnretainedValue())
+            let id = TISGetInputSourceProperty(source, kTISPropertyInputSourceID)
+                .map { Unmanaged<CFString>.fromOpaque($0).takeUnretainedValue() as String }
+            return InputSourceReading(id: id, isASCIICapable: capable)
         }
-        let capable = CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(rawCapable).takeUnretainedValue())
-        let id = TISGetInputSourceProperty(source, kTISPropertyInputSourceID)
-            .map { Unmanaged<CFString>.fromOpaque($0).takeUnretainedValue() as String }
-        return InputSourceReading(id: id, isASCIICapable: capable)
     }
 
     /// #1039: the id of the keyboard layout TIS gives for ASCII typing under the current source
     /// (for 2-Set Korean, the layout its Latin mode types through). nil when TIS returns none or
     /// its id does not read. No other layout is guessed at.
     static func readASCIICapableLayoutID() -> String? {
-        guard let source = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue(),
-              let raw = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else {
-            return nil
+        return NativeInputSources.withExclusiveAccess {
+            guard let source = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue(),
+                  let raw = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else {
+                return nil
+            }
+            return Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String
         }
-        return Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String
     }
 
     /// #1039: `TISSelectInputSource` on the enabled source whose id is `id`. False when no enabled
@@ -169,50 +173,56 @@ actor CGEventChannel: Channel {
     /// actor, where `readCurrentInputSource` was measured to read; whether a selection made here
     /// reaches the keys Logic receives is the live check's to show.
     static func selectEnabledInputSource(id: String) -> Bool {
-        let filter = [kTISPropertyInputSourceID as String: id] as CFDictionary
-        guard let list = TISCreateInputSourceList(filter, false)?.takeRetainedValue(),
-              CFArrayGetCount(list) > 0,
-              let raw = CFArrayGetValueAtIndex(list, 0) else {
-            return false
+        return NativeInputSources.withExclusiveAccess {
+            let filter = [kTISPropertyInputSourceID as String: id] as CFDictionary
+            guard let list = TISCreateInputSourceList(filter, false)?.takeRetainedValue(),
+                  CFArrayGetCount(list) > 0,
+                  let raw = CFArrayGetValueAtIndex(list, 0) else {
+                return false
+            }
+            let source = Unmanaged<TISInputSource>.fromOpaque(raw).takeUnretainedValue()
+            return TISSelectInputSource(source) == noErr
         }
-        let source = Unmanaged<TISInputSource>.fromOpaque(raw).takeUnretainedValue()
-        return TISSelectInputSource(source) == noErr
     }
 
     /// #1039 review R1: the character the installed keyboard layout `layoutID` types for `keyCode`
     /// with no modifier, read from the layout's own key map. nil when no installed source has that
     /// id, it carries no Unicode key layout, or the translation produces nothing.
     static func readLayoutLetter(layoutID: String, keyCode: CGKeyCode) -> String? {
-        let filter = [kTISPropertyInputSourceID as String: layoutID] as CFDictionary
-        guard let list = TISCreateInputSourceList(filter, true)?.takeRetainedValue(),
-              CFArrayGetCount(list) > 0,
-              let raw = CFArrayGetValueAtIndex(list, 0) else {
-            return nil
+        return NativeInputSources.withExclusiveAccess {
+            let filter = [kTISPropertyInputSourceID as String: layoutID] as CFDictionary
+            guard let list = TISCreateInputSourceList(filter, true)?.takeRetainedValue(),
+                  CFArrayGetCount(list) > 0,
+                  let raw = CFArrayGetValueAtIndex(list, 0) else {
+                return nil
+            }
+            let source = Unmanaged<TISInputSource>.fromOpaque(raw).takeUnretainedValue()
+            guard let rawData = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else {
+                return nil
+            }
+            let data = Unmanaged<CFData>.fromOpaque(rawData).takeUnretainedValue()
+            guard let bytes = CFDataGetBytePtr(data) else { return nil }
+            let layout = UnsafeRawPointer(bytes).assumingMemoryBound(to: UCKeyboardLayout.self)
+            var deadKeyState: UInt32 = 0
+            var characters = [UniChar](repeating: 0, count: 4)
+            var length = 0
+            let status = UCKeyTranslate(
+                layout, UInt16(keyCode), UInt16(kUCKeyActionDown), 0, UInt32(LMGetKbdType()),
+                OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters
+            )
+            guard status == noErr, length > 0 else { return nil }
+            return String(utf16CodeUnits: characters, count: length)
         }
-        let source = Unmanaged<TISInputSource>.fromOpaque(raw).takeUnretainedValue()
-        guard let rawData = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else {
-            return nil
-        }
-        let data = Unmanaged<CFData>.fromOpaque(rawData).takeUnretainedValue()
-        guard let bytes = CFDataGetBytePtr(data) else { return nil }
-        let layout = UnsafeRawPointer(bytes).assumingMemoryBound(to: UCKeyboardLayout.self)
-        var deadKeyState: UInt32 = 0
-        var characters = [UniChar](repeating: 0, count: 4)
-        var length = 0
-        let status = UCKeyTranslate(
-            layout, UInt16(keyCode), UInt16(kUCKeyActionDown), 0, UInt32(LMGetKbdType()),
-            OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters
-        )
-        guard status == noErr, length > 0 else { return nil }
-        return String(utf16CodeUnits: characters, count: length)
     }
 
     /// #1039 review R2: whether an enabled input source has this id. A disabled layout still reads
     /// its key map (`readLayoutLetter` reads installed ones) but cannot be selected.
     static func isEnabledInputSource(id: String) -> Bool {
-        let filter = [kTISPropertyInputSourceID as String: id] as CFDictionary
-        guard let list = TISCreateInputSourceList(filter, false)?.takeRetainedValue() else { return false }
-        return CFArrayGetCount(list) > 0
+        return NativeInputSources.withExclusiveAccess {
+            let filter = [kTISPropertyInputSourceID as String: id] as CFDictionary
+            guard let list = TISCreateInputSourceList(filter, false)?.takeRetainedValue() else { return false }
+            return CFArrayGetCount(list) > 0
+        }
     }
 
     /// #1039 review R1: layouts that type the U.S. letter on every letter key, tried when TIS's

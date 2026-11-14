@@ -983,6 +983,11 @@ extension AccessibilityChannel {
             }
         }
 
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+           let targetTrackIndex, resolvedPath == "Acoustic Piano/Studio Grand" {
+            return await setLogic13Instrument(index: targetTrackIndex, path: resolvedPath, preset: preset, runtime: runtime)
+        }
+
         // #135/#141 — Library-panel PRECONDITION. selectPath walks AXStaticText
         // rows in the VISIBLE Library browser; if the panel is closed those
         // rows do not exist and selectPath fails with the misleading

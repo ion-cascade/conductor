@@ -15,7 +15,7 @@ struct ConductorExportFileWitnessTests {
         let output = root.appendingPathComponent("Output")
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: false)
         var options = fastOptions(identity: { project.path })
-        options.isolatedSubjectBindingVerified = populationVerified
+        options.verifyIsolatedSubjectBinding = { _, _ in populationVerified }
         options.driveIsolatedStemExport = { destination, count in
             #expect(count == 1)
             let witness = try! ProjectStemExportFileWitness(root: destination, expectedCount: count)

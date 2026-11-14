@@ -16,9 +16,7 @@ final class MIDITrackExportPanel {
             if key == 5 {
                 // No input-source selection. Refuse an unverified command key
                 // map; the subsequent GoToWindow observation proves delivery.
-                guard let layout = keys.asciiCapableLayoutID(),
-                      ["com.apple.keylayout.ABC", "com.apple.keylayout.US"].contains(layout),
-                      keys.layoutLetter(layout, key) == "g" else { return false }
+                guard Keyboard.goToFolderKeyIsMapped(using: keys) else { return false }
             }
             // This AppKit Save-panel route did not receive postToPid even
             // when that API returned true. Use the foreground event route only
@@ -37,9 +35,15 @@ final class MIDITrackExportPanel {
                 event.flags = spec.flags; events.append(event)
             }
             guard keys.isLogicFrontmost(), keys.focusedApplicationPID() == pid else { return false }
+            if key == 5 && !Keyboard.goToFolderKeyIsMapped(using: keys) { return false }
             for event in events { event.post(tap: .cghidEventTap) }
             return true
         })
+
+        static func goToFolderKeyIsMapped(using keys: CGEventChannel.Runtime) -> Bool {
+            guard let layout = keys.asciiCapableLayoutID(), keys.layoutIsEnabled(layout) else { return false }
+            return keys.layoutLetter(layout, 5) == "g"
+        }
     }
 
     enum Failure: Error, Equatable {

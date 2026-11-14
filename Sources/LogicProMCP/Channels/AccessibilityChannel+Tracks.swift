@@ -3077,11 +3077,7 @@ extension AccessibilityChannel {
     /// it is the character it carries that changes. Four operations moved from refusing to
     /// qualifying between two sweeps that differed in nothing else.
     static func activeInputSourceID() -> String? {
-        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
-              let raw = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else {
-            return nil
-        }
-        return Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String
+        CGEventChannel.readCurrentInputSource()?.id
     }
 
     /// Whether `id` is a plain Latin keyboard LAYOUT rather than an input METHOD.

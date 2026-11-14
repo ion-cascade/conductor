@@ -17,10 +17,12 @@ enum ControlBarDisplayMode {
         let windowTitle: String?
         let document: String
         let popup: AXUIElement
+        var menuOpeningAction: String = kAXShowMenuAction as String
 
         static func == (lhs: Lease, rhs: Lease) -> Bool {
             lhs.original == rhs.original && lhs.windowTitle == rhs.windowTitle && lhs.document == rhs.document
                 && CFEqual(lhs.window, rhs.window) && CFEqual(lhs.popup, rhs.popup)
+                && lhs.menuOpeningAction == rhs.menuOpeningAction
         }
     }
 
@@ -64,8 +66,12 @@ enum ControlBarDisplayMode {
               let popup = popup(in: window, runtime: runtime.ax) else {
             return .unavailable("display_mode_popup_not_found")
         }
+        // Logic 13 acknowledges AXShowMenu without exposing a menu. AXPress opens the
+        // same popup's observable menu on the Mac mini's Logic 13 build.
+        let menuOpeningAction = ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1"
+            ? kAXPressAction as String : kAXShowMenuAction as String
         return selectBeats(
-            in: popup, window: window, runtime: runtime.ax,
+            in: popup, window: window, runtime: runtime.ax, menuOpeningAction: menuOpeningAction,
             currentOwner: {
                 guard let currentWindow = AXLogicProElements.mainWindow(runtime: runtime) else { return nil }
                 return (currentWindow, ControlBarDisplayMode.popup(in: currentWindow, runtime: runtime.ax))
@@ -88,6 +94,7 @@ enum ControlBarDisplayMode {
 
     static func selectBeats(
         in popup: AXUIElement, window: AXUIElement, runtime: AXHelpers.Runtime,
+        menuOpeningAction: String = kAXShowMenuAction as String,
         currentOwner: (() -> (AXUIElement, AXUIElement?)?)? = nil
     ) -> Switch {
         guard let initialTitle = title(of: popup, runtime: runtime) else {
@@ -98,13 +105,13 @@ enum ControlBarDisplayMode {
         }
         let windowTitle = AXHelpers.getTitle(window, runtime: runtime)
         let observation: MenuObservation
-        switch openMenu(in: popup, runtime: runtime) {
+        switch openMenu(in: popup, action: menuOpeningAction, runtime: runtime) {
         case .observed(let observed):
             observation = observed
         case .unavailable:
             let initialLease = Lease(
                 original: initialTitle, window: window, windowTitle: windowTitle,
-                document: projectDocument, popup: popup)
+                document: projectDocument, popup: popup, menuOpeningAction: menuOpeningAction)
             if let refusal = leaseRefusal(
                 initialLease, window: window, popup: popup, runtime: runtime,
                 currentOwner: currentOwner
@@ -120,7 +127,7 @@ enum ControlBarDisplayMode {
         }
         let lease = Lease(
             original: original, window: window, windowTitle: windowTitle,
-            document: projectDocument, popup: popup)
+            document: projectDocument, popup: popup, menuOpeningAction: menuOpeningAction)
         if let refusal = leaseRefusal(
             lease, window: window, popup: popup, runtime: runtime, currentOwner: currentOwner
         ) {
@@ -203,7 +210,7 @@ enum ControlBarDisplayMode {
             return .refused(refusal)
         }
         let observation: MenuObservation
-        switch openMenu(in: popup, runtime: runtime) {
+        switch openMenu(in: popup, action: lease.menuOpeningAction, runtime: runtime) {
         case .observed(let observed):
             observation = observed
         case .unavailable(let reason), .unsettled(let reason):
@@ -288,7 +295,7 @@ enum ControlBarDisplayMode {
         currentOwner: (() -> (AXUIElement, AXUIElement?)?)?
     ) -> Restore {
         let observation: MenuObservation
-        switch openMenu(in: popup, runtime: runtime) {
+        switch openMenu(in: popup, action: lease.menuOpeningAction, runtime: runtime) {
         case .observed(let observed):
             observation = observed
         case .unavailable(let reason), .unsettled(let reason):
@@ -349,17 +356,23 @@ enum ControlBarDisplayMode {
 
     /// Exactly one display-mode popup inside the window's control bar, or nil.
     private static func popup(in window: AXUIElement, runtime: AXHelpers.Runtime) -> AXUIElement? {
-        guard let bar = AXLogicProElements.getControlBar(in: window, runtime: runtime) else { return nil }
-        let roleCensus: AXHelpers.Census
-        switch AXHelpers.censusDescendantResult(
-            of: bar, role: kAXPopUpButtonRole as String, maxDepth: 8, runtime: runtime,
-            requiresCompleteTraversal: true
-        ) {
-        case .success(let observed):
-            roleCensus = observed
-        case .failure:
-            return nil
+        let role = kAXPopUpButtonRole as String
+        let census: Result<AXHelpers.Census, AXHelpers.AXStatusError>
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
+            // While the popup menu is open, walk the toolbar to the popup itself.
+            // Its temporary menu must not force a search through the entire Arrange window.
+            guard let toolbar = AXLogicProElements.logic13ControlBarContainer(in: window, runtime: runtime)
+            else { return nil }
+            census = AXLogicProElements.completeControlBarCensus(
+                of: toolbar, matching: [role], terminalRoles: [role, kAXCheckBoxRole as String,
+                    kAXButtonRole as String, kAXSliderRole as String, kAXStaticTextRole as String],
+                maxDepth: 8, runtime: runtime, descendThroughTerminalRoles: false)
+        } else {
+            guard let bar = AXLogicProElements.getControlBar(in: window, runtime: runtime) else { return nil }
+            census = AXHelpers.censusDescendantResult(
+                of: bar, role: role, maxDepth: 8, runtime: runtime, requiresCompleteTraversal: true)
         }
+        guard case .success(let roleCensus) = census else { return nil }
         var matches: [AXUIElement] = []
         for candidate in roleCensus.matches {
             switch AXLocalePolicy.elementMatchesResult(
@@ -481,7 +494,9 @@ enum ControlBarDisplayMode {
 
     /// Opens the popup and proves the complete bounded menu before returning any write authority.
     /// An unreadable role/title/enabled/checkmark or subtree cancels the owned menu and refuses.
-    private static func openMenu(in popup: AXUIElement, runtime: AXHelpers.Runtime) -> MenuAcquisition {
+    private static func openMenu(
+        in popup: AXUIElement, action: String, runtime: AXHelpers.Runtime
+    ) -> MenuAcquisition {
         guard let baseline = observedMenus(under: popup, runtime: runtime) else {
             return .unsettled("display_mode_menu_baseline_unreadable")
         }
@@ -489,7 +504,7 @@ enum ControlBarDisplayMode {
         guard baseline.isEmpty else {
             return .unsettled("display_mode_menu_already_open")
         }
-        let acknowledged = AXHelpers.performAction(popup, kAXShowMenuAction as String, runtime: runtime)
+        let acknowledged = AXHelpers.performAction(popup, action, runtime: runtime)
         guard let menu = waitForMenu(under: popup, runtime: runtime) else {
             guard let after = observedMenus(under: popup, runtime: runtime) else {
                 return .unsettled("display_mode_menu_state_unverified")

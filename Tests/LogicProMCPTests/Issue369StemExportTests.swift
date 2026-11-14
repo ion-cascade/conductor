@@ -20,6 +20,7 @@ private final class StemPanelSurfaceFake: ProjectStemExportPanelDriver.Surface, 
     /// then reports the configured presence. This models a panel materializing
     /// after AXPick instead of encoding an instantaneous fake-only contract.
     var absentPanelReadsBeforePresent = 0
+    var unavailablePanelReadsBeforePresent = 0
     var browserSelectionSucceeds = true
     var destinationBefore: String? = "Old Exports"
     var destinationAfter: String? = "Stem Exports"
@@ -70,6 +71,10 @@ private final class StemPanelSurfaceFake: ProjectStemExportPanelDriver.Surface, 
     func exportPanelPresence() -> ProjectStemExportPanelDriver.PanelPresence {
         events.append("panel_read")
         onPanelRead?()
+        if unavailablePanelReadsBeforePresent > 0 {
+            unavailablePanelReadsBeforePresent -= 1
+            return .unavailable
+        }
         if !events.contains("panel_close"), let panelPresenceReader {
             return panelPresenceReader()
         }
@@ -664,6 +669,15 @@ private final class ReadableThenUnreadableStemDirectoryFileManager: FileManager 
 
 @Suite("#369 late-bound stem plan and export-panel drive")
 struct Issue369StemExportTests {
+    @Test("a materializing panel can recover from transient AX failures without another menu pick")
+    func transientPanelReadFailureIsObservedWithinTheOriginalBudget() async {
+        let surface = StemPanelSurfaceFake()
+        surface.unavailablePanelReadsBeforePresent = 2
+        let result = await driveStemPanel(surface)
+        #expect(result == .completed)
+        #expect(surface.events.filter { $0 == "leaf_axpick" }.count == 1)
+        #expect(surface.events.filter { $0.hasPrefix("export_press") }.count == 1)
+    }
     // A fake whose leaf answers disabled until its menus are open. macOS validates
     // menu items on open, so a drive that reads before opening sees every export item
     // unavailable — measured live, the same items read false closed and true open.
@@ -774,8 +788,11 @@ struct Issue369StemExportTests {
         )
         #expect(neverBecameBoundedAbsence)
         let panelReadCount = surface.events.filter { $0 == "panel_read" }.count
-        let unavailableWasNotRetried = panelReadCount == 2 // initial read plus close readback
-        #expect(unavailableWasNotRetried)
+        // Observation may recover while the panel materializes, but the
+        // original deadline stays finite and no action is replayed.
+        #expect(panelReadCount >= 2 && panelReadCount <= 42)
+        #expect(surface.events.filter { $0 == "leaf_axpick" }.count == 1)
+        #expect(!surface.events.contains { $0.hasPrefix("export_press") })
     }
 
     @Test("stem Export submenu resolves its measured Korean title")

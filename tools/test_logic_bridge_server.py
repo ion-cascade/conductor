@@ -18,8 +18,8 @@ class BrokerTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory(prefix='lmp-'); self.root=Path(self.tmp.name)
   fake=self.root/'fake';fake.write_text('#!'+sys.executable+'\n'+FAKE);fake.chmod(0o700)
-  env=dict(os.environ,LOGIC_MCP_BRIDGE_DIR=str(self.root),LOGIC_MCP_EXECUTABLE=str(fake),MARKER=str(self.root/'marker'))
-  self.p=subprocess.Popen([sys.executable,str(Path(__file__).with_name('logic_bridge_server.py'))],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  self.env=dict(os.environ,LOGIC_MCP_BRIDGE_DIR=str(self.root),LOGIC_MCP_EXECUTABLE=str(fake),MARKER=str(self.root/'marker'))
+  self.p=subprocess.Popen([sys.executable,str(Path(__file__).with_name('logic_bridge_server.py'))],env=self.env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
   self.assertEqual(self.p.stdout.readline().strip(),b'shared bridge ready'); self.connections=[]
  def tearDown(self):
   for c,_ in self.connections:c.close()
@@ -33,6 +33,21 @@ class BrokerTests(unittest.TestCase):
   return c,f
  def send(self,c,m,i,p=None):c.sendall((json.dumps(dict(jsonrpc='2.0',method=m,id=i,params=p or {}))+'\n').encode())
  def recv(self,f):return json.loads(f.readline())
+ def test_duplicate_start_preserves_live_socket_and_pid(self):
+  pid_path = self.root / 'bridge.pid'
+  socket_path = self.root / 'bridge.sock'
+  before = socket_path.stat().st_ino
+  self.assertEqual(int(pid_path.read_text()), self.p.pid)
+  duplicate = subprocess.run(
+   [sys.executable, str(Path(__file__).with_name('logic_bridge_server.py'))],
+   env=self.env, capture_output=True, timeout=5)
+  self.assertNotEqual(duplicate.returncode, 0)
+  self.assertIn(b'another bridge already owns', duplicate.stderr)
+  self.assertEqual(socket_path.stat().st_ino, before)
+  self.assertEqual(int(pid_path.read_text()), self.p.pid)
+  client, replies = self.connect()
+  self.send(client, 'echo', 15)
+  self.assertEqual(self.recv(replies)['id'], 15)
  def test_two_idle_clients_share_upstream_and_ids(self):
   a,fa=self.connect();b,fb=self.connect()
   self.send(a,'echo',2,{'a':1});self.send(b,'echo',2,{'b':2})
@@ -70,6 +85,8 @@ class BrokerTests(unittest.TestCase):
  def test_upstream_failure_closes_clients_without_replay(self):
   a,fa=self.connect();self.send(a,'crash',2);self.assertEqual(fa.readline(),b'')
   self.p.wait(timeout=4)
+  self.assertFalse((self.root / 'bridge.pid').exists())
+  self.assertFalse((self.root / 'bridge.sock').exists())
 class RelayTests(unittest.TestCase):
  def test_startup_wait_happens_before_any_protocol_bytes_are_sent(self):
   with tempfile.TemporaryDirectory(prefix='lmr-') as directory:

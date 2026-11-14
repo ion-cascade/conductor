@@ -528,7 +528,7 @@ extension AXLogicProElements {
 
     /// Opt-in layout-specific candidate. A failed or ambiguous observation never
     /// selects a control. This does not prove absence elsewhere in the window.
-    static func directLogic13Toolbar(in window: AXUIElement, runtime: AXHelpers.Runtime) -> AXUIElement? {
+    static func logic13ControlBarContainer(in window: AXUIElement, runtime: AXHelpers.Runtime) -> AXUIElement? {
         guard case .success(let children) = AXHelpers.childrenResult(window, runtime: runtime) else { return nil }
         func read(_ element: AXUIElement, _ key: String) -> Result<String?, AXHelpers.AXStatusError> {
             AXHelpers.getAttributeResult(element, key, runtime: runtime)
@@ -545,11 +545,18 @@ extension AXLogicProElements {
             }
             if AXLocalePolicy.controlBarGroupLabel.matches(desc ?? "", mode: .exactStrict) { bars.append(child) }
         }
-        guard bars.count == 1,
+        return bars.count == 1 ? bars[0] : nil
+    }
+
+    static func directLogic13Toolbar(in window: AXUIElement, runtime: AXHelpers.Runtime) -> AXUIElement? {
+        guard let bar = logic13ControlBarContainer(in: window, runtime: runtime),
               case .success(let controls) = completeControlBarCensus(
-                of: bars[0], matching: [kAXCheckBoxRole as String],
+                of: bar, matching: [kAXCheckBoxRole as String],
                 terminalRoles: [kAXButtonRole as String, kAXCheckBoxRole as String],
                 maxDepth: 4, runtime: runtime) else { return nil }
+        func read(_ element: AXUIElement, _ key: String) -> Result<String?, AXHelpers.AXStatusError> {
+            AXHelpers.getAttributeResult(element, key, runtime: runtime)
+        }
         var play = 0, record = 0
         for control in controls.matches {
             let title: String?, description: String?
@@ -568,7 +575,7 @@ extension AXLogicProElements {
             if AXLocalePolicy.transportRecordControl.matches(title ?? "", mode: .exactStrict) ||
                 AXLocalePolicy.transportRecordControl.matches(description ?? "", mode: .exactStrict) { record += 1 }
         }
-        return play == 1 && record == 1 ? bars[0] : nil
+        return play == 1 && record == 1 ? bar : nil
     }
 
     /// A complete census inside the already-qualified direct toolbar. Never
@@ -595,12 +602,13 @@ extension AXLogicProElements {
     /// `AXGroup` or `AXToolbar`, so that verified terminal role cannot conceal another candidate.
     /// Container read failures remain unknown and fail the whole census, as do missing roles and a
     /// non-empty tree beyond the depth bound.
-    private static func completeControlBarCensus(
+    static func completeControlBarCensus(
         of root: AXUIElement,
         matching roles: Set<String>,
         terminalRoles: Set<String>,
         maxDepth: Int,
         runtime: AXHelpers.Runtime,
+        descendThroughTerminalRoles: Bool = true,
         permittingRead: () -> Bool = { true },
         observingRole: (AXUIElement, String?) -> Void = { _, _ in },
         observingChildren: (AXUIElement, [AXUIElement]) -> Void = { _, _ in }
@@ -611,6 +619,9 @@ extension AXLogicProElements {
         func visit(_ element: AXUIElement, knownRole: String?, remaining: Int)
             -> Result<Void, AXHelpers.AXStatusError> {
             guard permittingRead() else { return .failure(unavailable) }
+            if !descendThroughTerminalRoles, knownRole.map(terminalRoles.contains) == true {
+                return .success(())
+            }
             let children: [AXUIElement]
             switch AXHelpers.childrenResult(element, runtime: runtime) {
             case .success(let observed): children = observed

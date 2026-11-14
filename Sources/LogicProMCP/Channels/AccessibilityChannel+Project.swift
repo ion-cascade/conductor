@@ -1169,6 +1169,12 @@ extension AccessibilityChannel {
         }
 
         let matches = candidates.filter { candidate in
+            let role = AXHelpers.getRole(candidate, runtime: runtime.ax)
+            let subrole: String? = AXHelpers.getAttribute(candidate, kAXSubroleAttribute as String, runtime: runtime.ax)
+            let title = AXHelpers.getTitle(candidate, runtime: runtime.ax)
+            guard role == kAXSheetRole as String
+                || (role == kAXWindowRole as String && subrole == kAXDialogSubrole as String) else { return false }
+            guard AXLocalePolicy.savePanelWindowTitle.matches(title ?? "", mode: .exact) else { return false }
             let filenameFields = filenameFieldCandidates(in: candidate, runtime: runtime)
             let buttons = AXHelpers.findAllDescendants(
                 of: candidate, role: kAXButtonRole as String, maxDepth: 12, runtime: runtime.ax
@@ -1186,11 +1192,9 @@ extension AccessibilityChannel {
                 of: candidate, role: kAXRadioButtonRole as String, maxDepth: 12, runtime: runtime.ax
             )
             return saveAsDialogSelectionIsUnambiguous(
-                containerRole: AXHelpers.getRole(candidate, runtime: runtime.ax),
-                containerSubrole: AXHelpers.getAttribute(
-                    candidate, kAXSubroleAttribute as String, runtime: runtime.ax
-                ),
-                windowTitle: AXHelpers.getTitle(candidate, runtime: runtime.ax),
+                containerRole: role,
+                containerSubrole: subrole,
+                windowTitle: title,
                 filenameFieldCount: filenameFields.count,
                 saveButtonCount: saveButtons.count,
                 saveEnabled: saveEnabled,

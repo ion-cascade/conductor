@@ -301,6 +301,10 @@ extension ProjectExportExecutor {
             )
         }
 
+        let subjectBindingVerified: Bool
+        if let projectPath = plan.projects.first?.projectPath, let verify = options.verifyIsolatedSubjectBinding {
+            subjectBindingVerified = await verify(projectPath, subjects)
+        } else { subjectBindingVerified = false }
         guard OperationTraceContext.claimDeadlineEffect("project_export_stem") else {
             return stemSubjectArtifacts(
                 artifact: artifact,
@@ -365,7 +369,7 @@ extension ProjectExportExecutor {
         // newly allocated, independently panel-confirmed namespace provide a
         // binding without guessing filenames. General multi-subject mapping
         // still remains explicitly unverified below.
-        if options.isolatedSubjectBindingVerified, subjects.count == 1, isolatedFiles.count == 1 {
+        if subjectBindingVerified, subjects.count == 1, isolatedFiles.count == 1 {
             let observed = stemOutputObservation(path: isolatedFiles[0], plan: plan, options: options)
             return [RunArtifact(
                 kind: artifact.kind,

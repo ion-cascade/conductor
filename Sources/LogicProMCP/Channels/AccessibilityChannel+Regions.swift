@@ -191,9 +191,18 @@ extension AccessibilityChannel {
         guard let window = AXLogicProElements.mainWindow(runtime: runtime) else {
             return .failure(RegionEnumerationError("Cannot locate Logic Pro main window"))
         }
-        let candidates = AXHelpers.findAllDescendants(
-            of: window, role: kAXGroupRole, maxDepth: 14, runtime: runtime.ax
-        )
+        let directArrangeRead = ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1"
+        let candidates: [AXUIElement]
+        if directArrangeRead {
+            guard let content = AXLogicProElements.logic13TrackContent(in: window, runtime: runtime) else {
+                return .failure(RegionEnumerationError("The bound Logic 13 Arrange content path is unavailable"))
+            }
+            candidates = [content]
+        } else {
+            candidates = AXHelpers.findAllDescendants(
+                of: window, role: kAXGroupRole, maxDepth: 14, runtime: runtime.ax
+            )
+        }
         var contentGroup: AXUIElement? = nil
         var genericContentGroup: AXUIElement? = nil
         var groupDescSamples: [String] = []
@@ -221,26 +230,49 @@ extension AccessibilityChannel {
             ))
         }
 
-        let headers = AXLogicProElements.allTrackHeaders(runtime: runtime)
+        let headers: [AXUIElement]
+        if directArrangeRead {
+            guard case .read(let observed) = AXLogicProElements.allTrackHeadersVerifiedRead(in: window, runtime: runtime)
+            else { return .failure(RegionEnumerationError("The bound Arrange headers could not be read")) }
+            headers = observed
+        } else {
+            headers = AXLogicProElements.allTrackHeaders(runtime: runtime)
+        }
         let stackVisibilityGaps = headers.filter { header in
             let stack = AXValueExtractors.extractTrackStackState(from: header, runtime: runtime.ax)
             if stack.isStackHeader == false { return false }
             return !(stack.isStackHeader == true && stack.collapsed == false)
         }.count
         let headerYs: [(index: Int, y: CGFloat)] = headers.enumerated().compactMap { pair in
-            guard let p = AXHelpers.getPosition(pair.element, runtime: runtime.ax),
+            guard !directArrangeRead, let p = AXHelpers.getPosition(pair.element, runtime: runtime.ax),
                   let s = AXHelpers.getSize(pair.element, runtime: runtime.ax) else { return nil }
             return (pair.offset, p.y + s.height / 2)
         }
 
-        let items = AXHelpers.findAllDescendants(
-            of: content, role: "AXLayoutItem", maxDepth: 10, runtime: runtime.ax
-        )
+        let items: [AXUIElement]
+        if directArrangeRead {
+            guard let observed = AXLogicProElements.logic13RegionItems(in: content, runtime: runtime.ax) else {
+                return .failure(RegionEnumerationError("The bound Arrange region tree is incomplete or unreadable"))
+            }
+            items = observed
+        } else {
+            items = AXHelpers.findAllDescendants(
+                of: content, role: "AXLayoutItem", maxDepth: 10, runtime: runtime.ax
+            )
+        }
         var regions: [(item: AXUIElement, info: RegionInfo)] = []
         var nonRegionCount = 0
         var regionItemsOutsideViewport = 0
         for item in items {
-            let help = AXHelpers.getHelp(item, runtime: runtime.ax) ?? ""
+            guard !Task.isCancelled else { return .failure(RegionEnumerationError("Region read cancelled")) }
+            let help: String
+            if directArrangeRead {
+                guard case .success(let observed?) = AXHelpers.getAttributeResult(item, kAXHelpAttribute as String, runtime: runtime.ax)
+                    as Result<String?, AXHelpers.AXStatusError> else {
+                    return .failure(RegionEnumerationError("Region classification metadata is unreadable"))
+                }
+                help = observed
+            } else { help = AXHelpers.getHelp(item, runtime: runtime.ax) ?? "" }
             let isRegion = AXLocalePolicy.regionHelpKeyword.containsAny(in: help)
             guard isRegion else { nonRegionCount += 1; continue }
             guard isVisibleArrangeRegion(item, within: window, runtime: runtime.ax) else {
@@ -253,7 +285,13 @@ extension AccessibilityChannel {
             let kind = classifyRegionKind(name: name, help: help)
 
             var trackIndex = -1
-            if let pos = AXHelpers.getPosition(item, runtime: runtime.ax),
+            if directArrangeRead {
+                guard let observed = AXLogicProElements.logic13RegionTrackIndex(item, in: content,
+                    headers: headers, runtime: runtime.ax) else {
+                    return .failure(RegionEnumerationError("The MIDI or audio region could not be matched to one Arrange lane"))
+                }
+                trackIndex = observed
+            } else if let pos = AXHelpers.getPosition(item, runtime: runtime.ax),
                let size = AXHelpers.getSize(item, runtime: runtime.ax),
                !headerYs.isEmpty {
                 let regionMidY = pos.y + size.height / 2

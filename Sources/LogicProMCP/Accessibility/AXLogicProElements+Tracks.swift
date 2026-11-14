@@ -265,14 +265,30 @@ extension AXLogicProElements {
 
     /// The held rail and its sibling legend, not another window's Hide button.
     /// This same status-preserving locator serves observation and owned exposure.
+    enum HiddenTrackViewObservation {
+        case observed(HiddenTrackViewRead)
+        /// The measured English Tracks legend was completely scanned and has
+        /// no Hide View checkbox. This is not a hidden-track population proof.
+        case absent
+        case unavailable
+    }
+
     static func hiddenTrackViewRead(headers: [AXUIElement], in window: AXUIElement,
                                     runtime: Runtime, exposure: AXTrackBinding.Exposure? = nil) -> HiddenTrackViewRead? {
+        if case let .observed(reading) = hiddenTrackViewObservation(headers: headers, in: window, runtime: runtime, exposure: exposure) {
+            return reading
+        }
+        return nil
+    }
+
+    static func hiddenTrackViewObservation(headers: [AXUIElement], in window: AXUIElement,
+                                    runtime: Runtime, exposure: AXTrackBinding.Exposure? = nil) -> HiddenTrackViewObservation {
         let ax = runtime.ax
         guard let first = headers.first,
               let rail: AXUIElement = AXHelpers.getAttribute(first, kAXParentAttribute as String, runtime: ax),
               AXHelpers.getRole(rail, runtime: ax) == kAXGroupRole as String,
               AXLocalePolicy.trackHeadersDescription.matches(AXHelpers.getDescription(rail, runtime: ax)),
-              case .success(let rows) = AXHelpers.childrenResult(rail, runtime: ax) else { return nil }
+              case .success(let rows) = AXHelpers.childrenResult(rail, runtime: ax) else { return .unavailable }
         exposure?.observeHeaders(rows)
         guard rows.count == headers.count && zip(rows, headers).allSatisfy({ CFEqual($0, $1) }),
               let scroll: AXUIElement = AXHelpers.getAttribute(rail, kAXParentAttribute as String, runtime: ax),
@@ -286,7 +302,7 @@ extension AXLogicProElements {
               let split: AXUIElement = AXHelpers.getAttribute(headerSplit, kAXParentAttribute as String, runtime: ax),
               AXHelpers.getRole(split, runtime: ax) == kAXSplitGroupRole as String,
               case .success(let siblings) = AXHelpers.childrenResult(split, runtime: ax),
-              siblings.filter({ CFEqual($0, headerSplit) }).count == 1 else { return nil }
+              siblings.filter({ CFEqual($0, headerSplit) }).count == 1 else { return .unavailable }
         var ancestor = split
         var visited = [split]
         for _ in 0..<32 {
@@ -294,38 +310,41 @@ extension AXLogicProElements {
             guard let parent: AXUIElement = AXHelpers.getAttribute(ancestor, kAXParentAttribute as String, runtime: ax),
                   !visited.contains(where: { CFEqual($0, parent) }),
                   case .success(let children) = AXHelpers.childrenResult(parent, runtime: ax),
-                  children.filter({ CFEqual($0, ancestor) }).count == 1 else { return nil }
+                  children.filter({ CFEqual($0, ancestor) }).count == 1 else { return .unavailable }
             ancestor = parent; visited.append(parent)
         }
-        guard CFEqual(ancestor, window) else { return nil }
+        guard CFEqual(ancestor, window) else { return .unavailable }
         var matches: [AXUIElement] = []
+        var measuredLegends = 0
         for sibling in siblings {
             if CFEqual(sibling, headerSplit) { continue }
-            guard let role = AXHelpers.getRole(sibling, runtime: ax) else { return nil }
+            guard let role = AXHelpers.getRole(sibling, runtime: ax) else { return .unavailable }
             guard role == kAXSplitGroupRole as String else { continue }
-            guard case .success(let groups) = AXHelpers.childrenResult(sibling, runtime: ax) else { return nil }
+            guard case .success(let groups) = AXHelpers.childrenResult(sibling, runtime: ax) else { return .unavailable }
             for group in groups {
-                guard let role = AXHelpers.getRole(group, runtime: ax) else { return nil }
+                guard let role = AXHelpers.getRole(group, runtime: ax) else { return .unavailable }
                 guard role == kAXGroupRole as String else { continue }
-                guard case .success(let controls) = AXHelpers.childrenResult(group, runtime: ax) else { return nil }
+                if AXHelpers.getDescription(group, runtime: ax) == "Tracks legend" { measuredLegends += 1 }
+                guard case .success(let controls) = AXHelpers.childrenResult(group, runtime: ax) else { return .unavailable }
                 for control in controls {
-                    guard let role = AXHelpers.getRole(control, runtime: ax) else { return nil }
+                    guard let role = AXHelpers.getRole(control, runtime: ax) else { return .unavailable }
                     guard role == kAXCheckBoxRole as String else { continue }
                     guard case .success(.some(let description)) = AXHelpers.getAttributeResult(
                         control, kAXDescriptionAttribute as String, runtime: ax) as Result<String?, AXHelpers.AXStatusError>
-                    else { return nil }
+                    else { return .unavailable }
                     let label = description.components(separatedBy: "   ").first ?? description
                     if AXLocalePolicy.trackHiddenViewControl.matches(label) { matches.append(control) }
                 }
             }
         }
+        if matches.isEmpty { return measuredLegends == 1 ? .absent : .unavailable }
         guard matches.count == 1, let control = matches.first,
               let owner: AXUIElement = AXHelpers.getAttribute(control, kAXWindowAttribute as String, runtime: ax),
               CFEqual(owner, window),
               case .success(.some(let value)) = AXHelpers.getAttributeResult(
                 control, kAXValueAttribute as String, runtime: ax) as Result<NSNumber?, AXHelpers.AXStatusError>,
-              value == 0 || value == 1 else { return nil }
-        return .init(control: control, shown: value == 1)
+              value == 0 || value == 1 else { return .unavailable }
+        return .observed(.init(control: control, shown: value == 1))
     }
 
     /// A track-header enumeration whose unsuccessful traversal cannot be
@@ -468,6 +487,13 @@ extension AXLogicProElements {
     /// but cannot choose the first of competing named rails.
     static func uniqueTrackHeaderRail(in window: AXUIElement, runtime: Runtime,
                                       observingExposure: AXTrackBinding.Exposure? = nil) -> AXUIElement? {
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+           !projectPickerPreventsTrackRead(window, runtime: runtime),
+           let rail = logic13PrimaryTrackRail(in: window, runtime: runtime.ax),
+           case .read(let rows) = enumerateTrackHeaderRows(in: rail, runtime: runtime.ax) {
+            observingExposure?.observeHeaders(rows)
+            return rail
+        }
         guard case .complete(let candidates) = verifiedTrackHeaderCandidates(in: window, maxDepth: 32,
             runtime: runtime.ax, observingExposure: observingExposure) else { return nil }
         let rails = !candidates.lists.isEmpty ? candidates.lists

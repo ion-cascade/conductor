@@ -184,24 +184,23 @@ enum ProjectStemExportPanelDriver {
         surface.pickStemLeaf()
         let panelWaitStarted = monotonicNowNanos()
         while true {
-            switch surface.exportPanelPresence() {
+            let presence = surface.exportPanelPresence()
+            switch presence {
             case .present:
                 break
-            case .absent:
+            case .absent, .unavailable:
                 let now = monotonicNowNanos()
                 let elapsed = now >= panelWaitStarted ? now - panelWaitStarted : UInt64.max
                 guard elapsed < exportPanelObservationDeadlineNanos,
                       pollIntervalNanos > 0 else {
-                    return finish(.refused(
-                        "stem_export_panel_not_observed_after_bounded_wait_elapsed"
-                    ))
+                    return finish(.refused(presence == .unavailable
+                        ? "readback_unavailable: stem_export_panel_not_observed_after_axpick"
+                        : "stem_export_panel_not_observed_after_bounded_wait_elapsed"))
                 }
                 let remainingWaitNanos = exportPanelObservationDeadlineNanos - elapsed
                 let nextWaitNanos = min(pollIntervalNanos, remainingWaitNanos)
                 await sleep(nextWaitNanos)
                 continue
-            case .unavailable:
-                return finish(.refused("readback_unavailable: stem_export_panel_not_observed_after_axpick"))
             case let .partiallyMeasured(recognized, notMeasured):
                 return finish(.refused(
                     "stem_export_panel_partially_measured: recognized=\(recognized); not_measured=\(notMeasured)"
