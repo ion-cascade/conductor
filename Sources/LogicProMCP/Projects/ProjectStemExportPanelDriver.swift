@@ -367,72 +367,49 @@ final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable
     }
 
     func openFileMenu() -> Bool {
-        guard let app = AXLogicProElements.appRoot(runtime: runtime),
-              let menuBar: AXUIElement = AXHelpers.getAttribute(
-                  app, "AXMenuBar", runtime: runtime.ax
-              ),
-              let item = AXLocalePolicy.findMenuBarItem(
-                  in: menuBar,
-                  matching: AXLocalePolicy.fileMenuBar,
-                  runtime: runtime.ax
-              ) else {
-            return false
-        }
-        // Status is not evidence that the menu materialised. `resolveStemLeaf`
-        // observes the enabled leaf only after both menu-opening attempts.
+        guard case .found(let item) = fileMenuItem() else { return false }
+        // Status is not evidence that the menu materialised. The submenu read
+        // verifies the surface after the opening attempt.
         _ = AXHelpers.performAction(item, kAXPressAction as String, runtime: runtime.ax)
         return true
     }
 
     func openExportMenu() -> ProjectStemExportPanelDriver.MenuAvailability {
-        guard let app = AXLogicProElements.appRoot(runtime: runtime) else {
+        switch exportMenuItem() {
+        case .absent:
+            return .unavailable(ProjectStemExportPanelDriver.exportMenuLabelNotMeasuredReason)
+        case .unavailable:
             return .unavailable("stem_export_export_menu_unavailable")
+        case .found(let export):
+            _ = AXHelpers.performAction(export, kAXPressAction as String, runtime: runtime.ax)
+            return .available
         }
-        let exports = menuItems(in: app, matching: ProjectStemExportPanelDriver.exportMenuTitleMatches)
-        guard exports.count == 1, let export = exports.first else {
-            return .unavailable(exports.isEmpty
-                ? ProjectStemExportPanelDriver.exportMenuLabelNotMeasuredReason
-                : "stem_export_export_menu_unavailable")
-        }
-        // The leaf observation below, rather than this status, proves that the
-        // submenu became readable.
-        _ = AXHelpers.performAction(export, kAXPressAction as String, runtime: runtime.ax)
-        return .available
     }
 
     func resolveStemLeaf() -> ProjectStemExportPanelDriver.MenuAvailability {
-        guard let app = AXLogicProElements.appRoot(runtime: runtime) else {
+        switch stemMenuItem() {
+        case .absent:
+            return .unavailable(ProjectStemExportPanelDriver.stemLeafLabelNotMeasuredReason)
+        case .unavailable:
             return .unavailable("stem_export_menu_leaf_unavailable_after_open")
+        case .found(let leaf):
+            // Closed-menu enablement is not an observation of the live action.
+            return stemLeafIsEnabled(leaf)
+                ? .available
+                : .unavailable("stem_export_menu_leaf_unavailable_after_open")
         }
-        let leaves = menuItems(in: app, matching: ProjectStemExportPanelDriver.stemLeafTitleMatches)
-        guard leaves.count == 1, let leaf = leaves.first else {
-            return .unavailable(leaves.isEmpty
-                ? ProjectStemExportPanelDriver.stemLeafLabelNotMeasuredReason
-                : "stem_export_menu_leaf_unavailable_after_open")
-        }
-        // This read intentionally happens here, after `openFileMenu` and
-        // `openExportMenu`; closed-menu enablement is not a valid observation.
-        let enabled: NSNumber? = AXHelpers.getAttribute(
-            leaf, kAXEnabledAttribute as String, runtime: runtime.ax
-        )
-        return enabled?.boolValue == true
-            ? .available
-            : .unavailable("stem_export_menu_leaf_unavailable_after_open")
     }
 
     func pickStemLeaf() {
-        guard let app = AXLogicProElements.appRoot(runtime: runtime),
-              let leaf = menuItem(in: app, matching: ProjectStemExportPanelDriver.stemLeafTitleMatches) else {
-            return
-        }
-        // `AXPress` is a silent no-op for this popup leaf; AXPick is the
-        // measured actuator. Its status code is not promoted to evidence — the
-        // following panel observation is.
-        _ = AXHelpers.performAction(
-            leaf,
-            ProjectStemExportPanelDriver.stemLeafPickAction,
-            runtime: runtime.ax
-        )
+        guard case .found(let leaf) = stemMenuItem(), stemLeafIsEnabled(leaf) else { return }
+        // AXPress is a silent no-op for this leaf. The panel appearance,
+        // rather than the AXPick status, is the evidence of activation.
+        _ = AXHelpers.performAction(leaf, ProjectStemExportPanelDriver.stemLeafPickAction, runtime: runtime.ax)
+    }
+
+    private func stemLeafIsEnabled(_ leaf: AXUIElement) -> Bool {
+        let enabled: NSNumber? = AXHelpers.getAttribute(leaf, kAXEnabledAttribute as String, runtime: runtime.ax)
+        return enabled?.boolValue == true
     }
 
     func exportPanelPresence() -> ProjectStemExportPanelDriver.PanelPresence {
@@ -886,24 +863,61 @@ final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable
         return .success(nil)
     }
 
-    private func menuItem(
-        in app: AXUIElement,
-        matching predicate: (String) -> Bool
-    ) -> AXUIElement? {
-        let matches = menuItems(in: app, matching: predicate)
-        return matches.count == 1 ? matches[0] : nil
+    private enum MenuItemRead {
+        case found(AXUIElement)
+        case absent
+        case unavailable
     }
 
-    private func menuItems(
-        in app: AXUIElement,
-        matching predicate: (String) -> Bool
-    ) -> [AXUIElement] {
-        let census = AXHelpers.censusDescendant(
-            of: app, role: kAXMenuItemRole as String, maxDepth: 12, runtime: runtime.ax
-        )
-        return census.matches.filter {
-            predicate(AXHelpers.getTitle($0, runtime: runtime.ax) ?? "")
+    private func fileMenuItem() -> MenuItemRead {
+        guard let menuBar = AXLogicProElements.getMenuBar(runtime: runtime) else { return .unavailable }
+        return uniqueMenuItem(in: menuBar, role: kAXMenuBarItemRole as String) {
+            AXLocalePolicy.fileMenuBar.matches($0)
         }
+    }
+
+    private func exportMenuItem() -> MenuItemRead {
+        guard case .found(let file) = fileMenuItem() else { return .unavailable }
+        return directSubmenuItem(of: file, matching: ProjectStemExportPanelDriver.exportMenuTitleMatches)
+    }
+
+    private func stemMenuItem() -> MenuItemRead {
+        guard case .found(let export) = exportMenuItem() else { return .unavailable }
+        return directSubmenuItem(of: export, matching: ProjectStemExportPanelDriver.stemLeafTitleMatches)
+    }
+
+    /// The File and Export items each own one AXMenu. Walk only these direct
+    /// containers so a project sidebar or another menu cannot supply the leaf.
+    private func directSubmenuItem(of parent: AXUIElement, matching predicate: (String) -> Bool) -> MenuItemRead {
+        guard case .success(let children) = AXHelpers.childrenResult(parent, runtime: runtime.ax),
+              children.count == 1, let menu = children.first,
+              AXHelpers.getRole(menu, runtime: runtime.ax) == kAXMenuRole as String else { return .unavailable }
+        return uniqueMenuItem(in: menu, role: kAXMenuItemRole as String, matching: predicate)
+    }
+
+    private func uniqueMenuItem(
+        in menu: AXUIElement, role expectedRole: String, matching predicate: (String) -> Bool
+    ) -> MenuItemRead {
+        guard case .success(let children) = AXHelpers.childrenResult(menu, runtime: runtime.ax),
+              children.count <= 128 else { return .unavailable }
+        var match: AXUIElement?
+        for child in children {
+            guard let role = AXHelpers.getRole(child, runtime: runtime.ax) else { return .unavailable }
+            guard role == expectedRole else { continue }
+            let titleRead: Result<String?, AXHelpers.AXStatusError> = AXHelpers.getAttributeResult(
+                child, kAXTitleAttribute as String, runtime: runtime.ax
+            )
+            switch titleRead {
+            case .success(let title):
+                if let title, predicate(title) {
+                    guard match == nil else { return .unavailable }
+                    match = child
+                }
+            case .failure(let error):
+                guard error.isDefinitiveAbsence else { return .unavailable }
+            }
+        }
+        return match.map(MenuItemRead.found) ?? .absent
     }
 
     private func buttons(in root: AXUIElement) -> [AXUIElement] {

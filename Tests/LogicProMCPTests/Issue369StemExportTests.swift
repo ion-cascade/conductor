@@ -813,13 +813,29 @@ struct Issue369StemExportTests {
         let app = builder.element(1)
         let menuBar = builder.element(2)
         let file = builder.element(3)
-        let export = builder.element(4)
+        let fileMenu = builder.element(4)
+        let export = builder.element(5)
+        let exportMenu = builder.element(6)
+        let stem = builder.element(7)
+        let unrelated = builder.element(8)
         builder.setAttribute(app, "AXMenuBar", menuBar)
+        builder.setRole(file, kAXMenuBarItemRole as String)
         builder.setAttribute(file, kAXTitleAttribute as String, "File")
-        builder.setChildren(menuBar, [file])
+        builder.setRole(fileMenu, kAXMenuRole as String)
         builder.setRole(export, kAXMenuItemRole as String)
         builder.setAttribute(export, kAXTitleAttribute as String, "Export")
-        builder.setChildren(app, [export])
+        builder.setRole(exportMenu, kAXMenuRole as String)
+        for leaf in [stem, unrelated] {
+            builder.setRole(leaf, kAXMenuItemRole as String)
+            builder.setAttribute(leaf, kAXTitleAttribute as String, "1 Track as Audio File…")
+            builder.setAttribute(leaf, kAXEnabledAttribute as String, true)
+        }
+        builder.setChildren(menuBar, [file])
+        builder.setChildren(file, [fileMenu])
+        builder.setChildren(fileMenu, [export])
+        builder.setChildren(export, [exportMenu])
+        builder.setChildren(exportMenu, [stem])
+        builder.setChildren(app, [unrelated])
         let runtime = builder.makeLogicRuntime(
             appElement: app,
             setAttributeHandler: nil,
@@ -831,6 +847,23 @@ struct Issue369StemExportTests {
         #expect(fileCandidateWasFound)
         let exportCandidateWasFound = surface.openExportMenu() == .available
         #expect(exportCandidateWasFound)
+        #expect(surface.resolveStemLeaf() == .available)
+        surface.pickStemLeaf()
+        #expect(builder.actionCalls.last?.elementID == 7)
+        #expect(builder.actionCalls.last?.action == ProjectStemExportPanelDriver.stemLeafPickAction)
+
+        // A same-named item outside the File menu must not substitute for an absent leaf.
+        builder.setChildren(exportMenu, [])
+        #expect(surface.resolveStemLeaf() == .unavailable(ProjectStemExportPanelDriver.stemLeafLabelNotMeasuredReason))
+        let actionsBefore = builder.actionCalls.count
+        surface.pickStemLeaf()
+        #expect(builder.actionCalls.count == actionsBefore)
+
+        builder.setChildren(exportMenu, [stem, unrelated])
+        #expect(surface.resolveStemLeaf() == .unavailable("stem_export_menu_leaf_unavailable_after_open"))
+        surface.pickStemLeaf()
+        #expect(builder.actionCalls.count == actionsBefore)
+
     }
 
     @Test("English stem-export controls are identified and their effects are observed")
