@@ -1,18 +1,20 @@
 {
-  "name": "logic-pro-mcp",
-  "display_name": "Logic Pro MCP Server",
-  "description": "Production-oriented MCP server for Logic Pro. Gives Claude, Cursor, and custom MCP agents stateful DAW control, live project readback, MIDI composition, mixer/plugin operations, and fail-closed safety gates across 10 tools + 19 resources + 12 templates.",
-  "version": "3.19.0",
-  "author": "Isaac (MongLong0214)",
+  "name": "ion-cascade-conductor",
+  "display_name": "Ion Cascade Conductor",
+  "description": "A native MCP server for Apple Logic Pro with live track readback, verified MIDI import and per-track export across 10 tools + 19 resources + 12 templates.",
+  "version": "0.2.0",
+  "author": "Ion Cascade",
   "license": "MIT",
-  "homepage": "https://github.com/MongLong0214/logic-pro-mcp",
-  "repository": "https://github.com/MongLong0214/logic-pro-mcp",
+  "homepage": "https://github.com/ion-cascade/conductor",
+  "repository": "https://github.com/ion-cascade/conductor",
   "platforms": ["macos"],
-  "supported_architectures": ["arm64", "x86_64"],
   "runtime": "native",
-  "min_logic_pro_version": "12.0.1",
-  "latest_logic_pro_version": "12.3",
-  "latest_logic_pro_requires_macos": "15.6",
+  "qualified_environment": {
+    "architecture": "arm64",
+    "logic_pro_version": "13.0",
+    "logic_pro_build": "7801",
+    "macos_version": "27.2.1"
+  },
   "supported_logic_pro_variants": [
     {
       "name": "desktop",
@@ -46,16 +48,12 @@
     "macos",
     "swift"
   ],
-  "directories": {
-    "lobehub": "https://lobehub.com/mcp/monglong0214-logic-pro-mcp",
-    "pulsemcp": "https://www.pulsemcp.com/servers/monglong-logic-pro"
-  },
   "installation": {
     "macos": {
-      "command": "LogicProMCP",
+      "distribution": "source",
+      "command": ".build/release/LogicProMCP",
       "args": [],
-      "download_url": "https://github.com/MongLong0214/logic-pro-mcp/releases/download/v3.19.0/LogicProMCP",
-      "install_path": "/usr/local/bin/LogicProMCP"
+      "release_url": "https://github.com/ion-cascade/conductor/releases/tag/v0.2.0"
     }
   },
   "permissions": [

@@ -25,7 +25,7 @@ Build the native server with `swift build -c release`. Swift dependencies and na
 
 The inherited Swift suite includes a mixture of deterministic, source-contract, environment-dependent and live tests. Some test helpers exist only in debug builds. A filtered release test invocation is not a claim that the entire upstream suite passed.
 
-Current local evidence includes 146 focused Swift tests covering track-toggle behavior, core/full refreshes, transport wire metadata and stem-export panel navigation. Native checks remain separate: use a disposable project, exact build identity and independent readback. Export qualification must inspect the actual resulting audio file.
+The 0.2 candidate passed 245 focused Swift tests covering track selection, MIDI import verification, transport readback, project population, and per-track export completion. Native checks remain separate: use a disposable project, exact build identity and independent readback. Export qualification must inspect the actual resulting audio file.
 
 ## Distribution
 

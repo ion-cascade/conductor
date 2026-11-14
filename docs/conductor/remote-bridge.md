@@ -19,7 +19,9 @@ export LOGIC_MCP_COHERENT_READS=1
 
 Adjust the checkout path to your installation. The broker uses an owner-only directory and Unix socket under `~/Library/Application Support/Logic MCP Bridge`. It keeps one server process alive across client disconnects. Stop the broker deliberately when no operation is in flight.
 
-For persistent use, run that same Terminal-context bootstrap at login. A direct SSH launch has a different macOS permission context; an SSH connection alone does not prove GUI access. This repository does not grant permissions or install a login item automatically.
+For persistent use, launch the same Terminal-context bootstrap at login. The running broker writes `bridge.pid` after acquiring the directory lock and opening its socket. Leave that file to the broker. A duplicate start exits without replacing the live socket or PID.
+
+Run the bootstrap again if the upstream server exits. Then reconnect the MCP client and inspect the current project before continuing an interrupted edit. A direct SSH launch uses a different macOS permission context. Verify Accessibility and a live Logic observation through the configured client after login.
 
 ## Client computer: use the SSH relay
 

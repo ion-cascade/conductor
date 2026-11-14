@@ -40,79 +40,19 @@ private func latestChangelogReleaseHeading() throws -> ChangelogReleaseHeading? 
     return nil
 }
 
-private func forbiddenPublishedClaims(forUnpublishedCandidate version: String) -> [String] {
-    [
-        "stable-v\(version)-",
-        "The current stable line is `v\(version)`",
-        "**Current stable**: `v\(version)`",
-        "[v\(version)](https://github.com/MongLong0214/logic-pro-mcp/releases/tag/v\(version))",
-    ]
-}
-
-@Test func unpublished_candidate_wording_guard_rejects_stable_claims() {
-    let counterexamples = [
-        "<img src=\"https://img.shields.io/badge/stable-v9.8.7-blue.svg\" />",
-        "The current stable line is `v9.8.7` (cut today).",
-        "| Release state | **Current stable**: `v9.8.7` |",
-        "Download [v9.8.7](https://github.com/MongLong0214/logic-pro-mcp/releases/tag/v9.8.7) now.",
-    ]
-    let forbiddenClaims = forbiddenPublishedClaims(forUnpublishedCandidate: "9.8.7")
-    #expect(forbiddenClaims.count == 4)
-
-    let caughtCounterexamples = counterexamples.filter { counterexample in
-        forbiddenClaims.contains { counterexample.contains($0) }
-    }
-    #expect(
-        caughtCounterexamples.count == counterexamples.count,
-        "the prepublication wording guard must catch every independent stable-claim counterexample"
-    )
-}
-
-/// Source packaging follows the candidate version. Homebrew keeps the newest
-/// published archive until that candidate is published and its checksum is available.
-@Test func testServerVersionMatchesPackagingArtefacts() throws {
-    let sourceVersion = ServerConfig.serverVersion
-
-    let manifest = try readRepoFile("manifest.json")
-    #expect(
-        manifest.contains("\"version\": \"\(sourceVersion)\""),
-        "manifest.json version field must match ServerConfig.serverVersion=\(sourceVersion)"
-    )
-    #expect(
-        manifest.contains("releases/download/v\(sourceVersion)/"),
-        "manifest.json download_url must pin v\(sourceVersion)"
-    )
-
-    let formula = try readRepoFile("Formula/logic-pro-mcp.rb")
-    let versionPattern = try NSRegularExpression(pattern: #"(?m)^\s*version\s+"([0-9]+\.[0-9]+\.[0-9]+)"$"#)
-    let formulaRange = NSRange(formula.startIndex..<formula.endIndex, in: formula)
-    let versionMatch = try #require(versionPattern.firstMatch(in: formula, range: formulaRange))
-    let versionRange = try #require(Range(versionMatch.range(at: 1), in: formula))
-    let formulaVersion = String(formula[versionRange])
-    if formulaVersion != sourceVersion {
-        // Use the same publication evidence as the existing Formula CI job. Offline
-        // version arithmetic cannot establish whether a candidate has been published.
-        let check = Process()
-        check.executableURL = URL(fileURLWithPath: "/bin/bash")
-        check.arguments = [repositoryRootURL().appendingPathComponent("Scripts/ci-verify-formula-sha.sh").path]
-        check.currentDirectoryURL = repositoryRootURL()
-        let output = Pipe()
-        check.standardOutput = output
-        check.standardError = output
-        try check.run()
-        let evidence = output.fileHandleForReading.readDataToEndOfFile()
-        check.waitUntilExit()
-        #expect(
-            check.terminationStatus == 0,
-            "Formula may lag only on the newest published archive while source is unpublished: \(String(decoding: evidence, as: UTF8.self))"
-        )
-    }
-
-    let installScript = try readRepoFile("Scripts/install.sh")
-    #expect(
-        installScript.contains("LOGIC_PRO_MCP_VERSION:-v\(sourceVersion)"),
-        "Scripts/install.sh default VERSION must match v\(sourceVersion)"
-    )
+@Test func conductorManifestPinsItsOwnSourceRelease() throws {
+    let manifest = try #require(try sharedParseJSON(readRepoFile("manifest.json")) as? [String: Any])
+    let version = ServerConfig.serverVersion
+    let repository = "https://github.com/ion-cascade/conductor"
+    let installation = try #require(manifest["installation"] as? [String: [String: Any]])
+    let macOS = try #require(installation["macos"])
+    #expect(manifest["name"] as? String == "ion-cascade-conductor")
+    #expect(manifest["version"] as? String == version)
+    #expect(manifest["repository"] as? String == repository)
+    #expect(macOS["distribution"] as? String == "source")
+    #expect(macOS["release_url"] as? String == "\(repository)/releases/tag/v\(version)")
+    #expect(macOS["command"] as? String == ".build/release/LogicProMCP")
+    #expect(macOS["download_url"] == nil)
 }
 
 @Test func versionReleaseTimestamp_matches_latest_changelog_release_date() throws {
@@ -136,87 +76,10 @@ private func forbiddenPublishedClaims(forUnpublishedCandidate version: String) -
     )
 }
 
-@Test func readme_version_references_match_server_version() throws {
-    let readme = try readRepoFile("README.md")
-    let sourceCandidateVersion = ServerConfig.serverVersion
-
-    let registryData = Data(try readRepoFile("server.json").utf8)
-    let registry = try #require(
-        try JSONSerialization.jsonObject(with: registryData) as? [String: Any]
-    )
-    let publishedVersion = try #require(registry["version"] as? String)
-
-    let formula = try readRepoFile("Formula/logic-pro-mcp.rb")
-    let formulaVersionPattern = try NSRegularExpression(
-        pattern: #"(?m)^\s*version\s+"([0-9]+\.[0-9]+\.[0-9]+)"$"#
-    )
-    let formulaRange = NSRange(formula.startIndex..<formula.endIndex, in: formula)
-    let formulaVersionMatch = try #require(
-        formulaVersionPattern.firstMatch(in: formula, range: formulaRange)
-    )
-    let formulaVersionRange = try #require(Range(formulaVersionMatch.range(at: 1), in: formula))
-    let formulaVersion = String(formula[formulaVersionRange])
-
-    #expect(sourceCandidateVersion == "3.19.0")
-    #expect(publishedVersion == "3.18.0")
-    #expect(formulaVersion == publishedVersion)
-    #expect(sourceCandidateVersion != publishedVersion)
-
-    let requiredCandidateReferences = [
-        "source_candidate-v\(sourceCandidateVersion)-",
-        "**Source candidate**: `v\(sourceCandidateVersion)`",
-        "`v\(sourceCandidateVersion)` is the source candidate",
-        "The source candidate is `v\(sourceCandidateVersion)`",
-    ]
-    for reference in requiredCandidateReferences {
-        #expect(
-            readme.contains(reference),
-            "README.md must identify the source candidate without claiming publication: \(reference)"
-        )
-    }
-
-    let requiredPublishedReferences = [
-        "published_stable-v\(publishedVersion)-",
-        "**Current published stable**: [`v\(publishedVersion)`](https://github.com/MongLong0214/logic-pro-mcp/releases/tag/v\(publishedVersion))",
-        "`v\(publishedVersion)` remains the current published stable",
-        "current published stable remains `v\(publishedVersion)`",
-        "/v\(publishedVersion)/Scripts/install.sh",
-    ]
-    for reference in requiredPublishedReferences {
-        #expect(
-            readme.contains(reference),
-            "README.md must identify the Formula/server.json release as the published stable: \(reference)"
-        )
-    }
-
-    #expect(
-        readme.contains("published registry release (`v\(publishedVersion)`)")
-    )
-    let publishedInstallerURL = "https://raw.githubusercontent.com/MongLong0214/logic-pro-mcp/v\(publishedVersion)/Scripts/install.sh"
-    #expect(
-        readme.components(separatedBy: publishedInstallerURL).count - 1 == 2,
-        "both runnable shell-installer examples must pin the published stable version"
-    )
-    if sourceCandidateVersion != publishedVersion {
-        for forbiddenClaim in forbiddenPublishedClaims(
-            forUnpublishedCandidate: sourceCandidateVersion
-        ) {
-            #expect(
-                !readme.contains(forbiddenClaim),
-                "README.md must not describe an unpublished source candidate as stable: \(forbiddenClaim)"
-            )
-        }
-        #expect(
-            !readme.contains("https://raw.githubusercontent.com/MongLong0214/logic-pro-mcp/v\(sourceCandidateVersion)/Scripts/install.sh"),
-            "README.md must not offer a source-candidate installer URL before that tag is published"
-        )
-    }
-}
-
-@Test func testManifestResourceSurfaceMatchesPublishedStableRelease() throws {
+@Test func testConductorManifestMatchesServerCatalog() throws {
     let manifest = try sharedParseJSON(readRepoFile("manifest.json")) as! [String: Any]
 
-    // The manifest tools array is the published MCP-registry surface; it must equal the
+    // The manifest tools array describes the Conductor source release and must equal the
     // server catalog exactly so it can never silently drift (e.g. omit logic_audio).
     let tools = Set(try #require(manifest["tools"] as? [String]))
     #expect(tools == Set(ServerCatalog.tools.map(\.name)))
@@ -270,9 +133,9 @@ private func forbiddenPublishedClaims(forUnpublishedCandidate version: String) -
 
 @Test func testReadmeAndAPIDocsMatchPublicSurfaceAndRouting() throws {
     let readme = try readRepoFile("README.md")
-    #expect(readme.contains("| Read resources | 19 static resources"))
-    #expect(readme.contains("| Resource templates | 12 templates"))
-    #expect(readme.contains("All 10 tools, 19 resources, 12 templates"))
+    #expect(readme.contains("git clone https://github.com/ion-cascade/conductor.git"))
+    #expect(readme.contains("swift build -c release"))
+    #expect(readme.contains(".build/release/LogicProMCP"))
 
     let api = try readRepoFile("docs/API.md")
     // #983: the page's opening sentence carried a release summary nothing read, and it named
@@ -290,83 +153,17 @@ private func forbiddenPublishedClaims(forUnpublishedCandidate version: String) -
     #expect(api.contains("only the exact `marker_list_not_open` outcome carries the terminal `logic_navigate capture_markers` alternative"))
 }
 
-/// Issue #22 (thomas-doesburg): `brew install` broke at v3.4.6/v3.5.0 because
-/// the Formula installed helper assets from the tarball root while the release
-/// workflow stages them with repo-relative nested paths (`docs/SETUP.md`,
-/// `Scripts/…`). PR #2 fixed the same failure class in the opposite direction
-/// (formula nested / tarball flat), so this guards BOTH drift directions at
-/// PR time: every `pkgshare.install` path must exist in the repo at exactly
-/// the staged relative path, and every installed path (including
-/// `bin.install`) must appear in the release workflow's tarball staging list.
-/// The tag-time half of the guard lives in release.yml ("Verify Formula
-/// install paths against tarball"), which re-asserts the same paths against
-/// the actual built artifact before anything is published.
-@Test func testFormulaInstallPathsMatchRepoAndReleaseStaging() throws {
-    let formula = try readRepoFile("Formula/logic-pro-mcp.rb")
-    let releasePackaging = try readRepoFile("Scripts/release-package.sh")
-
-    func installPaths(_ directive: String) -> [String] {
-        formula.components(separatedBy: "\n").compactMap { line in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasPrefix("\(directive).install \"") else { return nil }
-            let parts = trimmed.components(separatedBy: "\"")
-            return parts.count >= 2 ? parts[1] : nil
-        }
-    }
-
-    let pkgsharePaths = installPaths("pkgshare")
-    let binPaths = installPaths("bin")
-    // ELEVEN since 2026-09-19: `Scripts/logic_ui_labels.py` joined them (#919). It is generated
-    // from AXLocalePolicy by `Scripts/locale_labels.py --write` and imported by
-    // `logic_bounce_ui.py`, which drove Logic's Bounce dialog through hand-typed
-    // English-and-Korean tables until then. A count is the right shape for this assertion --
-    // adding an asset to the Formula and not to the tarball is how v3.11.0 shipped
-    // `logic_bounce.py` without `logic_variants.py` -- so the number moves deliberately.
-    #expect(
-        pkgsharePaths.count == 11,
-        "expected the 11 helper assets in Formula pkgshare.install; parser or Formula drifted: \(pkgsharePaths)"
-    )
-    #expect(binPaths == ["LogicProMCP"], "Formula bin.install drifted: \(binPaths)")
-    #expect(
-        formula.contains("pkgshare.install \"Scripts/logic_bounce.py\" if (buildpath/\"Scripts/logic_bounce.py\").exist?"),
-        "Formula must keep logic_bounce.py optional so brew install stays compatible with published tarballs that predate project-helper scripts"
-    )
-    #expect(
-        formula.contains("pkgshare.install \"Scripts/logic_bounce_ui.py\" if (buildpath/\"Scripts/logic_bounce_ui.py\").exist?"),
-        "Formula must keep logic_bounce_ui.py optional so brew install stays compatible with published tarballs that predate project-helper scripts"
-    )
-    #expect(
-        formula.contains("pkgshare.install \"Scripts/logic_ui_jxa.py\" if (buildpath/\"Scripts/logic_ui_jxa.py\").exist?"),
-        "Formula must keep logic_ui_jxa.py optional so brew install stays compatible with published tarballs that predate project-helper scripts"
-    )
-    #expect(
-        formula.contains("pkgshare.install \"Scripts/logic_input_source.py\" if (buildpath/\"Scripts/logic_input_source.py\").exist?"),
-        "Formula must keep logic_input_source.py optional so brew install stays compatible with published tarballs that predate project-helper scripts"
-    )
-    // #427: logic_variants.py is the shared dependency of the bounce/export helpers;
-    // it must be packaged (its omission shipped a ModuleNotFoundError in v3.11.0) and
-    // kept optional for compatibility with pre-existing tarballs.
-    #expect(
-        formula.contains("pkgshare.install \"Scripts/logic_variants.py\" if (buildpath/\"Scripts/logic_variants.py\").exist?"),
-        "Formula must package logic_variants.py (shared bounce/export dependency, #427) and keep it optional"
-    )
-
+@Test func conductorSourceDistributionContainsRuntimeHelpers() throws {
+    let requiredFiles = [
+        "Package.swift", "Package.resolved", "NOTICE.md", "LICENSE", "manifest.json",
+        "tools/logic_bridge_server.py", "tools/logic_bridge_relay.py",
+        "Scripts/logic_bounce.py", "Scripts/logic_bounce_ui.py",
+        "Scripts/logic_ui_jxa.py", "Scripts/logic_input_source.py", "Scripts/logic_variants.py",
+    ]
     let root = repositoryRootURL()
-    for path in pkgsharePaths {
-        #expect(
-            !path.hasPrefix("/") && !path.contains(".."),
-            "Formula install path '\(path)' must be a clean repo-relative path"
-        )
-        #expect(
-            FileManager.default.fileExists(atPath: root.appendingPathComponent(path).path),
-            "Formula installs '\(path)' but no such file exists in the repo — the tarball stages repo-relative paths, so brew install would fail (issue #22)"
-        )
-    }
-    for path in pkgsharePaths + binPaths {
-        #expect(
-            releasePackaging.contains(path),
-            "Formula installs '\(path)' but Scripts/release-package.sh does not stage it into the tarball (issue #22)"
-        )
+    for path in requiredFiles {
+        #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent(path).path),
+            "The source distribution must contain \(path).")
     }
 }
 
