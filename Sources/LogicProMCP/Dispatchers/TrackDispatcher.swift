@@ -1191,6 +1191,7 @@ struct TrackDispatcher: OperationTraceDispatching {
         let index: Int
         let resolvedReference: TargetReference?
         let resolvedFingerprint: String?
+        let physicalTrack: AXTrackBinding.Binding?
         switch await TargetRefResolver.resolveMutationIndex(
             params,
             targetRegistry: targetRegistry,
@@ -1207,6 +1208,7 @@ struct TrackDispatcher: OperationTraceDispatching {
             index = resolved.index
             resolvedReference = resolved.reference
             resolvedFingerprint = resolved.binding?.observedFingerprint
+            physicalTrack = command == "arm" ? nil : resolved.binding?.physicalTrack
         case .failure(let result):
             return result
         }
@@ -1222,10 +1224,12 @@ struct TrackDispatcher: OperationTraceDispatching {
             enabled = true
         }
         let result = await withWriteBoundaryArmed(traceID) {
-            await router.route(
-                operation: operation,
-                params: ["index": String(index), "enabled": String(enabled)]
-            )
+            await AXTrackBinding.$current.withValue(physicalTrack) {
+                await router.route(
+                    operation: operation,
+                    params: ["index": String(index), "enabled": String(enabled)]
+                )
+            }
         }
         // #106: never surface an unverified channel success — a State B
         // "success without read-back" is reported as an error so callers

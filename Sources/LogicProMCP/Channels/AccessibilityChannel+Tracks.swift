@@ -2178,17 +2178,55 @@ extension AccessibilityChannel {
         guard let indexStr = params["index"], let index = Int(indexStr) else {
             return .error("Missing or invalid 'index' parameter")
         }
+        let held = AXTrackBinding.current
+        func findHeldButton(_ held: AXTrackBinding.Binding) -> AXUIElement? {
+            let labels: AXLocalePolicy.LabelSet
+            switch buttonName {
+            case "Mute": labels = AXLocalePolicy.trackMuteButton
+            case "Solo": labels = AXLocalePolicy.trackSoloButton
+            default: return nil
+            }
+            guard held.currentIndex() == index,
+                  case .success(let children) = AXHelpers.childrenResult(held.header, runtime: runtime.ax)
+            else { return nil }
+            var match: AXUIElement?
+            for child in children {
+                guard let role = AXHelpers.getRole(child, runtime: runtime.ax) else { return nil }
+                guard role == kAXCheckBoxRole as String else { continue }
+                switch AXHelpers.getAttributeResult(child, kAXDescriptionAttribute as String, runtime: runtime.ax)
+                    as Result<String?, AXHelpers.AXStatusError> {
+                case .success(let description):
+                    if labels.matches(description, mode: .prefix) {
+                        guard match == nil else { return nil }
+                        match = child
+                    }
+                case .failure(let error):
+                    guard error.isDefinitiveAbsence else { return nil }
+                }
+            }
+            return held.currentIndex() == index ? match : nil
+        }
         let finder: (Int) -> AXUIElement? = switch buttonName {
         case "Mute": { AXLogicProElements.findTrackMuteButton(trackIndex: $0, runtime: runtime) }
         case "Solo": { AXLogicProElements.findTrackSoloButton(trackIndex: $0, runtime: runtime) }
         case "Record": { AXLogicProElements.findTrackArmButton(trackIndex: $0, runtime: runtime) }
         default: { _ in nil }
         }
-        guard let button = finder(index) else {
+        let selectedButton = held == nil ? finder(index) : held.flatMap(findHeldButton)
+        guard let button = selectedButton else {
+            if held != nil {
+                return .error(HonestContract.encodeStateC(
+                    error: .readbackUnavailable, hint: "The held track or its unique \(buttonName) control could not be verified.",
+                    extras: ["track": index, "write_attempted": false, "fallback_unsafe": true]))
+            }
             return .error("Cannot find \(buttonName) button on track \(index)")
         }
+        func isCurrent() -> Bool {
+            guard let held else { return true }
+            return findHeldButton(held).map { CFEqual($0, button) } == true
+        }
         let desired: Bool = (params["enabled"] ?? "true") == "true"
-        let baseExtras: [String: Any] = [
+        var baseExtras: [String: Any] = [
             "track": index,
             "button": buttonName,
             "requested": desired,
@@ -2201,7 +2239,7 @@ extension AccessibilityChannel {
         // no-op (#106 sites-6/7), so trusting the return would fabricate a
         // State A on a control that never moved.
         func readValue() -> Bool? {
-            guard let v = AXHelpers.getValue(button, runtime: runtime.ax) else { return nil }
+            guard isCurrent(), let v = AXHelpers.getValue(button, runtime: runtime.ax) else { return nil }
             if let n = v as? NSNumber { return n.boolValue }
             if let b = v as? Bool { return b }
             if let i = v as? Int { return i != 0 }
@@ -2217,7 +2255,17 @@ extension AccessibilityChannel {
 
         // Toggle-from-read: already at the desired state → verified no-op. No
         // rung runs, so no keyboard/coordinate event is ever fired.
-        if let current = readValue(), current == desired {
+        let before = readValue()
+        if held != nil {
+            guard let before else {
+                return .error(HonestContract.encodeStateC(error: .readbackUnavailable,
+                    hint: "The held track toggle's initial value could not be verified.",
+                    extras: baseExtras.merging(["write_attempted": false, "fallback_unsafe": true]) { _, new in new }))
+            }
+            baseExtras["observed_before"] = before
+            baseExtras["write_attempted"] = false
+        }
+        if let current = before, current == desired {
             return .success(HonestContract.encodeStateA(extras: baseExtras.merging([
                 "observed": desired,
                 "action": "no-op"
@@ -2248,6 +2296,7 @@ extension AccessibilityChannel {
         let recordingBaselineState: Bool? =
             (buttonName == "Record") ? transportRecordingState(runtime: runtime) : nil
 
+        var writeAttempted = false
         let outcome = runTrackToggleLadder(
             rungs: trackToggleLadder(
                 button: button,
@@ -2258,13 +2307,26 @@ extension AccessibilityChannel {
                 runtime: runtime,
                 keyRuntime: keyRuntime,
                 processRuntime: processRuntime,
-                environment: environment
+                environment: environment,
+                heldHeader: held?.header,
+                permittingWrite: isCurrent,
+                willWrite: { writeAttempted = true }
             ),
             desired: desired,
             readValue: readValue,
             pollMatched: { pollMatched(deadlineMs: $0) }
         )
 
+        if held != nil { baseExtras["write_attempted"] = writeAttempted }
+        if held != nil, !isCurrent() {
+            let evidence = baseExtras.merging([
+                "write_attempted": writeAttempted, "fallback_unsafe": true, "safe_to_retry": false
+            ]) { _, new in new }
+            if writeAttempted {
+                return .success(HonestContract.encodeStateB(reason: .readbackUnavailable, extras: evidence))
+            }
+            return .error(HonestContract.encodeStateC(error: .staleTargetReference, extras: evidence))
+        }
         switch outcome {
         case .refused(let refusal):
             // A refused rung posted NO key, so our action caused no transport
@@ -2798,9 +2860,14 @@ extension AccessibilityChannel {
         runtime: AXLogicProElements.Runtime,
         keyRuntime: AXMouseHelper.Runtime,
         processRuntime: ProcessUtils.Runtime,
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        heldHeader: AXUIElement? = nil,
+        permittingWrite: @escaping () -> Bool = { true },
+        willWrite: (() -> Void)? = nil
     ) -> [TrackToggleRung] {
         let pressRung: TrackToggleRung = ("press", 250, { _ in
+            guard permittingWrite() else { return .refused(selectionNotExclusiveRefusal(index: index)) }
+            willWrite?()
             _ = AXHelpers.performAction(button, kAXPressAction, runtime: runtime.ax)
             return .actuated
         })
@@ -2816,7 +2883,10 @@ extension AccessibilityChannel {
                 index: index,
                 runtime: runtime,
                 processRuntime: processRuntime,
-                sleepMicros: keyRuntime.sleepMicros
+                sleepMicros: keyRuntime.sleepMicros,
+                heldHeader: heldHeader,
+                permittingWrite: permittingWrite,
+                willWrite: willWrite
             ) { return .refused(refusal) }
 
             for attempt in 0..<syntheticKeyRetryAttempts {
@@ -2834,6 +2904,8 @@ extension AccessibilityChannel {
                 if let refusal = syntheticKeyFocusRefusal(runtime: runtime) {
                     return .refused(refusal)
                 }
+                guard permittingWrite() else { return .refused(selectionNotExclusiveRefusal(index: index)) }
+                willWrite?()
                 postKey()
                 if pollMatched(syntheticKeyRetryPollMs) { return .landed }
                 if attempt < syntheticKeyRetryAttempts - 1 {
@@ -2949,7 +3021,10 @@ extension AccessibilityChannel {
         index: Int,
         runtime: AXLogicProElements.Runtime,
         processRuntime: ProcessUtils.Runtime,
-        sleepMicros: (useconds_t) -> Void
+        sleepMicros: (useconds_t) -> Void,
+        heldHeader: AXUIElement? = nil,
+        permittingWrite: (() -> Bool)? = nil,
+        willWrite: (() -> Void)? = nil
     ) -> RungRefusal? {
         _ = ProcessUtils.activateLogicPro(runtime: processRuntime)
 
@@ -2972,13 +3047,15 @@ extension AccessibilityChannel {
             }
         }
         guard frontmostSettled else { return logicNotFrontmostRefusal(index: index) }
-        guard confirmExclusiveSelection(index: index, runtime: runtime) else {
+        guard confirmExclusiveSelection(index: index, runtime: runtime, heldHeader: heldHeader,
+                                        permittingWrite: permittingWrite, willWrite: willWrite) else {
             return selectionNotExclusiveRefusal(index: index)
         }
         // Re-confirm atomically right before the key — selection can change
         // between the first confirm and the post (multi-select, user shift-click,
         // Logic reselection). If it no longer holds, fail closed without posting.
-        guard confirmExclusiveSelection(index: index, runtime: runtime) else {
+        guard confirmExclusiveSelection(index: index, runtime: runtime, heldHeader: heldHeader,
+                                        permittingWrite: permittingWrite, willWrite: willWrite) else {
             return selectionNotExclusiveRefusal(index: index)
         }
         guard processRuntime.logicIsFrontmost() else {

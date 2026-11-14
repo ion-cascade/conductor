@@ -126,7 +126,7 @@ enum TargetRefResolver {
 
             // These writers retain the physical carrier through their last native action.
             // Other paths still require the older ordinal and unique-name corroboration.
-            let hasPhysicalWriter = ["track.rename", "track.select", "mixer.set_volume", "mixer.set_pan"].contains(operation)
+            let hasPhysicalWriter = ["track.rename", "track.select", "track.set_mute", "track.set_solo", "mixer.set_volume", "mixer.set_pan"].contains(operation)
             if let physical = binding.physicalTrack, hasPhysicalWriter {
                 guard let index = physical.currentIndex() else {
                     return .failure(staleTargetReferenceResult(rawReference, operation: operation,

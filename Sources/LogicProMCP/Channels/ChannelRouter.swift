@@ -413,9 +413,9 @@ actor ChannelRouter {
         }
 
         // An index-only fallback cannot carry the retained Arrange header.
-        let tableChain = AXTrackBinding.current != nil && operation == "track.select"
-            ? configuredChain.filter { $0 == .accessibility }
-            : configuredChain
+        let requiresHeldTrack = AXTrackBinding.current != nil
+            && ["track.select", "track.set_mute", "track.set_solo"].contains(operation)
+        let tableChain = requiresHeldTrack ? configuredChain.filter { $0 == .accessibility } : configuredChain
 
         // Operations with empty chain don't need a channel.
         if tableChain.isEmpty {
