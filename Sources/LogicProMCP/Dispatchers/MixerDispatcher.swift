@@ -407,6 +407,7 @@ struct MixerDispatcher: OperationTraceDispatching {
             let resolvedReference: TargetReference?
             let resolvedFingerprint: String?
             let physical: AXMixerStripBinding.Binding?
+            let physicalTrack: AXTrackBinding.Binding?
             switch await TargetRefResolver.resolveMutationIndex(
                 params,
                 targetRegistry: targetRegistry,
@@ -425,6 +426,7 @@ struct MixerDispatcher: OperationTraceDispatching {
                 resolvedReference = resolved.reference
                 resolvedFingerprint = resolved.binding?.observedFingerprint
                 physical = resolved.binding?.physicalMixerStrip
+                physicalTrack = resolved.binding?.physicalTrack
             case .failure(let result):
                 return result
             }
@@ -441,10 +443,12 @@ struct MixerDispatcher: OperationTraceDispatching {
             let traceID = await startTraceIfEnabled(command: command)
             let routed = await withWriteBoundaryArmed(traceID) {
                 await AXMixerStripBinding.$current.withValue(physical) {
-                    await routedTextResult(router, operation: "mixer.set_volume", params: [
-                    "index": String(index),
-                    "volume": String(volume),
-                    ])
+                    await AXTrackBinding.$current.withValue(physicalTrack) {
+                        await routedTextResult(router, operation: "mixer.set_volume", params: [
+                            "index": String(index),
+                            "volume": String(volume),
+                        ])
+                    }
                 }
             }
             let result = TargetRefResolver.addEvidence(
@@ -460,6 +464,7 @@ struct MixerDispatcher: OperationTraceDispatching {
             let resolvedReference: TargetReference?
             let resolvedFingerprint: String?
             let physical: AXMixerStripBinding.Binding?
+            let physicalTrack: AXTrackBinding.Binding?
             switch await TargetRefResolver.resolveMutationIndex(
                 params,
                 targetRegistry: targetRegistry,
@@ -478,6 +483,7 @@ struct MixerDispatcher: OperationTraceDispatching {
                 resolvedReference = resolved.reference
                 resolvedFingerprint = resolved.binding?.observedFingerprint
                 physical = resolved.binding?.physicalMixerStrip
+                physicalTrack = resolved.binding?.physicalTrack
             case .failure(let result):
                 return result
             }
@@ -494,10 +500,12 @@ struct MixerDispatcher: OperationTraceDispatching {
             let traceID = await startTraceIfEnabled(command: command)
             let routed = await withWriteBoundaryArmed(traceID) {
                 await AXMixerStripBinding.$current.withValue(physical) {
-                    await routedTextResult(router, operation: "mixer.set_pan", params: [
-                    "index": String(index),
-                    "pan": String(pan),
-                    ])
+                    await AXTrackBinding.$current.withValue(physicalTrack) {
+                        await routedTextResult(router, operation: "mixer.set_pan", params: [
+                            "index": String(index),
+                            "pan": String(pan),
+                        ])
+                    }
                 }
             }
             let result = TargetRefResolver.addEvidence(

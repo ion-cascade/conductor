@@ -317,13 +317,20 @@ extension AccessibilityChannel {
         }
         let operation = target == .volume ? "mixer.set_volume" : "mixer.set_pan"
         let physical = AXMixerStripBinding.current
+        let physicalTrack = AXTrackBinding.current
         let physicalIndex = physical?.currentIndex(runtime: runtime)
+        let physicalTrackIndex = physicalTrack?.currentIndex()
         if physical != nil, physicalIndex == nil {
             return .error(HonestContract.encodeStateC(error: .staleTargetReference,
                 hint: "The referenced physical Mixer strip is no longer in its observed project/window.",
                 extras: ["operation": operation, "write_attempted": false]))
         }
-        let position = physicalIndex ?? index
+        if physicalTrack != nil, physicalTrackIndex == nil || physical != nil {
+            return .error(HonestContract.encodeStateC(error: .staleTargetReference,
+                hint: "The referenced Arrange track is no longer the unique held target in its project and window.",
+                extras: ["operation": operation, "write_attempted": false]))
+        }
+        let position = physicalIndex ?? physicalTrackIndex ?? index
         let positionKey = physical == nil ? "track" : "mixer_strip_index"
         let targetIdentity: [String: Any] = [
             (physical == nil ? "track_index" : "mixer_strip_index"): position,
@@ -339,6 +346,15 @@ extension AccessibilityChannel {
         // the nearest detent and read back every step. #973: an AXValue write does
         // not jump to the written value (`set 0.5` on a 0.76 fader looked unmoved),
         // but on Logic 12.3.1 it moved one raw unit toward it, which the fine phase uses.
+        func control(in header: AXUIElement) -> AXUIElement? {
+            switch target {
+            case .volume:
+                return AXLogicProElements.findVolumeFader(in: header, runtime: runtime.ax)
+            case .pan:
+                return AXLogicProElements.findPanControlInHeader(header, runtime: runtime.ax)
+            }
+        }
+
         var headerReadForDiagnostics: AXLogicProElements.TrackHeaderRead = .unavailable
         let slider: AXUIElement?
         if let physical {
@@ -346,16 +362,9 @@ extension AccessibilityChannel {
             case .volume: slider = AXLogicProElements.findVolumeFader(in: physical.strip, runtime: runtime.ax, requireUnique: true)
             case .pan: slider = AXLogicProElements.findPanControl(in: physical.strip, runtime: runtime.ax, requireUnique: true)
             }
+        } else if let physicalTrack {
+            slider = control(in: physicalTrack.header)
         } else {
-            func control(in header: AXUIElement) -> AXUIElement? {
-                switch target {
-                case .volume:
-                    return AXLogicProElements.findVolumeFader(in: header, runtime: runtime.ax)
-                case .pan:
-                    return AXLogicProElements.findPanControlInHeader(header, runtime: runtime.ax)
-                }
-            }
-
             var resolved: AXUIElement?
             if let arrangeWindow = AXLogicProElements.mainWindow(runtime: runtime) {
                 headerReadForDiagnostics = AXLogicProElements.allTrackHeadersRead(
@@ -387,6 +396,11 @@ extension AccessibilityChannel {
             slider = resolved
         }
         guard let slider else {
+            if physicalTrack != nil {
+                return .error(HonestContract.encodeStateC(error: .elementNotFound,
+                    hint: "The referenced Arrange track exposes no verified \(label) control.",
+                    extras: ["operation": operation, "write_attempted": false]))
+            }
             if physical != nil {
                 return .error(HonestContract.encodeStateC(error: .elementNotFound,
                     hint: "The referenced physical Mixer strip exposes no \(label) control.",
@@ -472,6 +486,11 @@ extension AccessibilityChannel {
         }
 
         func controlIsCurrent() -> Bool {
+            if let physicalTrack {
+                guard physicalTrack.currentIndex() == position,
+                      let current = control(in: physicalTrack.header), CFEqual(current, slider) else { return false }
+                return physicalTrack.currentIndex() == position
+            }
             guard let physical else { return true }
             guard physical.currentIndex(runtime: runtime) != nil else { return false }
             let current: AXUIElement?

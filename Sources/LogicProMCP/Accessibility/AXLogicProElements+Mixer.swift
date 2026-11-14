@@ -409,8 +409,12 @@ extension AXLogicProElements {
     /// as it did before — so an unmeasured locale is no worse off, and never silently better.
     static func findPanControlInHeader(
         _ header: AXUIElement, runtime: AXHelpers.Runtime = .production,
-        observingExposure: AXTrackBinding.Exposure? = nil
+        observingExposure: AXTrackBinding.Exposure? = nil,
+        requireIdentity: Bool = ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1"
     ) -> AXUIElement? {
+        if requireIdentity {
+            return findPanControl(in: header, runtime: runtime, requireUnique: true, allowElimination: false)
+        }
         let sliders = AXHelpers.findAllDescendants(of: header, role: kAXSliderRole, maxDepth: 4, runtime: runtime,
             batchingRoleAndChildren: true,
             observingRole: { observingExposure?.observeRole(element: $0, role: $1) },
@@ -2093,7 +2097,8 @@ extension AXLogicProElements {
     static func findPanControl(
         in strip: AXUIElement,
         runtime: AXHelpers.Runtime = .production,
-        requireUnique: Bool = false
+        requireUnique: Bool = false,
+        allowElimination: Bool = ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] != "1"
     ) -> AXUIElement? {
         let failures = AXPluginInstanceIdentity.FailedReads()
         let ax = requireUnique ? AXPluginInstanceIdentity.noting(failures, over: runtime) : runtime
@@ -2106,11 +2111,14 @@ extension AXLogicProElements {
                 of: strip, role: kAXSliderRole, maxDepth: 4, runtime: ax
             )
         }
-        let described = sliders.filter { sliderText($0, runtime: ax).isPanControl }
+        let described = sliders.filter {
+            let identity = sliderText($0, runtime: ax)
+            return identity.isPanControl && !identity.isVolumeFader
+        }
         if requireUnique {
             guard !failures.any else { return nil }
             if described.count == 1 { return described[0] }
-            if described.count > 1 { return nil }
+            guard described.isEmpty, allowElimination else { return nil }
             // Reuse the header selector's existing two-slider/one-named-volume elimination,
             // without assigning physical pan from a slider's position in the strip.
             let volumes = volumeFaderCandidates(among: sliders, runtime: ax)

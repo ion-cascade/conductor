@@ -57,6 +57,40 @@ struct Issue290HeaderPanEvidenceTests {
         #expect(CFEqual(found, sliders[2]))
     }
 
+    @Test(arguments: ["named", "unnamed", "ambiguous", "volume_mentions_pan"])
+    func identifiedPathRequiresOneActualPanControl(scenario: String) {
+        let b = FakeAXRuntimeBuilder()
+        let header = b.element(29100)
+        let volume = b.element(29101)
+        let slider = b.element(29102)
+        let competing = b.element(29103)
+        b.setRole(header, kAXLayoutItemRole as String)
+        for control in [volume, slider, competing] {
+            b.setRole(control, kAXSliderRole as String)
+            b.setChildren(control, [])
+        }
+        b.setAttribute(volume, kAXDescriptionAttribute as String, "Volume")
+        if scenario != "unnamed" && scenario != "volume_mentions_pan" {
+            b.setAttribute(slider, kAXHelpAttribute as String, "Pan/Balance knob. Drag vertically to position the track signal.")
+        }
+        if scenario == "volume_mentions_pan" {
+            b.setAttribute(volume, kAXHelpAttribute as String, "Volume fader beside the pan control.")
+        }
+        if scenario == "ambiguous" {
+            b.setAttribute(competing, kAXDescriptionAttribute as String, "Pan")
+        }
+        b.setChildren(header, scenario == "ambiguous" ? [volume, slider, competing] : [volume, slider])
+
+        let selection = AXLogicProElements.findPanControlInHeader(
+            header, runtime: b.makeAXRuntime(), requireIdentity: true)
+        if scenario == "named" {
+            #expect(selection.map { CFEqual($0, slider) } == true)
+        } else {
+            #expect(selection == nil)
+        }
+        #expect(b.actionCalls.isEmpty && b.setCalls.isEmpty)
+    }
+
     /// A header holding volume slider A beside a group that holds slider B. With `flaky`, the
     /// group answers its children once and then answers empty, so a second walk of the header
     /// sees a different inventory than the first.
