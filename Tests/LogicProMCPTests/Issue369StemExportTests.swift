@@ -850,7 +850,7 @@ struct Issue369StemExportTests {
         #expect(surface.resolveStemLeaf() == .available)
         let actionSurface = AXSurface(runtime: builder.makeLogicRuntime(appElement: app))
         actionSurface.pickStemLeaf()
-        #expect(builder.actionCalls.last?.elementID == 7)
+        #expect(builder.actionCalls.last?.elementID == builder.elementID(stem))
         #expect(builder.actionCalls.last?.action == ProjectStemExportPanelDriver.stemLeafPickAction)
 
         // A same-named item outside the File menu must not substitute for an absent leaf.
