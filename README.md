@@ -56,7 +56,7 @@ Missing, stale and partial observations remain explicit. An incomplete track inv
 ### Requirements
 
 - A Mac with Logic Pro installed and an open project.
-- A Swift toolchain capable of building the pinned package dependencies. Local qualification currently uses Swift 6.3.2 on Apple silicon.
+- A Swift toolchain capable of building the pinned package dependencies. Local qualification currently uses Swift 6.4.2 on Apple silicon.
 - An MCP client, such as Codex, Claude Desktop or another client supporting stdio servers.
 - macOS Accessibility permission for the application responsible for launching Conductor. Other operations can require additional permissions.
 

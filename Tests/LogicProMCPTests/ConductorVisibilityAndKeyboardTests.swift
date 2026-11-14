@@ -140,4 +140,59 @@ struct ConductorVisibilityAndKeyboardTests {
         #expect(payload["write_attempted"] as? Bool == false)
         #expect(b.actionCalls.isEmpty && b.setCalls.isEmpty)
     }
+
+    @Test func selectedTrackDoesNotProveKeyboardFocusInArrange() throws {
+        let b = FakeAXRuntimeBuilder()
+        let app = b.element(951100)
+        func node(_ id: Int, _ role: String, _ description: String) -> AXUIElement {
+            let element = b.element(id)
+            b.setRole(element, role)
+            b.setAttribute(element, kAXDescriptionAttribute as String, description)
+            b.setChildren(element, [])
+            return element
+        }
+        let window = node(951101, kAXWindowRole as String, "Test project")
+        let toolbar = node(951102, kAXToolbarRole as String, "Control Bar")
+        let library = node(951103, kAXCheckBoxRole as String, "Library")
+        let play = node(951104, kAXCheckBoxRole as String, "Play")
+        let record = node(951105, kAXCheckBoxRole as String, "Record")
+        let tracks = node(951106, kAXGroupRole as String, "Tracks")
+        let header = node(951107, kAXLayoutItemRole as String, "Selected track")
+        let editor = node(951108, kAXTextFieldRole as String, "Track name")
+        let browser = node(951109, kAXGroupRole as String, "Browser")
+        let table = node(951110, kAXTableRole as String, "Instruments")
+        let document = "file:///tmp/Fixture.logicx"
+        b.setAttribute(app, kAXWindowsAttribute as String, [window])
+        b.setAttribute(window, kAXDocumentAttribute as String, document)
+        b.setAttribute(header, kAXSelectedAttribute as String, true)
+        b.setAttribute(library, kAXValueAttribute as String, 1)
+        b.setAttribute(app, kAXFocusedUIElementAttribute as String, table)
+        b.setChildren(window, [toolbar, tracks, browser])
+        b.setChildren(toolbar, [library, play, record])
+        b.setChildren(tracks, [header])
+        b.setChildren(header, [editor])
+        b.setChildren(browser, [table])
+        let runtime = AXLogicProElements.Runtime(
+            logicProPID: { 4242 }, ax: b.makeAXRuntime(appElement: app), focusedApplicationPID: { 4242 })
+        let binding = AXTrackBinding.Binding(window: window, header: header, document: document,
+            runtime: runtime, observedStackHeader: false, observedHeaders: [header])
+        let scope = try #require(Logic13ArrangeKeyboardScope(binding: binding))
+
+        #expect(scope.libraryIsOpen == true)
+        #expect(!scope.hasArrangeFocus())
+        b.setAttribute(library, kAXValueAttribute as String, 0)
+        #expect(scope.libraryIsOpen == nil)
+        b.setChildren(window, [toolbar, tracks])
+        b.setAttribute(app, kAXFocusedUIElementAttribute as String, tracks)
+        #expect(scope.libraryIsOpen == false)
+        #expect(scope.hasArrangeFocus())
+        b.setAttribute(app, kAXFocusedUIElementAttribute as String, editor)
+        #expect(!scope.hasArrangeFocus())
+        b.setAttribute(app, kAXFocusedUIElementAttribute as String, tracks)
+        b.setAttribute(window, kAXDocumentAttribute as String, "file:///tmp/Other.logicx")
+        #expect(!scope.hasArrangeFocus())
+        #expect(!scope.requestLibrary(open: true))
+        #expect(b.actionCalls.isEmpty)
+    }
+
 }

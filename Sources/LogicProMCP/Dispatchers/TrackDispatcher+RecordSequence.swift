@@ -829,7 +829,24 @@ extension TrackDispatcher {
             base["gm_device_lane_index"] = sourceIndex
             base["gm_device_lane_name"] = sourceName
         }
-        func failure(_ error: String, stage: String, hint: String, extras: [String: Any] = [:]) -> CallTool.Result {
+        var keyboardScope: Logic13ArrangeKeyboardScope?
+        var requestedLibraryClose = false
+        var verifiedLibraryClosed = false
+
+        func restoreLibrary(into payload: inout [String: Any]) async {
+            guard requestedLibraryClose, let keyboardScope else { return }
+            if keyboardScope.libraryIsOpen == true {
+                payload["library_restored"] = true
+                return
+            }
+            guard verifiedLibraryClosed, keyboardScope.requestLibrary(open: true) else {
+                payload["library_restored"] = false
+                return
+            }
+            payload["library_restored"] = await keyboardScope.waitForLibrary(open: true, settle: settleReadback)
+        }
+
+        func failure(_ error: String, stage: String, hint: String, extras: [String: Any] = [:]) async -> CallTool.Result {
             var payload = base.merging(extras) { _, new in new }
             payload["success"] = false
             payload["verified"] = false
@@ -843,6 +860,7 @@ extension TrackDispatcher {
             payload["safe_to_retry"] = false
             payload["automatic_precondition_attempts_exhausted"] = true
             payload["hint"] = hint + " The imported take is still on \(sourceLabel) \(sourceIndex) ('\(sourceName)')."
+            await restoreLibrary(into: &payload)
             return jsonToolTextResult(payload, isError: true)
         }
 
@@ -855,7 +873,7 @@ extension TrackDispatcher {
         guard observedImportLane, tracksAfter == tracksBefore + 1,
               relocationInventoryIsOwnedAppend(baseline: baseline, current: afterImport),
               afterImport.last?.index == sourceIndex else {
-            return failure(
+            return await failure(
                 "relocation_unsupported", stage: "relocation_preflight",
                 hint: "Relocation requires exactly one verified imported lane and an unchanged pre-existing track population.",
                 extras: ["gm_device_lanes": gmLanes]
@@ -864,7 +882,7 @@ extension TrackDispatcher {
         guard afterImport.indices.contains(target.index),
               afterImport[target.index].name.utf8.elementsEqual(target.expectedName.utf8),
               logic13 || afterImport[target.index].type == .softwareInstrument else {
-            return failure(
+            return await failure(
                 "target_changed", stage: "relocation_postimport",
                 hint: "The exact Software Instrument target did not survive the owned GM-lane append unchanged."
             )
@@ -874,7 +892,7 @@ extension TrackDispatcher {
             readRegions: readRegions, settleReadback: settleReadback,
             match: { preferredRecordSequenceRegion(from: $0.filter { $0.trackIndex == sourceIndex }) }
         ) else {
-            return failure(
+            return await failure(
                 "unreadable_readback", stage: "relocation_source",
                 hint: "No MIDI region could be read on the GM Device lane, so nothing was copied."
             )
@@ -885,10 +903,30 @@ extension TrackDispatcher {
             .map({ recordSequenceRegionKey($0) == recordSequenceRegionKey(sourceRegion) }) == true {
             regionsBeforePaste = regions
         } else {
-            return failure(
+            return await failure(
                 "unreadable_readback", stage: "relocation_source",
                 hint: "The pre-paste region census did not cover the whole arrangement, so a paste could not be told apart from other changes."
             )
+        }
+
+        if logic13 {
+            guard let binding = afterImport[target.index].physicalBinding,
+                  let scope = Logic13ArrangeKeyboardScope(binding: binding),
+                  let libraryOpen = scope.libraryIsOpen else {
+                return await failure("arrange_unverified", stage: "relocation_keyboard_scope",
+                    hint: "The current Arrange window and Library state could not be verified.")
+            }
+            keyboardScope = scope
+            if libraryOpen {
+                requestedLibraryClose = scope.requestLibrary(open: false)
+                if requestedLibraryClose {
+                    verifiedLibraryClosed = await scope.waitForLibrary(open: false, settle: settleReadback)
+                }
+                guard verifiedLibraryClosed else {
+                    return await failure("arrange_unverified", stage: "relocation_keyboard_scope",
+                        hint: "Logic did not confirm the Library was closed before keyboard editing.")
+                }
+            }
         }
 
         let selectSource = await withWriteBoundaryArmed(
@@ -898,7 +936,7 @@ extension TrackDispatcher {
             await router.route(operation: "track.select", params: ["index": String(sourceIndex)])
         }
         guard channelResultIsVerified(selectSource) else {
-            return failure("select_failed", stage: "relocation_select_source",
+            return await failure("select_failed", stage: "relocation_select_source",
                            hint: "Could not verify exclusive selection of the GM Device lane: \(selectSource.message).")
         }
         guard let copyBoundary = relocationTrackInventory(),
@@ -907,17 +945,22 @@ extension TrackDispatcher {
               !logic13 || AccessibilityChannel.selectedRegionInfos().map({
                   $0.map(recordSequenceRegionKey) == [recordSequenceRegionKey(sourceRegion)]
               }) == true else {
-            return failure(
+            return await failure(
                 "source_changed", stage: "relocation_copy_boundary",
                 hint: "The exact GM Device source was no longer the sole selected track immediately before copy; nothing was copied."
             )
         }
         let clipboardBefore = logic13 ? await MainActor.run { NSPasteboard.general.changeCount } : nil
-        let copy = await withWriteBoundaryArmed(traceID, deadlineStage: "relocation_copy") {
-            await router.route(operation: "edit.copy")
+        let copy: ChannelResult? = await withWriteBoundaryArmed(traceID, deadlineStage: "relocation_copy") {
+            guard !logic13 || keyboardScope?.hasArrangeFocus() == true else { return nil }
+            return await router.route(operation: "edit.copy")
+        }
+        guard let copy else {
+            return await failure("arrange_focus_unverified", stage: "relocation_copy",
+                hint: "Keyboard focus was outside the verified Tracks area. Copy was withheld.")
         }
         guard copy.isSuccess else {
-            return failure("copy_failed", stage: "relocation_copy", hint: "Copy was not delivered: \(copy.message).")
+            return await failure("copy_failed", stage: "relocation_copy", hint: "Copy was not delivered: \(copy.message).")
         }
         var copiedClipboard: Int?
         if let clipboardBefore {
@@ -930,7 +973,7 @@ extension TrackDispatcher {
                 await settleReadback()
             }
             guard copiedClipboard != nil else {
-                return failure("copy_unverified", stage: "relocation_copy", hint: "Logic did not publish a new clipboard item.")
+                return await failure("copy_unverified", stage: "relocation_copy", hint: "Logic did not publish a new clipboard item.")
             }
         }
         let selectTarget = await withWriteBoundaryArmed(
@@ -940,7 +983,7 @@ extension TrackDispatcher {
             await router.route(operation: "track.select", params: ["index": String(target.index)])
         }
         guard channelResultIsVerified(selectTarget) else {
-            return failure("select_failed", stage: "relocation_select_target",
+            return await failure("select_failed", stage: "relocation_select_target",
                            hint: "Could not verify exclusive selection of target track \(target.index): \(selectTarget.message). Nothing was pasted.")
         }
 
@@ -951,7 +994,7 @@ extension TrackDispatcher {
                 beforePosition: beforePosition, router: router, cache: cache, traceID: traceID,
                 selectDisplay: selectFullPositionDisplay, restoreDisplay: restorePositionDisplay)
             guard anchored else {
-                return failure("playhead_unverified", stage: "relocation_playhead",
+                return await failure("playhead_unverified", stage: "relocation_playhead",
                     hint: "The exact bar-one paste position could not be verified.")
             }
         } else if TransportDispatcher.gotoPositionUnchangedResult(
@@ -968,7 +1011,7 @@ extension TrackDispatcher {
                 router: router, cache: cache
             )
             guard !(gotoResult.isError ?? false) else {
-                return failure("playhead_unverified", stage: "relocation_playhead",
+                return await failure("playhead_unverified", stage: "relocation_playhead",
                                hint: "The playhead could not be verified at bar 1, so nothing was pasted.")
             }
         }
@@ -982,7 +1025,7 @@ extension TrackDispatcher {
               pasteBoundary[target.index].name.utf8.elementsEqual(target.expectedName.utf8),
               logic13 ? pasteBoundary[target.index].hasSelectedLogic13Piano()
                   : pasteBoundary[target.index].type == .softwareInstrument else {
-            return failure(
+            return await failure(
                 "target_changed", stage: "relocation_paste_boundary",
                 hint: "The exact selected Software Instrument target changed or could not be renewed immediately before paste. Nothing was pasted."
             )
@@ -990,20 +1033,25 @@ extension TrackDispatcher {
         guard relocationInventoryConfirmsExclusiveSelection(
             pasteBoundary, selectedIndex: target.index
         ) else {
-            return failure(
+            return await failure(
                 "target_changed", stage: "relocation_paste_boundary",
                 hint: "The exact Software Instrument target was not the sole selected track immediately before paste. Nothing was pasted."
             )
         }
 
         if logic13, await MainActor.run(body: { NSPasteboard.general.changeCount }) != copiedClipboard {
-            return failure("clipboard_changed", stage: "relocation_paste_boundary", hint: "The clipboard changed after the owned copy.")
+            return await failure("clipboard_changed", stage: "relocation_paste_boundary", hint: "The clipboard changed after the owned copy.")
         }
-        let paste = await withWriteBoundaryArmed(traceID, deadlineStage: "relocation_paste") {
-            await router.route(operation: "edit.paste")
+        let paste: ChannelResult? = await withWriteBoundaryArmed(traceID, deadlineStage: "relocation_paste") {
+            guard !logic13 || keyboardScope?.hasArrangeFocus() == true else { return nil }
+            return await router.route(operation: "edit.paste")
+        }
+        guard let paste else {
+            return await failure("arrange_focus_unverified", stage: "relocation_paste",
+                hint: "Keyboard focus was outside the verified Tracks area. Paste was withheld.")
         }
         guard paste.isSuccess else {
-            return failure("paste_failed", stage: "relocation_paste", hint: "Paste was not delivered: \(paste.message).")
+            return await failure("paste_failed", stage: "relocation_paste", hint: "Paste was not delivered: \(paste.message).")
         }
 
         guard let pasted = await pollStableRegionReadback(
@@ -1015,14 +1063,14 @@ extension TrackDispatcher {
                 return added
             }
         ) else {
-            return failure("paste_unverified", stage: "relocation_verify",
+            return await failure("paste_unverified", stage: "relocation_verify",
                            hint: "The bounded readback did not prove exactly one new region on target track \(target.index) while preserving every prior region; no further write was issued.")
         }
         guard pasted.startBar == sourceRegion.startBar, pasted.endBar == sourceRegion.endBar,
               pasted.startBar == 1, pasted.endBar == expectedEndBar else {
             var observed = recordSequenceRegionFields(pasted, prefix: "observed_")
             observed["observed_track_index"] = pasted.trackIndex
-            return failure("timing_mismatch", stage: "relocation_verify",
+            return await failure("timing_mismatch", stage: "relocation_verify",
                            hint: "A region was pasted on track \(target.index) but its bars do not match the import.",
                            extras: observed)
         }
@@ -1036,6 +1084,7 @@ extension TrackDispatcher {
         payload["source_track_retained"] = true
         if !logic13 { payload["gm_device_lane_retained"] = true }
         payload["cleanup_hint"] = "The original take is still on \(sourceLabel) \(sourceIndex). Identify it by a fresh track reference before removing it."
+        await restoreLibrary(into: &payload)
         return jsonToolTextResult(payload)
     }
 
