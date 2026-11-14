@@ -4,8 +4,8 @@ import Foundation
 /// All tunables live here — ports, timeouts, poll intervals.
 struct ServerConfig: Sendable {
     // MARK: - Server Identity
-    static let serverName = "logic-pro-mcp"
-    static let serverVersion = "3.19.0"
+    static let serverName = "ion-cascade-conductor"
+    static let serverVersion = "0.1.0"
     static let versionMarker = "LOGIC_PRO_MCP_VERSION=\(serverVersion)"
 
     // MARK: - MIDI

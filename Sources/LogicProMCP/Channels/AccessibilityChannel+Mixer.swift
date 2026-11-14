@@ -49,6 +49,9 @@ extension AccessibilityChannel {
             )
             if let shallow {
                 lookup = .found(shallow.mixer)
+            } else if ProcessInfo.processInfo.environment["LOGIC_MCP_BOUNDED_MIXER_POLL"] == "1" {
+                // An inconclusive shallow scan is unknown, not an empty mixer.
+                return (nil, false)
             } else {
                 lookup = try AXLogicProElements.mixerPopulationAreaLookup(
                     in: window, runtime: runtime, checking: {

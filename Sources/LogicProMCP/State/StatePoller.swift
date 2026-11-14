@@ -37,6 +37,9 @@ actor StatePoller {
     }
 
     @TaskLocal private static var backgroundCycleYieldSignal: BackgroundCycleYieldSignal?
+    @TaskLocal private static var coreOnlyRefresh = false
+    private var waitingBatchNeedsMixer = false
+
 
     struct Runtime: Sendable {
         let hasVisibleWindow: @Sendable () -> Bool
@@ -88,6 +91,8 @@ actor StatePoller {
         /// `backgroundTickYields(to:)`. Defaults to "no text editing", the pre-existing behaviour,
         /// so a test runtime never reaches the live AX API by omission.
         let keyboardFocus: @Sendable () -> AccessibilityChannel.LogicKeyboardFocus
+        /// Opt-in diagnostic: skip expensive background mixer enumeration.
+        let pollMixer: @Sendable () -> Bool
 
         /// Source-compatible init: if `sleep` isn't supplied, use
         /// `Task.sleep(nanoseconds:)` so existing callers (mostly tests that
@@ -108,7 +113,8 @@ actor StatePoller {
             },
             blockingDialogInfo: @Sendable @escaping () -> AXLogicProElements.BlockingDialogInfo? = { nil },
             projectFileReader: LogicProjectFileReader.Runtime = .unavailable,
-            keyboardFocus: @Sendable @escaping () -> AccessibilityChannel.LogicKeyboardFocus = { .notTextEditing }
+            keyboardFocus: @Sendable @escaping () -> AccessibilityChannel.LogicKeyboardFocus = { .notTextEditing },
+            pollMixer: @Sendable @escaping () -> Bool = { true }
         ) {
             self.hasVisibleWindow = hasVisibleWindow
             self.projectChooserVisible = projectChooserVisible
@@ -117,6 +123,7 @@ actor StatePoller {
             self.blockingDialogInfo = blockingDialogInfo
             self.projectFileReader = projectFileReader
             self.keyboardFocus = keyboardFocus
+            self.pollMixer = pollMixer
         }
 
         /// The AX project reader supplies a title but cannot provide a trusted
@@ -133,7 +140,8 @@ actor StatePoller {
             dialogPresent: { AXLogicProElements.dialogPresent() },
             blockingDialogInfo: { AXLogicProElements.blockingDialogInfo() },
             projectFileReader: .production,
-            keyboardFocus: { AccessibilityChannel.readLogicKeyboardFocus(runtime: .production) }
+            keyboardFocus: { AccessibilityChannel.readLogicKeyboardFocus(runtime: .production) },
+            pollMixer: { ProcessInfo.processInfo.environment["LOGIC_MCP_SKIP_BACKGROUND_MIXER"] != "1" }
         )
 
         /// Test-friendly runtime for lifecycle-only coverage. Short-circuits
@@ -290,6 +298,12 @@ actor StatePoller {
         await runCoalescedCycle()
     }
 
+    /// An explicit track/project read must not age while an unrelated Mixer is scanned.
+    func refreshCoreNowReceipt() async -> RefreshReceipt {
+        await runCoalescedCycle(coreOnly: true)
+    }
+
+
     func acquireSessionPopulation(
         request: SessionPopulationObservation.Request, targetRegistry: TargetRegistry?
     ) async throws -> SessionPopulationObservation.Capture {
@@ -432,13 +446,14 @@ actor StatePoller {
     /// `yieldingToTextEditing` is the background loop's: its cycle stops at the next read once
     /// Logic's keyboard focus reads as text editing (`pollOnce`). A caller that queues behind a
     /// cycle is served by a cycle of its own, which never yields.
-    private func runCoalescedCycle(yieldingToTextEditing: Bool = false) async -> RefreshReceipt {
+    private func runCoalescedCycle(yieldingToTextEditing: Bool = false, coreOnly: Bool = false) async -> RefreshReceipt {
         // A stop is under way; starting a cycle now is the AX work that stop exists to end.
         if stopped { return .unchanged }
         if cycleInProgress {
             if !yieldingToTextEditing {
                 activeBackgroundCycleYieldSignal?.request()
             }
+            if !coreOnly { waitingBatchNeedsMixer = true }
             return await withCheckedContinuation { waitingForNextCycle.append($0) }
         }
         cycleInProgress = true
@@ -454,10 +469,9 @@ actor StatePoller {
             }
             activeBackgroundCycleYieldSignal = nil
         } else {
-            mine = await pollOnce(
-                axChannel: axChannel, cache: cache,
-                yieldingToTextEditing: yieldingToTextEditing
-            )
+            mine = await Self.$coreOnlyRefresh.withValue(coreOnly) {
+                await pollOnce(axChannel: axChannel, cache: cache, yieldingToTextEditing: false)
+            }
         }
         handOffCycle()
         return mine
@@ -486,7 +500,11 @@ actor StatePoller {
             if Task.isCancelled { break }
             let batch = waitingForNextCycle
             waitingForNextCycle = []
-            let shared = await pollOnce(axChannel: axChannel, cache: cache, yieldingToTextEditing: false)
+            let coreOnly = !waitingBatchNeedsMixer
+            waitingBatchNeedsMixer = false
+            let shared = await Self.$coreOnlyRefresh.withValue(coreOnly) {
+                await pollOnce(axChannel: axChannel, cache: cache, yieldingToTextEditing: false)
+            }
             for waiter in batch { waiter.resume(returning: shared) }
         }
     }
@@ -498,6 +516,7 @@ actor StatePoller {
     private func strandWaiters() {
         let stranded = waitingForNextCycle
         waitingForNextCycle = []
+        waitingBatchNeedsMixer = false
         for waiter in stranded { waiter.resume(returning: .unchanged) }
     }
 
@@ -851,27 +870,30 @@ actor StatePoller {
         if Self.helpReadsStopped { return yieldCycle(cacheKeys) }
         if transportReady.applied { cacheKeys.append(.transport) }
         if backgroundCycleYields(yieldingToTextEditing) { return yieldCycle(cacheKeys) }
-        let mixerVersion = await cache.currentVersion(for: .mixer)
-        let focus = runtime.keyboardFocus
-        let mixerRead = await axChannel.readMixerStates(stoppingWhen: {
-            yieldingToTextEditing && Self.backgroundReadYields(to: focus())
-        })
-        if mixerRead.yielded || Self.helpReadsStopped { return yieldCycle(cacheKeys) }
-        let mixerReady: PollOutcome
-        if mixerRead.provided {
-            if let states = mixerRead.states {
-                mixerReady = PollOutcome(readable: true, applied: await cache.updateChannelStrips(states, ifCurrent: mixerVersion))
-            } else { mixerReady = PollOutcome(readable: false, applied: false) }
-        } else {
-            mixerReady = await poll(
-                operation: "mixer.get_state", label: "Mixer", section: .mixer,
-                axChannel: axChannel, cache: cache, as: [ChannelStripState].self
-            ) { cache, strips, observed in
-                await cache.updateChannelStrips(strips, ifCurrent: observed)
+        if runtime.pollMixer() && !Self.coreOnlyRefresh {
+            let mixerVersion = await cache.currentVersion(for: .mixer)
+            let focus = runtime.keyboardFocus
+            let mixerRead = await axChannel.readMixerStates(stoppingWhen: {
+                yieldingToTextEditing && Self.backgroundReadYields(to: focus())
+            })
+            if mixerRead.yielded || Self.helpReadsStopped { return yieldCycle(cacheKeys) }
+            let mixerReady: PollOutcome
+            if mixerRead.provided {
+                if let states = mixerRead.states {
+                    mixerReady = PollOutcome(readable: true, applied: await cache.updateChannelStrips(states, ifCurrent: mixerVersion))
+                } else { mixerReady = PollOutcome(readable: false, applied: false) }
+            } else {
+                mixerReady = await poll(
+                    operation: "mixer.get_state", label: "Mixer", section: .mixer,
+                    axChannel: axChannel, cache: cache, as: [ChannelStripState].self
+                ) { cache, strips, observed in
+                    await cache.updateChannelStrips(strips, ifCurrent: observed)
+                }
             }
+            if Self.helpReadsStopped { return yieldCycle(cacheKeys) }
+            if mixerReady.applied { cacheKeys.append(.mixer) }
         }
-        if Self.helpReadsStopped { return yieldCycle(cacheKeys) }
-        if mixerReady.applied { cacheKeys.append(.mixer) }
+        if Self.coreOnlyRefresh { return await finishPoll(cacheKeys, yieldingToTextEditing: yieldingToTextEditing) }
         markerPollTick += 1
         if markerPollTick >= Self.markerPollInterval {
             if backgroundCycleYields(yieldingToTextEditing) { return yieldCycle(cacheKeys) }

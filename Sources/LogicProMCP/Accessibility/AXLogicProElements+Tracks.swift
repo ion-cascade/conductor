@@ -405,6 +405,12 @@ extension AXLogicProElements {
     static func getTrackHeaders(runtime: Runtime = .production) -> AXUIElement? {
         guard let window = mainWindow(runtime: runtime) else { return nil }
         if projectPickerPreventsTrackRead(window, runtime: runtime) { return nil }
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+           case .read(let rows) = shallowExactTrackHeadersRead(in: window, runtime: runtime),
+           let first = rows.first,
+           let rail: AXUIElement = AXHelpers.getAttribute(first, kAXParentAttribute as String, runtime: runtime.ax) {
+            return rail
+        }
         // Contracted / test-path lookups first.
         if let area = AXHelpers.findDescendant(
             of: window, role: kAXListRole, identifier: "Track Headers", runtime: runtime.ax
@@ -524,6 +530,11 @@ extension AXLogicProElements {
             }
             // The last AX lookup can revoke custody; permission must follow it.
             return permittingWrite?() ?? true
+        }
+
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
+            return selectTrackUsingSearch(at: index, header: header, runtime: runtime,
+                permittingWrite: permitted, willWrite: willWrite)
         }
 
         // Step 1 (v3.0.9 primary path) — AXSelectedChildren on parent group.
@@ -690,6 +701,17 @@ extension AXLogicProElements {
         runtime: Runtime = .production,
         observingExposure: AXTrackBinding.Exposure? = nil
     ) -> VerifiedTrackHeaderRead {
+        // The exact, role-checked Arrange rail is sufficient for exposed membership.
+        // An unrelated editor failing AXChildren must not invalidate this held rail.
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+           let exact = shallowExactTrackHeadersRead(in: window, runtime: runtime) {
+            switch exact {
+            case .read(let rows): return .read(rows)
+            case .unavailable: return .unavailable
+            case .unreadable: return .unreadable(stage: "exact_track_rail", status: "unreadable")
+            }
+        }
+
         guard !projectPickerPreventsTrackRead(window, runtime: runtime) else {
             return .unavailable
         }

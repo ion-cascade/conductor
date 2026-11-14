@@ -491,14 +491,32 @@ final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable
         case let .success(.some(listedDirectory)):
             startingDirectory = listedDirectory
         case .success(nil):
-            guard let volume = volume(containing: target) else {
-                return .refused("stem_destination_volume_unresolvable")
+            // Startup disks can be hidden in the sidebar (observed on macOS 27).
+            // The visible home row is another candidate, never proof by name: the
+            // same checked-selection + actual child-URL listing must establish its root.
+            let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+            var observedHome: String?
+            if isDirectory(home.path, anAncestorOf: wanted) {
+                switch selectVolumeRoot(named: home.lastPathComponent, at: home.path, in: panel) {
+                case .selected: observedHome = home.path
+                case .refused(let reason):
+                    // Only a missing/ambiguous candidate (before any sidebar action)
+                    // permits the existing volume route. Lost navigation custody stops.
+                    if reason != "stem_destination_volume_row_not_uniquely_resolvable:\(home.lastPathComponent)" {
+                        return .refused(reason)
+                    }
+                }
             }
-            switch selectVolumeRoot(named: volume.name, at: volume.root, in: panel) {
-            case .selected:
-                startingDirectory = volume.root
-            case let .refused(reason):
-                return .refused(reason)
+            if let observedHome {
+                startingDirectory = observedHome
+            } else {
+                guard let volume = volume(containing: target) else {
+                    return .refused("stem_destination_volume_unresolvable")
+                }
+                switch selectVolumeRoot(named: volume.name, at: volume.root, in: panel) {
+                case .selected: startingDirectory = volume.root
+                case .refused(let reason): return .refused(reason)
+                }
             }
         }
 

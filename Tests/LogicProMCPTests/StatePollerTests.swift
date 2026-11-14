@@ -788,3 +788,56 @@ private func makeStatePollerAccessibilityRuntime(
     blocker.unblock()
     await stopTask.value
 }
+
+
+@Test func testOptionalMixerPollingGatePreservesTransportAndTracks() async throws {
+    let cache = StateCache()
+    let transportPayload = """
+    {"isPlaying":true,"isRecording":false,"isCycleEnabled":false,"isMetronomeEnabled":false,"tempo":123.5,"sampleRate":48000,"position":"3.1.1.1","timePosition":"00:00:12.000","lastUpdated":"2026-04-12T00:00:00Z"}
+    """
+    let tracksPayload = """
+    [{"id":0,"name":"Audio 1","type":"audio","isMuted":false,"isSoloed":false,"isArmed":false,"isSelected":true,"volume":0.82,"pan":0,"automationMode":"off","color":null}]
+    """
+    let mixerPayload = """
+    [{"trackIndex":0,"volume":0.82,"pan":0,"sends":[],"input":null,"output":null,"eqEnabled":false,"plugins":[]}]
+    """
+    let channel = AccessibilityChannel(runtime: makeStatePollerAccessibilityRuntime(
+        projectInfoResult: .success("{" + #""name":"Session","sampleRate":48000,"bitDepth":24,"tempo":123.5,"timeSignature":"4/4","trackCount":1,"filePath":null,"lastUpdated":"2026-04-12T00:00:00Z""# + "}"),
+        transportResult: .success(transportPayload), tracksResult: .success(tracksPayload), mixerResult: .success(mixerPayload)))
+    let poller = StatePoller(axChannel: channel, cache: cache, runtime: .init(hasVisibleWindow: { true }, pollMixer: { false }))
+    await poller.refreshNow()
+    let transport = await cache.getTransport()
+    let tracks = await cache.getTracks()
+    let strips = await cache.getChannelStrips()
+    #expect(transport.isPlaying)
+    #expect(tracks.count == 1)
+    #expect(strips.isEmpty)
+}
+
+@Test func testCoreRefreshSkipsMixerWithoutDisablingLaterFullRefresh() async throws {
+    let cache = StateCache()
+    let transportPayload = """
+    {"isPlaying":true,"isRecording":false,"isCycleEnabled":false,"isMetronomeEnabled":false,"tempo":123.5,"sampleRate":48000,"position":"3.1.1.1","timePosition":"00:00:12.000","lastUpdated":"2026-04-12T00:00:00Z"}
+    """
+    let tracksPayload = """
+    [{"id":0,"name":"Audio 1","type":"audio","isMuted":false,"isSoloed":false,"isArmed":false,"isSelected":true,"volume":0.82,"pan":0,"automationMode":"off","color":null}]
+    """
+    let mixerPayload = """
+    [{"trackIndex":0,"volume":0.82,"pan":0,"sends":[],"input":null,"output":null,"eqEnabled":false,"plugins":[]}]
+    """
+    let channel = AccessibilityChannel(runtime: makeStatePollerAccessibilityRuntime(
+        projectInfoResult: .success("{" + #""name":"Session","sampleRate":48000,"bitDepth":24,"tempo":123.5,"timeSignature":"4/4","trackCount":1,"filePath":null,"lastUpdated":"2026-04-12T00:00:00Z""# + "}"),
+        transportResult: .success(transportPayload), tracksResult: .success(tracksPayload), mixerResult: .success(mixerPayload)))
+    let poller = StatePoller(axChannel: channel, cache: cache, runtime: .init(hasVisibleWindow: { true }))
+    let receipt = await poller.refreshCoreNowReceipt()
+    let transport = await cache.getTransport()
+    let tracks = await cache.getTracks()
+    let strips = await cache.getChannelStrips()
+    #expect(transport.isPlaying)
+    #expect(tracks.count == 1)
+    #expect(strips.isEmpty)
+    #expect(!receipt.changedSections.contains(.mixer))
+    let full = await poller.refreshNowReceipt()
+    #expect(full.changedSections.contains(.mixer))
+    #expect(await cache.getChannelStrips().count == 1)
+}

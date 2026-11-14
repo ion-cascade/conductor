@@ -679,6 +679,18 @@ extension AccessibilityChannel {
         private var topologyRefreshIssued = false
         var effects = SessionPopulationObservation.UIEffects()
 
+        // Diagnostic only: the existing full read may survey unrelated deep UI trees.
+        // The shallow reader identifies an exact rail but is not a proof that no competing
+        // rail exists elsewhere, so this opt-in must not be treated as production custody.
+        private static func navigationHeaders(in window: AXUIElement, runtime: AXLogicProElements.Runtime) -> AXLogicProElements.TrackHeaderRead {
+            if ProcessInfo.processInfo.environment["LOGIC_MCP_SHALLOW_NAVIGATION_HEADERS"] == "1",
+               case .read(let headers)? = AXLogicProElements.shallowExactTrackHeadersRead(in: window, runtime: runtime),
+               !headers.isEmpty {
+                return .read(headers)
+            }
+            return AXLogicProElements.allTrackHeadersRead(in: window, runtime: runtime)
+        }
+
         init?(
             window: AXUIElement, runtime: AXLogicProElements.Runtime,
             expectedProject: TargetDescriptor?, requiresProjectReference: Bool,
@@ -690,7 +702,7 @@ extension AccessibilityChannel {
                   let url = URL(string: document), url.isFileURL,
                   url.host == nil || url.host == "" || url.host == "localhost",
                   let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedUIElementAttribute, runtime: runtime.ax),
-                  case .read(let headers) = AXLogicProElements.allTrackHeadersRead(in: window, runtime: runtime)
+                  case .read(let headers) = Self.navigationHeaders(in: window, runtime: runtime)
             else { return nil }
             if requiresProjectReference {
                 guard let expectedProject,
@@ -745,7 +757,7 @@ extension AccessibilityChannel {
                   case .success(.some(let currentDocument)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
                   currentDocument.utf8.elementsEqual(document.utf8),
                   !AXLogicProElements.dialogPresent(runtime: runtime),
-                  case .read(let currentHeaders) = AXLogicProElements.allTrackHeadersRead(in: window, runtime: runtime),
+                  case .read(let currentHeaders) = Self.navigationHeaders(in: window, runtime: runtime),
                   currentHeaders.count == headers.count,
                   zip(headers, currentHeaders).allSatisfy({ CFEqual($0, $1) }),
                   currentHeaders.map({ AXHelpers.getAttribute($0, kAXSelectedAttribute as String, runtime: runtime.ax) as Bool? }) == selected.map(Optional.some),
@@ -1885,6 +1897,76 @@ extension AccessibilityChannel {
         }
     }
 
+    /// Opt-in Logic 13 panel experiment. This verifies the directly owned Control
+    /// Bar checkbox, not the existence or absence of separate floating Mixer windows.
+    /// Only the exact current project/window and a stopped transport are admitted.
+    static func diagnosticMixerPanelVisibility(_ desired: Bool, runtime: AXLogicProElements.Runtime) -> ChannelResult {
+        let operation = "view.set_mixer_visibility"
+        func refused(_ reason: String, wrote: Bool = false) -> ChannelResult {
+            .error(HonestContract.encodeStateC(error: .readbackUnavailable,
+                hint: wrote ? "The Mixer panel action was attempted but could not be verified; do not blindly retry."
+                            : "The exact stopped-project Mixer panel control could not be verified; no action was sent.",
+                extras: ["operation": operation, "reason": reason, "write_attempted": wrote, "safe_to_retry": !wrote]))
+        }
+        guard (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
+              let pid = runtime.logicProPID(), let app = AXLogicProElements.appRoot(runtime: runtime),
+              runtime.focusedApplicationPID() == pid,
+              AXHelpers.getAttribute(app, kAXFrontmostAttribute as String, runtime: runtime.ax) as Bool? == true,
+              case .found(let window) = AXLogicProElements.arrangeWindowRead(runtime: runtime),
+              let main: AXUIElement = AXHelpers.getAttribute(app, kAXMainWindowAttribute as String, runtime: runtime.ax),
+              let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute as String, runtime: runtime.ax),
+              CFEqual(window, main), CFEqual(window, focused),
+              !AXLogicProElements.dialogPresent(runtime: runtime),
+              case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
+              let toolbar = AXLogicProElements.directLogic13Toolbar(in: window, runtime: runtime.ax),
+              let play = AXLogicProElements.directToolbarControl(AXLocalePolicy.transportPlayControl, in: toolbar, runtime: runtime.ax),
+              let record = AXLogicProElements.directToolbarControl(AXLocalePolicy.transportRecordControl, in: toolbar, runtime: runtime.ax),
+              AXValueExtractors.extractButtonState(play, runtime: runtime.ax) == false,
+              AXValueExtractors.extractButtonState(record, runtime: runtime.ax) == false,
+              let control = AXLogicProElements.directToolbarControl(AXLocalePolicy.controlBarMixerToggle, in: toolbar, runtime: runtime.ax),
+              case .success(let enabled?) = AXHelpers.getAttributeResult(control, kAXEnabledAttribute as String, runtime: runtime.ax) as Result<NSNumber?, AXHelpers.AXStatusError>,
+              enabled.boolValue,
+              case .success(let actions)? = runtime.ax.actionNamesResult?(control), actions.contains(kAXPressAction as String),
+              let before = AXValueExtractors.extractButtonState(control, runtime: runtime.ax) else {
+            return refused("mixer_panel_scope_unavailable")
+        }
+        func stillCurrent() -> Bool {
+            guard (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
+                  runtime.logicProPID() == pid, runtime.focusedApplicationPID() == pid,
+                  let currentApp = AXLogicProElements.appRoot(runtime: runtime), CFEqual(app, currentApp),
+                  case .found(let currentWindow) = AXLogicProElements.arrangeWindowRead(runtime: runtime), CFEqual(window, currentWindow),
+                  !AXLogicProElements.dialogPresent(runtime: runtime),
+                  case .success(.some(let currentDocument)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
+                  currentDocument.utf8.elementsEqual(document.utf8),
+                  let currentToolbar = AXLogicProElements.directLogic13Toolbar(in: window, runtime: runtime.ax), CFEqual(toolbar, currentToolbar),
+                  let currentControl = AXLogicProElements.directToolbarControl(AXLocalePolicy.controlBarMixerToggle, in: currentToolbar, runtime: runtime.ax), CFEqual(control, currentControl),
+                  AXValueExtractors.extractButtonState(play, runtime: runtime.ax) == false,
+                  AXValueExtractors.extractButtonState(record, runtime: runtime.ax) == false else { return false }
+            return true
+        }
+        guard stillCurrent(), AXValueExtractors.extractButtonState(control, runtime: runtime.ax) == before else {
+            return refused("mixer_panel_scope_changed")
+        }
+        if before == desired {
+            return .success(HonestContract.encodeStateA(extras: ["operation": operation, "requested_visible": desired,
+                "before_visible": before, "after_visible": before, "write_attempted": false,
+                "visibility_source": "direct_control_bar_mixer_panel", "floating_windows_covered": false]))
+        }
+        guard case .success = AXHelpers.performActionResult(control, kAXPressAction as String, runtime: runtime.ax) else {
+            return refused("mixer_panel_press_unverified", wrote: true)
+        }
+        for _ in 0..<10 {
+            Thread.sleep(forTimeInterval: 0.1)
+            guard stillCurrent() else { return refused("mixer_panel_scope_changed_after_press", wrote: true) }
+            if AXValueExtractors.extractButtonState(control, runtime: runtime.ax) == desired {
+                return .success(HonestContract.encodeStateA(extras: ["operation": operation, "requested_visible": desired,
+                    "before_visible": before, "after_visible": desired, "write_attempted": true,
+                    "visibility_source": "direct_control_bar_mixer_panel", "floating_windows_covered": false]))
+            }
+        }
+        return refused("mixer_panel_readback_mismatch", wrote: true)
+    }
+
     static func defaultSetMixerVisibility(params: [String: String], runtime: AXLogicProElements.Runtime) async -> ChannelResult {
         guard let raw = params["visible"], raw == "true" || raw == "false" else {
             return .error(HonestContract.encodeStateC(error: .invalidParams,
@@ -1892,6 +1974,9 @@ extension AccessibilityChannel {
         }
         if let approval = ApprovedSessionRepair.current {
             return await approval.perform(raw == "true", runtime: runtime)
+        }
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_DIRECT_MIXER_PANEL"] == "1" {
+            return diagnosticMixerPanelVisibility(raw == "true", runtime: runtime)
         }
         let stop: @Sendable () -> Bool = {
             (try? SessionPopulationObservation.requireOwnedAcquisition()) == nil

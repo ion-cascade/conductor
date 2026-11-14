@@ -101,6 +101,18 @@ extension AccessibilityChannel {
         runtime: AXLogicProElements.Runtime = .production,
         mouseRuntime: AXMouseHelper.Runtime = .production
     ) -> ChannelResult {
+        // AXPress on Logic 13's Play checkbox started playback while Logic was
+        // backgrounded but a second press did not stop it. If the frontmost
+        // CGEvent route cannot establish keyboard ownership, fail before any
+        // fallback write rather than starting/stopping in an unverified context.
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_DIRECT_TOOLBAR"] == "1",
+           ["Play", "Stop", "Record"].contains(name),
+           (runtime.logicProPID() == nil || runtime.focusedApplicationPID() != runtime.logicProPID()) {
+            return .error(HonestContract.encodeStateC(error: .readbackUnavailable,
+                hint: "Bring Logic to the foreground before using transport; no accessibility action was sent.",
+                extras: ["operation": "transport.\(name.lowercased())", "write_attempted": false,
+                         "safe_to_retry": false, "reason": "logic_not_keyboard_owner"]))
+        }
         // Try the Logic Pro 12 control-bar checkbox first (Korean + English UI).
         // Falls back to legacy toolbar button search.
         // One LabelSet per control, not one Korean string and one English one. The table was

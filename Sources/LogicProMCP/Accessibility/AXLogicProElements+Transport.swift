@@ -369,6 +369,11 @@ extension AXLogicProElements {
     /// The same discriminator, scoped to the window the caller actually acquired.
     static func getControlBar(in window: AXUIElement, runtime: AXHelpers.Runtime) -> AXUIElement? {
 
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_DIRECT_TOOLBAR"] == "1",
+           let direct = directLogic13Toolbar(in: window, runtime: runtime) {
+            return direct
+        }
+
         // #628: "Control Bar" is not a unique AXDescription. Measured on one arrange window, two
         // groups carry it — (10, 54, 1900, 58) with twenty direct checkboxes, and
         // (828, 58, 264, 48) with none. The loop that used to be here returned whichever the walk
@@ -519,6 +524,70 @@ extension AXLogicProElements {
         // Exactly one, or nothing. Two bars that both hold transport controls is a tree this code
         // has never seen and must not guess about; the callers all fail closed on nil.
         return controlBarCandidate(labelled: labelled, withControls: withControls)
+    }
+
+    /// Opt-in layout-specific candidate. A failed or ambiguous observation never
+    /// selects a control. This does not prove absence elsewhere in the window.
+    static func directLogic13Toolbar(in window: AXUIElement, runtime: AXHelpers.Runtime) -> AXUIElement? {
+        guard case .success(let children) = AXHelpers.childrenResult(window, runtime: runtime) else { return nil }
+        func read(_ element: AXUIElement, _ key: String) -> Result<String?, AXHelpers.AXStatusError> {
+            AXHelpers.getAttributeResult(element, key, runtime: runtime)
+        }
+        var bars: [AXUIElement] = []
+        for child in children {
+            guard case .success(.some(let role)) = read(child, kAXRoleAttribute as String) else { return nil }
+            guard role == kAXToolbarRole as String else { continue }
+            let desc: String?
+            switch read(child, kAXDescriptionAttribute as String) {
+            case .success(let value): desc = value
+            case .failure(let error) where error.isDefinitiveAbsence: desc = nil
+            case .failure: return nil
+            }
+            if AXLocalePolicy.controlBarGroupLabel.matches(desc ?? "", mode: .exactStrict) { bars.append(child) }
+        }
+        guard bars.count == 1,
+              case .success(let controls) = completeControlBarCensus(
+                of: bars[0], matching: [kAXCheckBoxRole as String],
+                terminalRoles: [kAXButtonRole as String, kAXCheckBoxRole as String],
+                maxDepth: 4, runtime: runtime) else { return nil }
+        var play = 0, record = 0
+        for control in controls.matches {
+            let title: String?, description: String?
+            switch read(control, kAXTitleAttribute as String) {
+            case .success(let value): title = value
+            case .failure(let error) where error.isDefinitiveAbsence: title = nil
+            case .failure: return nil
+            }
+            switch read(control, kAXDescriptionAttribute as String) {
+            case .success(let value): description = value
+            case .failure(let error) where error.isDefinitiveAbsence: description = nil
+            case .failure: return nil
+            }
+            if AXLocalePolicy.transportPlayControl.matches(title ?? "", mode: .exactStrict) ||
+                AXLocalePolicy.transportPlayControl.matches(description ?? "", mode: .exactStrict) { play += 1 }
+            if AXLocalePolicy.transportRecordControl.matches(title ?? "", mode: .exactStrict) ||
+                AXLocalePolicy.transportRecordControl.matches(description ?? "", mode: .exactStrict) { record += 1 }
+        }
+        return play == 1 && record == 1 ? bars[0] : nil
+    }
+
+    /// A complete census inside the already-qualified direct toolbar. Never
+    /// choose by visual order or swallow a failed label read.
+    static func directToolbarControl(_ label: AXLocalePolicy.LabelSet, in toolbar: AXUIElement,
+                                     runtime: AXHelpers.Runtime) -> AXUIElement? {
+        guard case .success(let census) = completeControlBarCensus(
+            of: toolbar, matching: [kAXCheckBoxRole as String],
+            terminalRoles: [kAXButtonRole as String, kAXCheckBoxRole as String],
+            maxDepth: 4, runtime: runtime) else { return nil }
+        var matches: [AXUIElement] = []
+        for element in census.matches {
+            switch AXLocalePolicy.elementMatchesResult(element, label, runtime: runtime) {
+            case .success(true): matches.append(element)
+            case .success(false): break
+            case .failure: return nil
+            }
+        }
+        return matches.count == 1 ? matches[0] : nil
     }
 
     /// Logic 13.0 build 7801 returns `AXError.failure` for `AXChildren` on an audio-patch

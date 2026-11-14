@@ -726,6 +726,10 @@ actor LogicProServer {
                     mutationGate: sagaControlPath ? nil : mutationGate,
                     externallyManagedMutation: isSagaExecute
                 ) {
+                    if ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] == "1",
+                       name == "logic_tracks" || name == "logic_mixer" || name == "logic_midi" || name == "logic_project" {
+                        _ = await poller.refreshCoreNowReceipt()
+                    }
                     if let handler {
                         return await handler(dispatchDependencies, cmdParams)
                     }
@@ -753,7 +757,12 @@ actor LogicProServer {
                 // session must return a typed operation_timeout body, never leave
                 // the client with no JSON-RPC response.
                 try await Self.runResourceReadWithDeadline(uri: params.uri) {
-                    try await ResourceHandlers.read(
+                    if ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] == "1",
+                       params.uri == "logic://tracks" || params.uri == "logic://mixer" || params.uri == "logic://project/info" {
+                        if params.uri == "logic://mixer" { _ = await poller.refreshNowReceipt() }
+                        else { _ = await poller.refreshCoreNowReceipt() }
+                    }
+                    return try await ResourceHandlers.read(
                         uri: params.uri,
                         cache: cache,
                         router: router,

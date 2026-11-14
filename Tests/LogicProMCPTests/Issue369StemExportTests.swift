@@ -992,6 +992,27 @@ struct Issue369StemExportTests {
         #expect(refusedWrongRootListing)
     }
 
+    @Test("a visible home row can establish a destination when the startup volume is absent")
+    func homeSidebarRequiresActualHomeListing() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+        let destination = home.appendingPathComponent("Stem Exports").path
+        let fixture = DestinationBrowserAXFixture(initialEntries: ["/tmp/unrelated"],
+            childrenByPath: [destination: []], volumeName: home.lastPathComponent,
+            volumeRootEntriesAfterSelection: [destination])
+        #expect(fixture.makeSurface().selectDestinationBrowserElement(at: destination) == .selected)
+    }
+
+    @Test("a matching home label cannot authorize a browser rooted elsewhere")
+    func homeSidebarRefusesWrongRootListing() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+        let fixture = DestinationBrowserAXFixture(initialEntries: [], childrenByPath: [:],
+            volumeName: home.lastPathComponent,
+            volumeRootEntriesAfterSelection: ["/Volumes/not-home/Stem Exports"])
+        let result = fixture.makeSurface().selectDestinationBrowserElement(at: home.appendingPathComponent("Stem Exports").path)
+        #expect(result != .selected)
+        #expect(fixture.state.selectedChildrenWrites.isEmpty)
+    }
+
     @Test("the destination popup is identified by carrying a title, not by traversal order")
     func destinationPopupIsIdentifiedStructurally() {
         // Five untitled decoys come first; taking the first popup would read

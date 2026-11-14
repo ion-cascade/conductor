@@ -42,7 +42,8 @@ extension ResourceHandlers {
         // v3.1.4 — `ax_occluded` added so clients can detect when the
         // StatePoller is preserving cache through a modal-dialog or
         // plugin-window AX occlusion.
-        let inner = encodeJSON(state)
+        let inner = transportWireJSON(state,
+            observationsOnly: ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] == "1")
         let body = """
             {"state":\(inner),"has_document":\(hasDocument)}
             """
@@ -69,6 +70,16 @@ extension ResourceHandlers {
         return ReadResource.Result(
             contents: [.text(json, uri: uri, mimeType: "application/json")]
         )
+    }
+
+    /// Legacy transport defaults have never been read from Logic's transport.
+    static func transportWireJSON(_ state: TransportState, observationsOnly: Bool) -> String {
+        guard observationsOnly else { return encodeJSON(state) }
+        var object = jsonObject(state) as? [String: Any] ?? [:]
+        object.removeValue(forKey: "sampleRate")
+        object.removeValue(forKey: "timePosition")
+        object["unavailable_fields"] = ["sampleRate", "timePosition"]
+        return encodeJSONObject(object)
     }
 
     struct LiveTransportStateReadback: Sendable {
@@ -238,6 +249,12 @@ extension ResourceHandlers {
             payload.reserveCapacity(tracksOut.count)
             for (track, reference) in zip(tracksOut, references) {
                 var object = jsonObject(track) as? [String: Any] ?? [:]
+                if ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] == "1" {
+                    object.removeValue(forKey: "pan")
+                    object.removeValue(forKey: "automationMode")
+                    object["type"] = "unknown"
+                    object["unavailable_fields"] = ["pan", "automationMode", "type"]
+                }
                 if let reference {
                     object["track_ref"] = reference.rawValue
                 }
@@ -253,6 +270,8 @@ extension ResourceHandlers {
         // that demonstrably has tracks. `ax_live` is the only source that saw the real thing; the
         // file-count tiers synthesise placeholder names from a count, and cold scalar feedback
         // can populate cache rows without observing their identities.
+        let recent = cacheFetchedAt > .distantPast && Date().timeIntervalSince(cacheFetchedAt) <= 5 && !axOccluded
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] == "1", source == "ax_live", !recent { source = "cache" }
         let observedLive = source == "ax_live"
         let collapsedStacks = collapsedTrackStacks(in: tracksOut)
         // This legacy cache holds exposed rows, not a request-owned project population witness.
@@ -384,7 +403,10 @@ extension ResourceHandlers {
     /// honest label is `mixer_not_visible` rather than a false freshness claim.
     /// Threshold mirrors `readProjectInfo`'s 5s `ax_live` window.
     static func mixerDataSource(fetchedAt: Date, now: Date = Date(), freshThreshold: Double = 5.0) -> String {
-        guard fetchedAt > .distantPast else { return "mixer_not_visible" }
+        guard fetchedAt > .distantPast else {
+            return ProcessInfo.processInfo.environment["LOGIC_MCP_BOUNDED_MIXER_POLL"] == "1"
+                ? "mixer_unverified" : "mixer_not_visible"
+        }
         return now.timeIntervalSince(fetchedAt) <= freshThreshold ? "ax_poll" : "cache_stale"
     }
 

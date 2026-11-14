@@ -1,0 +1,107 @@
+import ApplicationServices
+import Foundation
+
+extension AXLogicProElements {
+    /// Logic 13 accepts AXSelectedChildren/AXPress without changing the selection.
+    /// Its own Search and Select Track palette supplies a numbered, named result.
+    /// This opt-in adapter confirms that exact result before one Return, then reads
+    /// exclusive selection from the retained rail. No coordinates or blind retries.
+    static func selectTrackUsingSearch(
+        at index: Int, header: AXUIElement, runtime: Runtime,
+        keys: AXMouseHelper.Runtime = .production,
+        permittingWrite: () -> Bool, willWrite: (() -> Void)? = nil
+    ) -> Bool {
+        let ax = runtime.ax
+        guard let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
+              let app = appRoot(runtime: runtime),
+              AXHelpers.getAttribute(app, kAXFrontmostAttribute as String, runtime: ax) as Bool? == true,
+              case .found(let window) = arrangeWindowRead(runtime: runtime),
+              case .success(let document?) = projectPickerDocumentRead(window, runtime: runtime),
+              let rail: AXUIElement = AXHelpers.getAttribute(header, kAXParentAttribute as String, runtime: ax),
+              case .success(let rows) = AXHelpers.childrenResult(rail, runtime: ax),
+              rows.indices.contains(index), CFEqual(rows[index], header),
+              case .success(let name?) = AXValueExtractors.extractTrackNameResult(from: header, runtime: ax),
+              let description = AXHelpers.getDescription(header, runtime: ax),
+              description.hasPrefix("Track \(index + 1) "),
+              let windows: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax),
+              windows.count == 1, CFEqual(windows[0], window) else { return false }
+        func current() -> Bool {
+            guard !Task.isCancelled, permittingWrite(),
+                  runtime.focusedApplicationPID() == pid,
+                  projectPickerDocumentRead(window, runtime: runtime) == .success(document),
+                  case .success(let now) = AXHelpers.childrenResult(rail, runtime: ax),
+                  now.count == rows.count, zip(now, rows).allSatisfy({ CFEqual($0, $1) }),
+                  case .success(let currentName?) = AXValueExtractors.extractTrackNameResult(from: header, runtime: ax)
+            else { return false }
+            return currentName == name
+        }
+        if rows.enumerated().allSatisfy({ AXValueExtractors.extractSelectedState($0.element, runtime: ax) == ($0.offset == index) }) {
+            return true
+        }
+        guard let bar: AXUIElement = AXHelpers.getAttribute(app, kAXMenuBarAttribute as String, runtime: ax),
+              case .success(let top) = AXHelpers.childrenResult(bar, runtime: ax) else { return false }
+        let tracks = top.filter { AXHelpers.getTitle($0, runtime: ax) == "Track" }
+        guard tracks.count == 1, case .success(let menus) = AXHelpers.childrenResult(tracks[0], runtime: ax),
+              menus.count == 1, case .success(let items) = AXHelpers.childrenResult(menus[0], runtime: ax) else { return false }
+        let search = items.filter { AXHelpers.getTitle($0, runtime: ax) == "Search and Select Track…" }
+        guard search.count == 1, current() else { return false }
+        willWrite?()
+        _ = AXHelpers.performAction(search[0], kAXPressAction, runtime: ax)
+        keys.sleepMicros(150_000)
+        guard let after: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax) else { return false }
+        let added = after.filter { w in !windows.contains { CFEqual($0, w) } }
+        guard added.count == 1 else { return false }
+        let popup = added[0]
+        var confirmed = false
+        defer {
+            // Close only our retained palette. Never send a global Escape.
+            if !confirmed, let nodes = searchPaletteNodes(popup, runtime: ax) {
+                let close = nodes.filter { AXHelpers.getRole($0, runtime: ax) == kAXButtonRole as String && AXHelpers.getDescription($0, runtime: ax) == "Close" }
+                if close.count == 1 { _ = AXHelpers.performAction(close[0], kAXPressAction, runtime: ax) }
+            }
+        }
+        guard let nodes = searchPaletteNodes(popup, runtime: ax),
+              nodes.filter({ AXHelpers.getRole($0, runtime: ax) == kAXImageRole as String && AXHelpers.getDescription($0, runtime: ax) == "Search" }).count == 1 else { return false }
+        let fields = nodes.filter { AXHelpers.getRole($0, runtime: ax) == kAXTextFieldRole as String }
+        guard fields.count == 1, current() else { return false }
+        willWrite?()
+        guard AXHelpers.setAttribute(fields[0], kAXValueAttribute, String(index + 1) as CFString, runtime: ax) else { return false }
+        keys.sleepMicros(150_000)
+        guard let resultNodes = searchPaletteNodes(popup, runtime: ax) else { return false }
+        let labels = resultNodes.filter { AXHelpers.getRole($0, runtime: ax) == kAXStaticTextRole as String }
+            .compactMap { AXHelpers.getAttribute($0, kAXValueAttribute as String, runtime: ax) as String? }
+        guard searchTrackResultMatches(labels, number: index + 1, name: name), current(),
+              let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedUIElementAttribute as String, runtime: ax),
+              CFEqual(focused, fields[0]) else { return false }
+        willWrite?()
+        guard keys.postKeyEvent(36) else { return false }
+        for _ in 0..<6 {
+            keys.sleepMicros(50_000)
+            if rows.enumerated().allSatisfy({ AXValueExtractors.extractSelectedState($0.element, runtime: ax) == ($0.offset == index) }) {
+                guard current(), let remaining: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax),
+                      !remaining.contains(where: { CFEqual($0, popup) }) else { return false }
+                confirmed = true
+                return true
+            }
+        }
+        return false
+    }
+
+    static func searchTrackResultMatches(_ labels: [String], number: Int, name: String) -> Bool {
+        labels == ["\(number)\t\(name)"]
+    }
+
+    private static func searchPaletteNodes(_ root: AXUIElement, runtime: AXHelpers.Runtime) -> [AXUIElement]? {
+        var pending: [(AXUIElement, Int)] = [(root, 0)], result: [AXUIElement] = []
+        let leaves: Set<String> = [kAXStaticTextRole as String, kAXTextFieldRole as String, kAXImageRole as String, kAXButtonRole as String, kAXColumnRole as String]
+        while !pending.isEmpty {
+            let (node, depth) = pending.removeFirst()
+            guard result.count < 128, depth <= 8, let role = AXHelpers.getRole(node, runtime: runtime) else { return nil }
+            result.append(node)
+            if leaves.contains(role) { continue }
+            guard case .success(let children) = AXHelpers.childrenResult(node, runtime: runtime) else { return nil }
+            pending.append(contentsOf: children.map { ($0, depth+1) })
+        }
+        return result
+    }
+}

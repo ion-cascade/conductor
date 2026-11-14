@@ -40,7 +40,9 @@ extension AccessibilityChannel {
                 ?? AXLogicProElements.allTrackHeadersRead(in: window, runtime: runtime)
             : AXLogicProElements.allTrackHeadersRead(in: window, runtime: runtime)
         guard case .read(let headers) = headerRead else { return (nil, false) }
-        return readTrackStates(from: headers, in: window, runtime: runtime, stoppingWhen: stop)
+        return readTrackStates(from: headers, in: window, runtime: runtime,
+            readingTypeHelp: !preferringShallowExactRail || ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] != "1",
+            stoppingWhen: stop)
     }
 
     /// Read the retained rail, rather than rediscovering a possibly different window.
