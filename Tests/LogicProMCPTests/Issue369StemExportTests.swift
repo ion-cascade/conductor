@@ -135,7 +135,8 @@ private final class StemPanelTestClock: @unchecked Sendable {
 private func driveStemPanel(
     _ surface: StemPanelSurfaceFake,
     attempts: Int = 3,
-    pollIntervalNanos: UInt64 = 250_000_000
+    pollIntervalNanos: UInt64 = 250_000_000,
+    artifactCompletion: @escaping @Sendable () -> Bool = { false }
 ) async -> ProjectStemExportPanelDriver.Outcome {
     let clock = StemPanelTestClock()
     return await ProjectStemExportPanelDriver.drive(
@@ -147,6 +148,7 @@ private func driveStemPanel(
             clock.now += duration
         },
         pollIntervalNanos: pollIntervalNanos,
+        artifactCompletion: artifactCompletion,
         monotonicNowNanos: { clock.now }
     )
 }
@@ -1424,6 +1426,23 @@ struct Issue369StemExportTests {
             exportEffectObserved: false
         )
         #expect(uncertain)
+    }
+
+    @Test("a closed panel and a private completed-file witness cover an unseen progress window")
+    func fastExportRequiresFileWitnessAndClosedPanel() async {
+        let surface = StemPanelSurfaceFake()
+        surface.panelDisappearsAfterExportPress = true
+        surface.progressObservations = [.absent, .absent]
+        let result = await driveStemPanel(surface, artifactCompletion: { true })
+        #expect(result == .completed)
+    }
+
+    @Test("files alone cannot complete an export while the panel remains open")
+    func fileWitnessCannotSubstituteForPanelClosure() async {
+        let surface = StemPanelSurfaceFake()
+        surface.exportEffectOccurs = false
+        let result = await driveStemPanel(surface, artifactCompletion: { true })
+        #expect(result != .completed)
     }
 
     @Test("a failed Export action status with observed progress is treated as an observed export effect")

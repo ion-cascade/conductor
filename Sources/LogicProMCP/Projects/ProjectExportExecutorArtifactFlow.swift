@@ -232,7 +232,7 @@ extension ProjectExportExecutor {
         plan: ProjectExportPlan,
         options: Options
     ) async -> [RunArtifact] {
-        let destination = artifact.destination ?? artifact.path
+        var destination = artifact.destination ?? artifact.path
         guard let subjects = artifact.subjects, !subjects.isEmpty else {
             return [failedArtifact(
                 artifact,
@@ -252,7 +252,7 @@ extension ProjectExportExecutor {
                 observations: nil
             )
         }
-        guard let drive = options.driveStemExport else {
+        guard options.driveStemExport != nil || options.driveIsolatedStemExport != nil else {
             return stemSubjectArtifacts(
                 artifact: artifact,
                 destination: destination,
@@ -314,7 +314,20 @@ extension ProjectExportExecutor {
                 observations: nil
             )
         }
-        switch await drive(destination) {
+        let outcome: ProjectStemExportPanelDriver.Outcome
+        var isolatedFiles: [String] = []
+        if let drive = options.driveIsolatedStemExport {
+            let receipt = await drive(destination, subjects.count)
+            outcome = receipt.outcome
+            if let actualDirectory = receipt.directory { destination = actualDirectory }
+            isolatedFiles = receipt.files
+        } else if let drive = options.driveStemExport {
+            outcome = await drive(destination)
+        } else {
+            // The availability gate above makes this unreachable.
+            return [failedArtifact(artifact, error: "stem_export_panel_unavailable")]
+        }
+        switch outcome {
         case .refused(let error):
             return stemSubjectArtifacts(
                 artifact: artifact,
@@ -346,6 +359,27 @@ extension ProjectExportExecutor {
             )
         case .completed:
             break
+        }
+
+        // A sole planned populated subject and a sole complete file in a
+        // newly allocated, independently panel-confirmed namespace provide a
+        // binding without guessing filenames. General multi-subject mapping
+        // still remains explicitly unverified below.
+        if options.isolatedSubjectBindingVerified, subjects.count == 1, isolatedFiles.count == 1 {
+            let observed = stemOutputObservation(path: isolatedFiles[0], plan: plan, options: options)
+            return [RunArtifact(
+                kind: artifact.kind,
+                path: observed.path,
+                state: observed.verified ? "A" : "B",
+                verified: observed.verified,
+                bounceFired: true,
+                writeAttempted: true,
+                error: nil,
+                reason: observed.reason,
+                evidence: observed.evidence,
+                subject: subjects[0],
+                observedStemOutputs: [observed]
+            )]
         }
 
         let after: [String]

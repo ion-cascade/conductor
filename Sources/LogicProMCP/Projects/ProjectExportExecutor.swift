@@ -94,6 +94,12 @@ enum ProjectExportExecutor {
         /// seam is intentionally never reused for stems: it would produce the
         /// old project-level artifact behind the word "stem".
         var driveStemExport: StemExportDrive? = nil
+        /// Production route: private output namespace plus complete-file
+        /// evidence, including exports too short to expose a progress window.
+        var driveIsolatedStemExport: (@Sendable (String, Int) async -> ProjectIsolatedStemExportResult)? = nil
+        /// Set only from a fresh complete native population acquisition bound
+        /// to this project and its planned subjects. A cached count is not proof.
+        var isolatedSubjectBindingVerified = false
 
         static func live() -> Options {
             Options(
@@ -106,8 +112,8 @@ enum ProjectExportExecutor {
                 minimumDurationSeconds: 0.05,
                 bounceToPath: { artifactPath in await ProjectExportExecutor.runBounceHelper(artifactPath: artifactPath) },
                 dialogPresent: { AXLogicProElements.dialogPresent() },
-                driveStemExport: { destination in
-                    await ProjectStemExportPanelDriver.live(destination: destination)
+                driveIsolatedStemExport: { destination, count in
+                    await ProjectIsolatedStemExport.live(root: destination, expectedCount: count)
                 }
             )
         }

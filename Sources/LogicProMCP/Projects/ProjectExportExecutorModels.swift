@@ -89,7 +89,7 @@ struct ProjectExportRunArtifact: Codable, Sendable, Equatable {
     /// track, not an inference from an output filename.
     let subject: ProjectExportStemSubject?
     /// Files observed in the before/after directory delta and analyzed after
-    /// export. They are intentionally separate from `subject`: the current AX
+    /// export. They are separate from `subject`: the general multi-track AX
     /// route has no evidence that a particular filename belongs to a track or
     /// that an entry created after the before snapshot was produced by Logic
     /// rather than a concurrent writer.

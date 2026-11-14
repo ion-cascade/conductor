@@ -56,8 +56,8 @@ enum ProjectStemExportPanelDriver {
     }
 
     enum Outcome: Sendable, Equatable {
-        /// The Export button was pressed and the transient progress dialog was
-        /// observed to disappear.
+        /// The Export button was pressed and completion was corroborated by
+        /// a progress round trip or the private completed-file witness.
         case completed
         /// No Export click was made. The associated State C must expose
         /// `write_attempted:false`.
@@ -111,6 +111,7 @@ enum ProjectStemExportPanelDriver {
         progressPollAttempts: Int,
         sleep: @escaping @Sendable (UInt64) async -> Void,
         pollIntervalNanos: UInt64,
+        artifactCompletion: @escaping @Sendable () -> Bool = { false },
         monotonicNowNanos: @escaping @Sendable () -> UInt64 = {
             DispatchTime.now().uptimeNanoseconds
         }
@@ -237,13 +238,14 @@ enum ProjectStemExportPanelDriver {
         var progressReadFailed = false
         var panelReadFailed = false
         for attempt in 0..<max(1, progressPollAttempts) {
+            var panelAbsent = false
             switch surface.exportPanelPresence() {
             case .absent:
                 // The panel can disappear because the user dismissed it or a
                 // transient census missed it. The actuator was already reached
                 // by `pressExport()`, but disappearance alone is not evidence
                 // that an export started.
-                break
+                panelAbsent = true
             case .unavailable:
                 panelReadFailed = true
             case .present, .partiallyMeasured, .unmeasured:
@@ -255,6 +257,11 @@ enum ProjectStemExportPanelDriver {
                 sawExportEffect = true
             case .absent:
                 if sawProgressWindow {
+                    return finish(.completed)
+                }
+                // Only the run-owned file witness may corroborate a fast
+                // export. A disappearing panel by itself remains insufficient.
+                if panelAbsent && !panelReadFailed && !progressReadFailed && artifactCompletion() {
                     return finish(.completed)
                 }
             case .unavailable:
