@@ -282,6 +282,7 @@ extension AccessibilityChannel {
 
             let name = AXHelpers.getDescription(item, runtime: runtime.ax) ?? ""
             let (startBar, endBar) = parseRegionBars(from: help)
+            let bounds = directArrangeRead ? ArrangeRegionBounds.read(from: help) : nil
             let kind = classifyRegionKind(name: name, help: help)
 
             var trackIndex = -1
@@ -310,7 +311,9 @@ extension AccessibilityChannel {
                     rawHelp: help,
                     isSelected: directArrangeRead
                         ? AXValueExtractors.extractSelectedState(item, runtime: runtime.ax)
-                        : nil
+                        : nil,
+                    startPosition: bounds?.start,
+                    endPosition: bounds?.end
                 )
             ))
         }
@@ -540,6 +543,11 @@ extension AccessibilityChannel {
         executeScript: @Sendable (String) async -> ChannelResult = { await AppleScriptChannel.executeAppleScript($0) },
         settle: @Sendable () async -> Void = { try? await Task.sleep(nanoseconds: 350_000_000) }
     ) async -> ChannelResult {
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
+            return await moveChosenRegionToExactPlayhead(runtime: runtime,
+                move: { await executeScript(moveRegionToPlayheadScript(activate: false)) }, settle: settle)
+        }
+
         // Pre-state: snapshot the currently selected region (may be nil if
         // nothing is selected or the AX surface is unreadable).
         // THE SELECTION, not the first thing in it. Logic's `Move to Playhead` acts on everything
@@ -575,44 +583,7 @@ extension AccessibilityChannel {
             ))
         }
 
-        let logicProAppleScript = LogicProTarget.appleScriptTarget()
-        // #519: bar/item/leaf names come from AXLocalePolicy's LabelSets (Edit/Move/To
-        // Playhead) instead of a hard-coded EN/KO literal pair — see AppleScriptMenuResolution.
-        let editBarResolution = AppleScriptMenuResolution.menuBarItem(
-            AXLocalePolicy.editMenuBar,
-            variableName: "editBarName",
-            notFoundError: "EDIT_MENU_BAR_NOT_FOUND"
-        )
-        let moveMenuItemResolution = AppleScriptMenuResolution.menuItem(
-            AXLocalePolicy.moveMenuItem,
-            under: "menu bar item editBarName of menu bar 1",
-            variableName: "moveItemName",
-            notFoundError: "MOVE_MENU_ITEM_NOT_FOUND"
-        )
-        let toPlayheadMenuItemResolution = AppleScriptMenuResolution.menuItem(
-            AXLocalePolicy.toPlayheadMenuItem,
-            under: "menu item moveItemName of menu 1 of menu bar item editBarName of menu bar 1",
-            variableName: "toPlayheadItemName",
-            notFoundError: "TO_PLAYHEAD_MENU_ITEM_NOT_FOUND"
-        )
-        let script = """
-        \(logicProAppleScript.activateByBundleID)
-        delay 0.1
-        tell application "System Events"
-            tell \(logicProAppleScript.systemEventsProcessTarget)
-                try
-                    \(editBarResolution)
-                    \(moveMenuItemResolution)
-                    \(toPlayheadMenuItemResolution)
-                    click menu item toPlayheadItemName of menu 1 of menu item moveItemName of menu 1 of menu bar item editBarName of menu bar 1
-                on error errMsg
-                    return "MENU_ERROR: " & errMsg
-                end try
-            end tell
-        end tell
-        return "OK"
-        """
-        let result = await executeScript(script)
+        let result = await executeScript(moveRegionToPlayheadScript())
         switch result {
         case .success(let output):
             if output.hasPrefix("MENU_ERROR") {
@@ -717,6 +688,48 @@ extension AccessibilityChannel {
             ))
         }
     }
+
+    private static func moveRegionToPlayheadScript(activate: Bool = true) -> String {
+        let logicProAppleScript = LogicProTarget.appleScriptTarget()
+        // #519: bar/item/leaf names come from AXLocalePolicy's LabelSets (Edit/Move/To
+        // Playhead) instead of a hard-coded EN/KO literal pair — see AppleScriptMenuResolution.
+        let editBarResolution = AppleScriptMenuResolution.menuBarItem(
+            AXLocalePolicy.editMenuBar,
+            variableName: "editBarName",
+            notFoundError: "EDIT_MENU_BAR_NOT_FOUND"
+        )
+        let moveMenuItemResolution = AppleScriptMenuResolution.menuItem(
+            AXLocalePolicy.moveMenuItem,
+            under: "menu bar item editBarName of menu bar 1",
+            variableName: "moveItemName",
+            notFoundError: "MOVE_MENU_ITEM_NOT_FOUND"
+        )
+        let toPlayheadMenuItemResolution = AppleScriptMenuResolution.menuItem(
+            AXLocalePolicy.toPlayheadMenuItem,
+            under: "menu item moveItemName of menu 1 of menu bar item editBarName of menu bar 1",
+            variableName: "toPlayheadItemName",
+            notFoundError: "TO_PLAYHEAD_MENU_ITEM_NOT_FOUND"
+        )
+        let activation = activate ? "\(logicProAppleScript.activateByBundleID)\ndelay 0.1" : ""
+        return """
+        \(activation)
+        tell application "System Events"
+            tell \(logicProAppleScript.systemEventsProcessTarget)
+                try
+                    \(editBarResolution)
+                    \(moveMenuItemResolution)
+                    \(toPlayheadMenuItemResolution)
+                    if not frontmost then return "MENU_ERROR: Logic lost foreground"
+                    click menu item toPlayheadItemName of menu 1 of menu item moveItemName of menu 1 of menu bar item editBarName of menu bar 1
+                on error errMsg
+                    return "MENU_ERROR: " & errMsg
+                end try
+            end tell
+        end tell
+        return "OK"
+        """
+    }
+
     /// Put Logic's selection on exactly one region: the last one in the arrange area.
     ///
     /// "Last" is the greatest start bar, ties broken by the greater track index — the ordering

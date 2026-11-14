@@ -116,7 +116,7 @@ enum ControlBarDisplayMode {
         return isBeats(value)
     }
 
-    private static func foregroundStoppedProject(
+    static func foregroundStoppedProject(
         window: AXUIElement, runtime: AXLogicProElements.Runtime
     ) -> Bool {
         let ax = runtime.ax

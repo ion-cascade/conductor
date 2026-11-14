@@ -381,9 +381,10 @@ struct RegionState: Sendable, Codable, Identifiable {
     let id: String
     var name: String
     var trackIndex: Int
-    var startPosition: String   // Bar.Beat
+    var startPosition: String
     var endPosition: String
-    var length: String
+    var length: String   // Legacy bar estimate, not a measured musical duration.
+    var positionPrecision: String? = nil
     var isSelected: Bool = false
     var isLooped: Bool = false
 }
@@ -596,6 +597,9 @@ struct RegionInfo: Sendable, Codable {
     /// The region’s own AXSelected value when the bound Arrange reader could observe it.
     /// An unavailable value stays absent in inventory JSON.
     var isSelected: Bool? = nil
+    /// Native one-based bar.beat.division.tick coordinates, when the help format is known.
+    var startPosition: String? = nil
+    var endPosition: String? = nil
 }
 
 struct RegionInventoryPayload: Codable, Sendable {
@@ -685,9 +689,12 @@ extension RegionInfo {
             id: "\(trackIndex):\(startBar):\(endBar):\(safeName)",
             name: safeName,
             trackIndex: trackIndex,
-            startPosition: "\(startBar) 1 1 1",
-            endPosition: "\(endBar) 1 1 1",
-            length: "\(lengthBars) 0 0 0"
+            startPosition: startPosition?.replacingOccurrences(of: ".", with: " ") ?? "\(startBar) 1 1 1",
+            endPosition: endPosition?.replacingOccurrences(of: ".", with: " ") ?? "\(endBar) 1 1 1",
+            length: "\(lengthBars) 0 0 0",
+            positionPrecision: startPosition != nil && endPosition != nil
+                ? "musical_components" : (startBar > 0 && endBar > 0 ? "bars_only" : "unavailable"),
+            isSelected: isSelected ?? false
         )
     }
 }

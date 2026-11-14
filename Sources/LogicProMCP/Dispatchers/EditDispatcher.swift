@@ -45,11 +45,11 @@ struct EditDispatcher: OperationTraceDispatching {
             move_to_playhead. \
             Params by command: \
             quantize -> { value: String } ("1/4", "1/8", "1/16", etc.); \
-            move_to_playhead -> {} moves the SELECTED region to the playhead and verifies it: \
-            State A only when the same region (same name, same track) is selected after the move \
-            and its start bar landed on the playhead within one bar; State B when the readback is \
-            unavailable, when the region did not move, or when the selection changed underneath \
-            the operation; \
+            move_to_playhead -> {} moves the selected region to the playhead. \
+            The Logic 13 Arrange path requires complete visible geometry, the hidden-track view shown, \
+            a stopped foreground project and one selected region. It verifies the held region's exact \
+            bar.beat.division.tick start at the playhead and reports the observed end. \
+            Legacy layouts verify only bar-level placement. \
             Most others -> {} (operate on current selection)
             """,
         inputSchema: .object([

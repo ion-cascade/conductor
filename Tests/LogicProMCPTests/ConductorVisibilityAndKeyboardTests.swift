@@ -195,6 +195,31 @@ struct ConductorVisibilityAndKeyboardTests {
         #expect(b.actionCalls.isEmpty)
     }
 
+    @Test(arguments: [
+        ("3 bars 2 beats 3 divisions 17 ticks", "3.2.3.17"),
+        ("3 bars 17 ticks", "3.1.1.17"),
+        ("3 bars 2 beats", "3.2.1.1"),
+        ("3 bars 3 divisions", "3.1.3.1"),
+        ("1 bar", "1.1.1.1"),
+    ])
+    func exactRegionBoundsDecodeTheMeasuredOmissions(start: String, position: String) {
+        let help = "Region starts at \(start)  and ends at 4 bars 2 beats 3 divisions 17 ticks , MIDI region."
+        let bounds = ArrangeRegionBounds.read(from: help)
+        #expect(bounds?.start == position)
+        #expect(bounds?.end == "4.2.3.17")
+    }
+
+    @Test(arguments: [
+        "Region starts at 3 seconds and ends at 7 seconds",
+        "Region starts at 3 bars 0 beats and ends at 4 bars",
+        "Region starts at 3 bars 17 ticks and ends at 3 bars",
+        "Region starts at 3 bars and ends at 4 bars 2 unknown",
+        "Chord group starts at 3 bars and ends at 4 bars",
+    ])
+    func ambiguousRegionHelpDoesNotClaimExactBounds(help: String) {
+        #expect(ArrangeRegionBounds.read(from: help) == nil)
+    }
+
     @Test func heldTrackSelectionRefusesStaleProjectWithoutUsingIndexFallback() async throws {
         let b = FakeAXRuntimeBuilder()
         let app = b.element(951200)
