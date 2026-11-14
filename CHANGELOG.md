@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Verify short per-track exports from completed, decoded WAV or AIFF files in a private run directory. Attributing several files to several tracks remains outside the verified path.
 - Resolve the stem export command within File → Export. Renew the export’s region inventory on the held project before planning and check the complete track population before binding a single result.
 - Bound Library-open track discovery and modal reads. Add verified hidden-track view control, Studio Grand selection and readback, and a bounded Save As dialog lookup.
-- Preserve the active bridge’s socket and PID when a second process tries to start. Document reconnection and startup for the Terminal-launched bridge.
+- Preserve the active bridge’s socket and PID when a second process tries to start. Verify Terminal-launched bridge recovery and automatic startup after a fresh macOS login.
 
 ---
 

@@ -111,7 +111,7 @@ Qualification is specific to the build, host and workflow. Current local work us
 
 | Check | Current evidence |
 | --- | --- |
-| Shared bridge and recovery | The configured SSH launcher supported simultaneous clients and a fresh connection after the upstream exited. Duplicate startup preserved the active socket and PID. After Logic quit and relaunched, the same client reopened the saved fixture and verified its notes. |
+| Shared bridge and recovery | The configured SSH launcher supported simultaneous clients and a fresh connection after the upstream exited. Conductor started automatically after signing out of macOS and signing back in, then read the saved MIDI through the same launcher. Duplicate startup preserved the active socket and PID. After Logic quit and relaunched, the same client reopened the saved fixture and verified its notes. |
 | Target selection | Numbered search results were checked against the intended track name, with independent selection readback. |
 | Stable track references | Track selection and mute on/off succeeded through issued references. |
 | Read-after-write state | Explicit core refreshes replace stale track data; unread transport defaults are omitted. |
@@ -133,7 +133,6 @@ Logic creates a staging track when it imports the Standard MIDI File. Conductor 
 - Short per-track exports can finish between progress observations. The 0.2 candidate verifies a stable, decodable WAV or AIFF in its own run directory with one independently bound subject. General multi-track file attribution remains unverified.
 - MIDI note readback uses the native Standard MIDI File export and reports ticks from the SMF origin. The bar-three fixture keeps its leading space. Its region spans bars one through four, and the first note falls at tick 3840 at 480 PPQ.
 - Factory patch qualification covers Studio Grand. Arbitrary instruments and effects, Stem Splitter and general export workflows remain outside this qualification.
-- No full reboot or logout test has established login-startup behavior for this version.
 - Screenshots were unavailable in the current remote Mac environment. Live qualification used MCP responses and separate native Accessibility probes; no visual or listening approval is implied.
 
 See [development notes](docs/conductor/development.md) for the source layout and validation approach. The inherited [technical API reference](docs/API.md) describes the broader command surface; its operation-specific requirements still apply.
