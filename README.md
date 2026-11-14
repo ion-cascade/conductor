@@ -116,14 +116,15 @@ Qualification is specific to the build, host and workflow. Current local work us
 | Stable track references | Track selection and mute on/off succeeded through issued references. |
 | Read-after-write state | Explicit core refreshes replace stale track data; unread transport defaults are omitted. |
 | Playback and mixer panel | Play/Stop and mixer hide/show were verified in a disposable session. |
-| MIDI-to-audio workflow | A known four-note MIDI file is loaded and saved as an editable Logic project. The export destination path is still being qualified. |
-| Automated checks | 146 focused Swift tests passed. The bridge has focused tests for concurrent clients, reconnects, cancellation, disconnects and startup. |
+| MIDI-to-audio workflow | A known four-note MIDI file was opened through macOS LaunchServices, saved as an editable Logic project through MCP, and rendered through MCP per-track export. The 3.715 s stereo AIFF passed file analysis and independent pitch checks. See the completion limitation below. |
+| Automated checks | 146 focused Swift tests and 15 Python tests passed. The bridge tests cover concurrent clients, reconnects, cancellation, disconnects and startup. |
 
 ### Current limits
 
 - The qualified track-selection adapter currently expects English UI labels and an exposed, contiguous track rail in a single project window.
 - Track and routing inventories can be partial. Hidden tracks and collapsed stacks require their own evidence.
 - Pan controls depend on the visible layout; missing controls are not verified centre pan.
+- Short per-track exports can finish before a progress window is observed. `export_run` then honestly returns State B (`stem_export_press_effect_not_observed`) even when the audio file exists. Inspect the destination and run `logic_audio.analyze_file`; do not blindly repeat an uncertain export.
 - Exact MIDI-event readback, arbitrary instruments and effects, Stem Splitter and general export workflows are not yet qualified by these checks.
 - No full reboot or logout test has established login-startup behavior for this version.
 - Screenshots were unavailable in the current remote Mac environment. Live qualification used MCP responses and separate native Accessibility probes; no visual or listening approval is implied.
