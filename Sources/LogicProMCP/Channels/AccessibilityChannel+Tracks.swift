@@ -1244,6 +1244,13 @@ extension AccessibilityChannel {
             }
             var pendingPresentation = presentation(of: pending, headers: beforeHeaders, descriptions: beforePresentation)
             while let target = pending.first {
+                if originalPresentation != nil, let hiddenControl,
+                   !CFEqual(target.disclosure, hiddenControl), !CFEqual(originalFocus, rail) {
+                    // The combined gesture can move workspace focus to the rail.
+                    // Preserve the Hide View inverse when that focus cannot be restored.
+                    effects.reason = "stack_focus_restoration_unavailable"
+                    return
+                }
                 let currentTarget = presentation(of: [target], headers: beforeHeaders, descriptions: beforePresentation)[0]
                 if beforePresentation != nil, currentTarget == nil || currentTarget != pendingPresentation[0] {
                     effects.reason = "stack_header_moved_after_exposure"
