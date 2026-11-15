@@ -113,7 +113,37 @@ extension AXLogicProElements {
             }
             // else: not an insert slot — skip without consuming an index.
         }
-        return screenOrderedInsertSlots(slots, children: children, runtime: runtime)
+        var ordered = screenOrderedInsertSlots(slots, children: children, runtime: runtime)
+        if let append = namedInstrumentStripAppend(after: ordered, children: children, runtime: runtime) {
+            ordered.append(append)
+        }
+        return ordered
+    }
+
+    /// Logic 13's named Audio Plug-in button immediately after the final
+    /// effect opens that strip's insert chooser. Keep arbitrary short controls
+    /// excluded. Only the observed instrument-strip layout can name this
+    /// particular append position.
+    private static func namedInstrumentStripAppend(
+        after inserts: [PluginInsertSlot],
+        children: [AXUIElement],
+        runtime: AXHelpers.Runtime
+    ) -> PluginInsertSlot? {
+        guard let last = inserts.last,
+              inserts.allSatisfy({ $0.readStatus == .occupiedReadable }),
+              children.filter({ isNamedMIDIPluginButton($0, runtime: runtime) }).count == 1,
+              let lastFrame = elementFrame(last.element, runtime: runtime) else { return nil }
+        let buttons = children.filter {
+            AXHelpers.getRole($0, runtime: runtime) == kAXButtonRole as String
+                && AXHelpers.getDescription($0, runtime: runtime) == "audio plug-in"
+        }
+        guard buttons.count == 1, let append = buttons.first,
+              let frame = elementFrame(append, runtime: runtime),
+              frame.height == 11,
+              frame.minX == lastFrame.minX, frame.width == lastFrame.width,
+              frame.minY == lastFrame.maxY else { return nil }
+        return PluginInsertSlot(index: inserts.count, element: append, name: nil,
+                                isBypassed: nil, readStatus: .empty)
     }
 
     /// Number the recognised slots from the top of the strip down, and take a software

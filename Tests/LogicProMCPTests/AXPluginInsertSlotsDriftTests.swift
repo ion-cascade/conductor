@@ -90,10 +90,35 @@ private func addFramedButton(
         children: [append, effect, separator, instrument, midi], runtime: builder.makeAXRuntime())
 
     let slot = try #require(slots.first)
-    #expect(slots.count == 1)
+    #expect(slots.count == 2)
     #expect(slot.index == 0)
     #expect(slot.name == "Compressor")
     #expect(slot.readStatus == .occupiedReadable)
+    #expect(slots.last?.index == 1)
+    #expect(slots.last?.isEmpty == true)
+    #expect(slots.last.map { CFEqual($0.element, append) } == true)
+}
+
+@Test func testLogic13AudioAppendRequiresAdjacencyToTheLastEffect() throws {
+    let builder = FakeAXRuntimeBuilder()
+    let midi = addFramedButton(builder, 870, y: 973, width: 66, height: 22,
+                               description: "MIDI plug-in")
+    let instrument = addOccupiedSlot(builder, 871, name: "Piano")
+    let effect = addOccupiedSlot(builder, 872, name: "Compressor")
+    builder.setAttribute(instrument, kAXPositionAttribute as String, axPoint(100, 1001))
+    builder.setAttribute(instrument, kAXSizeAttribute as String, axSize(66, 22))
+    builder.setAttribute(effect, kAXPositionAttribute as String, axPoint(100, 1030))
+    builder.setAttribute(effect, kAXSizeAttribute as String, axSize(66, 20))
+    let separator = addFramedButton(builder, 873, y: 1029, width: 66, height: 1,
+                                     description: "insert bar")
+    let nonAdjacent = addFramedButton(builder, 874, y: 1080, width: 66, height: 11,
+                                       description: "audio plug-in")
+    let slots = AXLogicProElements.audioPluginInsertSlots(
+        children: [nonAdjacent, effect, separator, instrument, midi], runtime: builder.makeAXRuntime())
+
+    #expect(slots.count == 1)
+    #expect(slots.first?.name == "Compressor")
+    #expect(slots.first?.isEmpty == false)
 }
 
 @Test func testInsertSlotsPreservePhysicalIndexAcrossUnreadableOccupied() throws {
