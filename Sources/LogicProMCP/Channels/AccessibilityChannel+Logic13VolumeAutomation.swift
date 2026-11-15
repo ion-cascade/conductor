@@ -78,8 +78,8 @@ extension AccessibilityChannel {
               (0...127).contains(expected), (0...127).contains(requested) else {
             return refusal(.invalidParams, "Supply an observed musical position, expected value and requested Logic fader value.")
         }
-        let matches = points.indices.filter { points[$0].position == position }
-        guard matches.count == 1, let index = matches.first, points[index].value == expected else {
+        let matchingIndices = points.indices.filter { points[$0].position == position }
+        guard matchingIndices.count == 1, let index = matchingIndices.first, points[index].value == expected else {
             return refusal(.staleSnapshot, "The position and expected value do not identify one current Volume event.")
         }
         guard (requested - expected).isMultiple(of: 10) else {
