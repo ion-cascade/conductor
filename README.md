@@ -12,6 +12,7 @@
   <a href="#what-conductor-does">Capabilities</a> ·
   <a href="#tested-status">Tested status</a> ·
   <a href="docs/conductor/remote-bridge.md">Remote Mac setup</a> ·
+  <a href="https://github.com/ion-cascade/conductor/releases/latest">Latest release</a> ·
   <a href="https://github.com/ion-cascade/conductor/issues">Issues</a>
 </p>
 
@@ -30,8 +31,8 @@ Our focus is practical music work with trustworthy feedback: a command being acc
 | Area | Available interfaces |
 | --- | --- |
 | **Transport** | Playback, stop, tempo, position and control-bar state |
-| **Tracks** | Inspect names and exposed controls; select, mute, solo, create and rename tracks |
-| **Mixer** | Channel strips, faders, inserts, sends and guarded routing operations |
+| **Tracks** | Inspect and select tracks, adjust track controls, and create and edit Volume automation |
+| **Mixer** | Channel strips, faders, stock inserts, Compressor presets, sends and guarded routing operations |
 | **MIDI** | Sequence creation and import, MIDI messages, region-event inspection and guarded MIDI export |
 | **Projects** | Open, save, inspect exact region boundaries, plan exports and verify produced artifacts |
 | **Audio analysis** | File format, duration, levels and spectrum measurements |
@@ -137,6 +138,19 @@ Logic creates a staging track when it imports the Standard MIDI File. Conductor 
 With the Mixer open, read `logic://mixer` and take the `mixer_strip_ref` from the intended strip. Use it as `target_ref` with `logic_mixer` and the `set_volume`, `set_pan`, `set_mute` or `set_solo` command. A mute or solo request also takes a Boolean `enabled`. Read the strip again to check its new state.
 
 For Arrange controls, use a track reference from `logic_project.inspect_session`. Review coverage before deciding which tracks exist and reacquire references when opening a different project or exposing a different set of tracks. A control listed in `unavailable_fields` needs fresh native evidence before use.
+
+### Apply a Compressor preset
+
+With the Mixer open and the intended track selected, call `logic_plugins.get_inventory` with its current zero-based Arrange index. Take the Compressor’s `plugin_insert_ref` and use it as `target_ref` for `get_preset_verified`. To load the factory Piano preset, call `set_preset_verified` with the same reference, `path: "02 Keyboards/Piano"` and the just-observed setting as `expected_current`. Reacquire the reference after reopening the project.
+
+For the Compressor threshold, `get_param_verified` and `set_param_verified` use the plug-in’s normalized percentage. A setting of 82 represents 82% on that control.
+
+### Automate track volume
+
+1. Stop playback and select one region on the intended track. Show track automation and leave the enabled Volume lane in Read mode.
+2. Take the track reference from `logic://tracks` and read the selected region’s exact start and end with `logic_project.get_regions`. Call `logic_tracks.create_volume_automation_at_region_borders` with the reference, `start`, and `end`. Creation requires an empty track automation event list.
+3. Open Logic’s Track Automation Event List for the track. Call `get_volume_automation` with the same track reference and verify its `points` and `selected_positions`.
+4. Call `set_volume_automation_point` with a reported `position`, `expected_current` and the target `value`. If Logic selected two points together, send the other position as `linked_position`. The adapter changes values in 10-unit steps in Logic’s 0–127 fader scale.
 
 ### Current limits
 

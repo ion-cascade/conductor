@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [0.4.0] — 2026-11-15
+
+- Bind Logic Pro 13 insert operations to the visible Mixer and distinguish instrument and MIDI-effect controls from audio inserts. Verify an appended stock insert against the refreshed effect chain.
+- Read the stock Compressor setting and apply the factory `02 Keyboards/Piano` preset through its bound insert and native Settings menu.
+- Recognize Logic Pro 13’s `Stereo Out` strip label as the same endpoint as `Stereo Output` in routing menus.
+- Create region-border points on an empty track Volume lane. Read and edit points at bar, beat, division and tick resolution using Logic fader units. Edits to a selected pair require both positions.
+
 ## [0.3.0] — 2026-11-15
 
 - Read Logic 13 playhead and MIDI region positions at bar, beat, division and tick resolution. Verify exact movement of a selected region against fresh native boundaries and restore the LCD presentation after temporary changes.
