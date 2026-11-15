@@ -1624,7 +1624,7 @@ extension AccessibilityChannel {
 
         private func isHeldRailFocus(_ focus: AXUIElement) -> Bool {
             guard ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
-                  hiddenControl == nil, CFEqual(focus, rail),
+                  CFEqual(focus, rail),
                   AXLogicProElements.uniqueTrackHeaderRail(in: window, runtime: logic)
                     .map({ CFEqual($0, rail) }) == true,
                   Self.workspacePath(focus, in: window, ax: logic.ax) != nil,
