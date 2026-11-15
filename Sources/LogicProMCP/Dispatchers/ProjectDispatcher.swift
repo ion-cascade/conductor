@@ -445,9 +445,14 @@ struct ProjectDispatcher: OperationTraceDispatching {
                   }) else {
                 return toolInvalidParamsResult("edit_region requires target_ref, expected_start and expected_end. Use move with start, or trim with exactly one new boundary.")
             }
+            let observedProject = await cache.currentProjectIdentity()
             let traceID = await startTraceIfEnabled(command: command)
             let result = await withWriteBoundaryArmed(traceID) {
                 await router.route(operation: "region.edit_by_reference", params: params.compactMapValues(\.stringValue))
+            }
+            if let receipt = try? JSONSerialization.jsonObject(with: Data(result.message.utf8)) as? [String: Any],
+               receipt["write_attempted"] as? Bool == true {
+                await cache.invalidateRegions(ifCurrent: observedProject)
             }
             return await finalizeTrace(toolTextResult(result), traceID: traceID)
 

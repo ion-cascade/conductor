@@ -559,6 +559,14 @@ extension OperationRegistry {
                 "new_name": .unconstrained("read as text when names is absent"),
                 "names": .unconstrained("an array of strings or comma-separated text; checked against the plan step"),
             ], required: [["step_id", "stepId"], ["confirmed"]]),
+            "project.edit_region": .init(params: [
+                "target_ref": .enforced(.string, .string("reg_test")),
+                "expected_start": .enforced(.string, .string("1.1.1.1")),
+                "expected_end": .enforced(.string, .string("2.1.1.1")),
+                "mode": .enforced(.string, .string("move"), allowed: ["move", "trim"]),
+                "start": .enforced(.string, .string("3.1.1.1")),
+                "end": .enforced(.string, .string("1.3.1.1")),
+            ], required: [["target_ref"], ["expected_start"], ["expected_end"], ["mode"], ["start", "end"]]),
             "project.inspect_session": .init(params: [
                 "snapshot_id": .unconstrained("a value that is not a string is read as no snapshot"),
                 "allow_ui_navigation": .enforced(.boolean, .bool(false)),

@@ -75,9 +75,13 @@ extension AccessibilityChannel {
               selected.allSatisfy({ CFEqual($0, held.item) }) else {
             return refuse(.unsupportedState, "Deselect other regions before editing this target.")
         }
-        guard await scope.show(held.page, replacing: scope.originalPage) else {
-            return refuse(.readbackUnavailable, "The saved region viewport could not be reacquired.",
-                          restored: scope.page()?.matches(scope.originalPage) == true)
+        let presentation = await scope.transition(to: held.page, replacing: scope.originalPage)
+        if !presentation.reached {
+            let restored: Bool
+            if let owned = presentation.ownedPage {
+                restored = await scope.show(scope.originalPage, replacing: owned)
+            } else { restored = false }
+            return refuse(.readbackUnavailable, "The saved region viewport could not be reacquired.", restored: restored)
         }
 
         let ax = runtime.ax

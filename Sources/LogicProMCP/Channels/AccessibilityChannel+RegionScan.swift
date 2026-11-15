@@ -44,24 +44,38 @@ extension AccessibilityChannel {
         init?(runtime: AXLogicProElements.Runtime) {
             _ = runtime.onScreenWindowList()
             guard ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
-                  (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
-                  let app = AXLogicProElements.appRoot(runtime: runtime),
+                  (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil else {
+                Log.debug("Arrange region acquisition environment or gate unavailable", subsystem: "ax")
+                return nil
+            }
+            guard let app = AXLogicProElements.appRoot(runtime: runtime),
                   case .found(let window) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: runtime),
                   case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
-                  URL(string: document)?.isFileURL == true,
-                  ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime),
-                  let content = AXLogicProElements.logic13TrackContent(in: window, runtime: runtime),
+                  URL(string: document)?.isFileURL == true else {
+                Log.debug("Arrange region document unavailable", subsystem: "ax")
+                return nil
+            }
+            guard ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime) else {
+                Log.debug("Arrange region foreground or stopped transport unavailable", subsystem: "ax")
+                return nil
+            }
+            guard let content = AXLogicProElements.logic13TrackContent(in: window, runtime: runtime),
                   let pane: AXUIElement = AXHelpers.getAttribute(content, kAXParentAttribute, runtime: runtime.ax),
                   AXHelpers.getRole(pane, runtime: runtime.ax) == kAXScrollAreaRole,
                   case .success(let children) = AXHelpers.childrenResult(pane, runtime: runtime.ax),
                   children.filter({ CFEqual($0, content) }).count == 1,
                   let x = Self.scrollbar(kAXHorizontalOrientationValue, in: children, runtime: runtime.ax),
                   let y = Self.scrollbar(kAXVerticalOrientationValue, in: children, runtime: runtime.ax),
-                  let h = Self.value(x, runtime: runtime.ax), let v = Self.value(y, runtime: runtime.ax),
-                  case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: window, runtime: runtime),
+                  let h = Self.value(x, runtime: runtime.ax), let v = Self.value(y, runtime: runtime.ax) else {
+                Log.debug("Arrange region pane or scroll values unavailable", subsystem: "ax")
+                return nil
+            }
+            guard case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: window, runtime: runtime),
                   !headers.isEmpty, headers.count <= 256,
-                  let selection = Self.regionSelection(content, runtime: runtime.ax)
-            else { return nil }
+                  let selection = Self.regionSelection(content, runtime: runtime.ax) else {
+                Log.debug("Arrange region track headers or selection unavailable", subsystem: "ax")
+                return nil
+            }
             self.runtime = runtime
             self.app = app
             self.window = window
@@ -73,7 +87,10 @@ extension AccessibilityChannel {
             self.headers = headers
             originalPage = .init(horizontal: h, vertical: v)
             originalSelection = selection
-            guard holdsArrange() else { return nil }
+            guard holdsArrange() else {
+                Log.debug("Arrange region scope changed during acquisition", subsystem: "ax")
+                return nil
+            }
         }
 
         private static func scrollbar(_ axis: String, in children: [AXUIElement],
@@ -265,7 +282,7 @@ extension AccessibilityChannel {
         var targets: [String: HeldRegion] = [:]
         let rows = observed.map { held -> RegionScanReport.Row in
             guard restored, held.fullFrameObserved, held.info.startPosition != nil, held.info.endPosition != nil,
-                  ["midi", "audio"].contains(held.info.kind),
+                  Self.isOrdinaryRegion(held.info),
                   observed.filter({ CFEqual($0.item, held.item) }).count == 1 else {
                 return .init(region: held.info, reference: nil)
             }
@@ -281,6 +298,14 @@ extension AccessibilityChannel {
         }
         return Self.encodeResult(RegionScanReport(regions: rows, sampledPages: sampled, reasons: reasons.reduce(into: []) { if !$0.contains($1) { $0.append($1) } },
                                                   restoration: restored ? "restored" : "unverified"))
+    }
+
+    private static func isOrdinaryRegion(_ info: RegionInfo) -> Bool {
+        let help = info.rawHelp.lowercased()
+        let markers = ["looped region", "alias region", "take folder"]
+        guard !markers.contains(where: { help.contains($0) }) else { return false }
+        return (info.kind == "audio" && help.contains("audio region."))
+            || (info.kind == "midi" && help.contains("midi region."))
     }
 
     static func sameRegionObservation(_ held: HeldRegion, item: AXUIElement, info: RegionInfo) -> Bool {

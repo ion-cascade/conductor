@@ -787,6 +787,14 @@ actor StateCache {
         return true
     }
 
+    func invalidateRegions(ifCurrent observed: ProjectIdentity?) {
+        guard currentProjectIdentity() == observed else { return }
+        regions = []
+        regionsComplete = false
+        regionsFetchedAt = .distantPast
+        regionsProjectIdentity = nil
+    }
+
     func updateRegions(_ newRegions: [RegionState], complete: Bool) {
         regions = newRegions
         regionsComplete = complete
