@@ -142,7 +142,10 @@ extension AccessibilityChannel {
             evidence["observed"] = before
             return .success(HonestContract.encodeStateA(extras: evidence))
         }
-        guard AXHelpers.getAttribute(button, kAXEnabledAttribute as String, runtime: ax) as Bool? == true,
+        // Logic 13 reports AXEnabled=0 for the active Mixer switches. The
+        // held AXSwitch, declared AXPress and independent value determine success.
+        let usesLogic13Switch = ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1"
+        guard usesLogic13Switch || AXHelpers.getAttribute(button, kAXEnabledAttribute as String, runtime: ax) as Bool? == true,
               AXHelpers.getActionNames(button, runtime: ax).contains(kAXPressAction as String),
               current(), readMixerSwitch(button, runtime: ax) == before,
               OperationTraceContext.claimDeadlineEffect(operation) else {
