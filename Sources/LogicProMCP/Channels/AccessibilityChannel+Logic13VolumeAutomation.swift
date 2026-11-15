@@ -193,7 +193,9 @@ private struct Logic13VolumeEventList {
         }
 
         let columns = tableChildren.filter { AXHelpers.getRole($0, runtime: runtime) == kAXColumnRole as String }
-        guard columns.map({ AXHelpers.getDescription($0, runtime: runtime) ?? "" })
+        guard columns.map({ column -> String in
+            AXHelpers.getAttribute(column, kAXIdentifierAttribute as String, runtime: runtime) ?? ""
+        })
                 == ["Lock", "Muted", "Position", "Status", "Ch", "Num", "Val", "Length"] else {
             onRefusal("event_columns")
             return nil
