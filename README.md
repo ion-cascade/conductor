@@ -83,18 +83,9 @@ Keep recordings and projects on your own machines. Conductor's bridge uses your 
 
 ## Tested status
 
-Qualification is specific to the build, host and workflow. Current local work uses **Logic Pro 13.0 build 7801 on an Apple M2 Pro running macOS 27.2.1**.
+Conductor 1.0 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
 
-| Check | Current evidence |
-| --- | --- |
-| Shared bridge and recovery | The configured SSH launcher supported simultaneous clients and a fresh connection after the upstream exited. Conductor started automatically after signing out of macOS and signing back in, then read the saved MIDI through the same launcher. Duplicate startup preserved the active socket and PID. After Logic quit and relaunched, the same client reopened the saved fixture and verified its notes. |
-| Target selection | Numbered search results were checked against the intended track name, with independent selection readback. |
-| Stable track references | Track selection and mute on/off succeeded through issued references. |
-| Read-after-write state | Explicit core refreshes replace stale track data; unread transport defaults are omitted. |
-| Playback and mixer panel | Play/Stop and mixer hide/show were verified in a disposable session. |
-| MIDI-to-audio workflow | The Mac mini tests loaded Studio Grand through MCP, imported four-note fixtures at bars one and three, and read them back from Logic’s MIDI export. Pitch, onset, duration, velocity and channel matched at 480 PPQ before and after reopening. Independent checks verified both native stereo AIFF renders, including the 3.715-second render through the configured SSH launcher after a bridge restart. |
-| Audio delivery | Conductor 0.5 verified stereo PCM bounce, two aligned track exports with repeatable audio, and six native Splitter assets with region and mute readback after reopen. |
-| Automated checks | Conductor 0.5 passed 404 focused Swift tests and 16 Python tests. The bridge tests cover concurrent clients, reconnects, cancellation, disconnects and duplicate startup. |
+The release passed 404 focused Swift tests and 19 Python tests covering the installer and shared bridge.
 
 ### Render and export from Logic 13
 
@@ -104,7 +95,7 @@ Logic’s Stem Splitter is a separate workflow. Select an audio region in a save
 
 ### Import onto an existing instrument
 
-On the Logic 13 candidate, select the Studio Grand track and keep its Inspector visible. Pass its current zero-based index as `target_track` and its unique current name as `target_expected_name` to `logic_tracks.record_sequence`. The note string contains pitch, offset in milliseconds, duration in milliseconds, velocity and a one-based MIDI channel.
+In Logic 13, select the Studio Grand track and keep its Inspector visible. Pass its current zero-based index as `target_track` and its unique current name as `target_expected_name` to `logic_tracks.record_sequence`. The note string contains pitch, offset in milliseconds, duration in milliseconds, velocity and a one-based MIDI channel.
 
 Logic creates a staging track when it imports the Standard MIDI File. Conductor verifies Arrange keyboard focus before copying and pasting the new region onto the selected instrument track. It then checks the result against the previous arrangement. When Conductor closes the Library to transfer the region, the receipt reports whether it verified that the Library reopened. The receipt identifies the retained staging track. Reacquire track references before reading the notes or deleting the staging track, especially when both tracks have the same name. After an interrupted or unverified write, inspect the arrangement before another import.
 

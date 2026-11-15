@@ -29,7 +29,7 @@ The 0.2 candidate passed 245 focused Swift tests covering track selection, MIDI 
 
 ## Distribution
 
-The supported installation path for this development preview is a source build from this repository. No Conductor binary release, Homebrew package or registry publication is established by the inherited distribution files. Historical release and registry workflows are retained under `docs/upstream/` for reference; they are not active publishing workflows for this project.
+Conductor publishes a verified source archive and checksums. The [managed Mac installer](install.md) builds from that archive. Historical distribution workflows remain under `docs/upstream/` for reference.
 
 The Swift module and executable retain `LogicProMCP` names for compatibility. The runtime MCP identity and repository branding are Ion Cascade Conductor.
 
