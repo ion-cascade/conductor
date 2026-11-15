@@ -871,6 +871,7 @@ actor StateCache {
         ensureChannelStripExists(at: strip)
         guard channelStrips.indices.contains(strip) else { return }
         channelStrips[strip].volume = volume
+        channelStrips[strip].volumeReadback = nil
         // v3.1.0 (Ralph-2 / C1) — stamp the write time so pollFaderEcho can
         // tell a fresh echo from a stale cache hit left over from a prior
         // identical-value set_volume call.
@@ -905,6 +906,7 @@ actor StateCache {
         ensureChannelStripExists(at: strip)
         guard channelStrips.indices.contains(strip) else { return }
         channelStrips[strip].pan = min(max(value, -1.0), 1.0)
+        channelStrips[strip].panReadback = nil
         panUpdatedAt[strip] = Date()
         advanceSectionRevision(.mixer)
     }

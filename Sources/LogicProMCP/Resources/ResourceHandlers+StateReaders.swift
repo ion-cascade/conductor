@@ -435,6 +435,22 @@ extension ResourceHandlers {
         }
     }
 
+    private static func mixerStripObject(
+        _ strip: ChannelStripState, requireNativeScalars: Bool, isCurrent: Bool
+    ) -> [String: Any] {
+        var object = jsonObject(strip) as? [String: Any] ?? [:]
+        if requireNativeScalars {
+            var unavailable: [String] = []
+            for (key, readback) in [("volume", strip.volumeReadback), ("pan", strip.panReadback)] {
+                if isCurrent, strip.physicalBinding != nil, case .observed = readback { continue }
+                object.removeValue(forKey: key)
+                unavailable.append(key)
+            }
+            object["unavailable_fields"] = unavailable
+        }
+        return object
+    }
+
     static func readMixer(
         cache: StateCache,
         uri: String,
@@ -453,18 +469,21 @@ extension ResourceHandlers {
         let conn = await cache.getMCUConnection()
         let fetchedAt = capture.mixerFetchedAt
         let axOccluded = capture.before.axOccluded
+        let dataSource = mixerDataSource(fetchedAt: fetchedAt)
+        let coherent = ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] == "1"
         let stripsJSON: String
         var project = RoutingProjectBinding.referencesUnavailable
-        if capture.targetSnapshot != nil {
+        if coherent || capture.targetSnapshot != nil {
             // The mixer issues through the same path as logic://tracks, so reading it first binds
             // the same trk_ references rather than finding none (#291 R0).
-            guard capture.issued != nil, capture.mixerReferences != nil else {
+            if capture.targetSnapshot != nil, capture.issued == nil || capture.mixerReferences == nil {
                 throw MCPError.internalError("mixer target snapshot became stale during resource emission")
             }
             var payload: [[String: Any]] = []
             payload.reserveCapacity(strips.count)
             for (row, strip) in strips.enumerated() {
-                var object = jsonObject(strip) as? [String: Any] ?? [:]
+                var object = mixerStripObject(strip, requireNativeScalars: coherent,
+                    isCurrent: dataSource == "ax_poll" && !axOccluded)
                 if let reference = capture.mixerReference(at: row) {
                     object["mixer_strip_ref"] = reference.rawValue
                 }
@@ -484,7 +503,6 @@ extension ResourceHandlers {
         // B1 (#11): provenance + MCU triplet so a duplicate-and-readback harness
         // can decide whether to trust the strips. `registered` is kept as a
         // one-release alias of `mcu_registered` for existing parsers.
-        let dataSource = mixerDataSource(fetchedAt: fetchedAt)
         let routingGraph = RoutingGraphPublication.publish(capture: capture, project: project)
         let routingGraphJSON = encodeJSON(routingGraph)
         let ageMsPart = conn.lastFeedbackAgeMs().map { "\($0)" } ?? "null"
@@ -844,10 +862,12 @@ extension ResourceHandlers {
         let agePart = (age as? Double).map { "\($0)" } ?? "null"
         let isoPart = (iso as? String).map { "\"\($0)\"" } ?? "null"
         let dataSource = mixerDataSource(fetchedAt: fetchedAt)
+        let coherent = ProcessInfo.processInfo.environment["LOGIC_MCP_COHERENT_READS"] == "1"
         let stripJSON: String
-        if capture.targetSnapshot != nil {
-            var object = jsonObject(strip) as? [String: Any] ?? [:]
-            guard capture.issued != nil, capture.mixerReferences != nil else {
+        if coherent || capture.targetSnapshot != nil {
+            var object = mixerStripObject(strip, requireNativeScalars: coherent,
+                isCurrent: dataSource == "ax_poll" && !capture.before.axOccluded)
+            if capture.targetSnapshot != nil, capture.issued == nil || capture.mixerReferences == nil {
                 throw MCPError.internalError("mixer target snapshot became stale during resource emission")
             }
             if let reference = capture.mixerReference(at: row) {
