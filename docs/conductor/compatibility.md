@@ -1,6 +1,6 @@
-# Conductor 1.6 compatibility
+# Conductor 1.7 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.6 and the checks from earlier releases.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.7 and the checks from earlier releases.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -14,6 +14,16 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
+
+## 1.7 Compressor sidechain
+
+| Workflow | Mac mini qualification |
+| --- | --- |
+| Immediate native readback | Changed a referenced stock Compressor between Internal and `Bus 2 ← Audio 1`. The original editor popup could remain stale. A fresh editor on the same insert agreed with the native checked menu before any save or project reopen. |
+| Keyed and control renders | In matched 44.1 kHz stereo WAV bounces of a dedicated key and piano fixture, the piano’s measured low-band level fell by about 2.7 dB during the key. The independently measured 2351 Hz key tone stayed steady. |
+| Persistence | Saved, closed and reopened the project through a fresh connection, then verified the same insert’s bus selection using a fresh reference. |
+
+The tested route uses an English Logic 13 Mixer with one stock Compressor on the target strip, a stopped transport, and one labelled bus source. [Compressor sidechain commands](../API.md#set-a-stock-compressor-sidechain-source)
 
 ## 1.6 Verified mix delivery
 

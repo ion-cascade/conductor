@@ -61,6 +61,8 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case pluginsGetInventory = "plugins.get_inventory"
     case pluginsGetHostParameterManifest = "plugins.get_host_parameter_manifest"
     case pluginsSetBypassVerified = "plugins.set_bypass_verified"
+    case pluginsGetSidechainVerified = "plugins.get_sidechain_verified"
+    case pluginsSetSidechainVerified = "plugins.set_sidechain_verified"
     case pluginsGetPresetVerified = "plugins.get_preset_verified"
     case pluginsSetPresetVerified = "plugins.set_preset_verified"
     case pluginsGetParamVerified = "plugins.get_param_verified"
@@ -364,7 +366,7 @@ enum OperationRegistry {
             "system.setup_arm_key", "system.setup_midi_key_commands", "system.setup_control_surface",
         ],
         ToolID.logicPlugins.rawValue: [
-            "plugins.get_inventory", "plugins.get_host_parameter_manifest", "plugins.get_param_verified", "plugins.get_preset_verified", "plugins.set_preset_verified", "plugins.set_bypass_verified", "plugins.get_channel_eq_state_verified", "plugins.plan_parameter_changes", "plugins.set_param_verified", "plugins.set_eq_band_verified", "plugins.insert_verified",
+            "plugins.get_inventory", "plugins.get_host_parameter_manifest", "plugins.get_param_verified", "plugins.get_sidechain_verified", "plugins.set_sidechain_verified", "plugins.get_preset_verified", "plugins.set_preset_verified", "plugins.set_bypass_verified", "plugins.get_channel_eq_state_verified", "plugins.plan_parameter_changes", "plugins.set_param_verified", "plugins.set_eq_band_verified", "plugins.insert_verified",
         ],
         ToolID.logicEdit.rawValue: [
             "edit.undo", "edit.redo", "edit.cut", "edit.copy", "edit.paste", "edit.delete",
@@ -427,7 +429,7 @@ enum OperationRegistry {
             "setup_arm_key", "setup_midi_key_commands", "setup_control_surface",
         ],
         ToolID.logicPlugins.rawValue: [
-            "get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_preset_verified", "set_preset_verified", "set_bypass_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
+            "get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_sidechain_verified", "set_sidechain_verified", "get_preset_verified", "set_preset_verified", "set_bypass_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
         ],
         ToolID.logicEdit.rawValue: [
             "undo", "redo", "cut", "copy", "paste", "delete", "select_all", "split", "join",
@@ -789,6 +791,14 @@ enum OperationRegistry {
             VerificationPolicy.none,
             TargetPolicy.acceptsStableTarget,
             ["expected_build_fingerprint", "insert", "plugin", "plugin_id", "plugin_name", "track"]
+        ),
+        (
+            .pluginsGetSidechainVerified, "get_sidechain_verified", Mutability.readOnly, DeadlineClass.medium,
+            VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, []
+        ),
+        (
+            .pluginsSetSidechainVerified, "set_sidechain_verified", Mutability.mutating, DeadlineClass.medium,
+            VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["source", "expected_current"]
         ),
         (
             .pluginsGetPresetVerified, "get_preset_verified", Mutability.readOnly, DeadlineClass.medium,

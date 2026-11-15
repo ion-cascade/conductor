@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.7.0] — 2026-11-15
+
+- Read and select an independently verified stock Compressor sidechain source on a referenced insert. ([#28](https://github.com/ion-cascade/conductor/issues/28))
+
 ## [1.6.0] — 2026-11-15
 
 - Inspect a selective delivery and verify its saved project and files without opening Logic. ([#34](https://github.com/ion-cascade/conductor/issues/34))

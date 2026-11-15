@@ -485,6 +485,12 @@ extension OperationRegistry {
 
             // logic_plugins: the dispatcher omits a value that does not read, and the channel's own
             // schema step refuses the request, so those refusals come after a channel ran.
+            "plugins.get_sidechain_verified": .init(params: ["target_ref": targetRef], required: [["target_ref"]]),
+            "plugins.set_sidechain_verified": .init(params: [
+                "target_ref": targetRef,
+                "source": .enforced(.string, .string("Bus 2 ← Audio 1")),
+                "expected_current": .enforced(.string, .string("Internal")),
+            ], required: [["target_ref"], ["source"], ["expected_current"]]),
             "plugins.set_bypass_verified": .init(params: [
                 "target_ref": targetRef, "project_ref": projectRef,
                 "bypassed": .enforced(.boolean, .bool(true)), "expected_current": .enforced(.boolean, .bool(false)),

@@ -2470,6 +2470,9 @@ actor AccessibilityChannel: Channel {
             return await AccessibilityChannel.defaultGetHostParameterManifest(params: params, runtime: runtime.logicRuntime)
         case "plugin.set_bypass_verified":
             return await Self.setPluginBypassVerified(params: params, runtime: runtime.logicRuntime)
+        case "plugin.get_sidechain_verified", "plugin.set_sidechain_verified":
+            return await Self.compressorSidechainVerified(params: params,
+                writing: operation == "plugin.set_sidechain_verified", runtime: runtime.logicRuntime)
         case "plugin.get_preset_verified", "plugin.set_preset_verified":
             return await Self.defaultCompressorPreset(params: params,
                 writing: operation == "plugin.set_preset_verified", runtime: runtime.logicRuntime)

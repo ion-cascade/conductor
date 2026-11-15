@@ -297,6 +297,14 @@ Minimal `set_param_verified` shape:
 }
 ```
 
+#### Set a stock Compressor sidechain source
+
+On desktop Logic Pro 13, show the track’s Mixer strip, stop transport, and close floating plug-in windows. Read `logic_plugins.get_inventory` and use the occupied stock Compressor’s `plugin_insert_ref`. The track must have one identifiable Compressor.
+
+Call `logic_plugins.get_sidechain_verified` with that reference as `target_ref`. Copy its `source` into `expected_current` and choose a new `source` from `choices` for `set_sidechain_verified`. Supported choices include `Internal` and unique labelled bus choices such as `Bus 2 ← Audio 1`. The setter verifies the current source before pressing the chosen row.
+
+Conductor reopens the same insert’s editor and compares its freshly read source with the menu’s checked choice before reporting success. The matching current and requested source requires no source write. The command closes the temporary editor and reports whether cleanup was verified. Save the project in Logic to retain the change.
+
 ### `logic_midi`
 
 Common commands: `send_note`, `send_chord`, `send_cc`, `send_program_change`, `send_pitch_bend`, `send_aftertouch`, `send_sysex`, `play_sequence`, `import_file`, `list_ports`, `create_virtual_port`, `step_input`, `mmc_play`, `mmc_stop`, `mmc_record`, `mmc_locate`.

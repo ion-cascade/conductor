@@ -83,7 +83,7 @@ Keep recordings and projects on your own machines. Conductor's bridge uses your 
 
 ## Tested status
 
-Conductor 1.6 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
+Conductor 1.7 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
 
 ### Turn a selected drum step on or off
 
@@ -115,6 +115,10 @@ Run `logic_project.scan_regions` to sample the Arrange view and obtain a referen
 2. Select one MIDI region in Arrange. Read `logic_project.get_regions` and check its selection and exact boundaries.
 3. Call `logic_transport.goto_position` with a position such as `3.2.3.17` for bar, beat, division and tick. Confirm the tool observed that exact position.
 4. Call `logic_edit.move_to_playhead` and check its verified start and end positions. Save and reopen to check persistence. Use `logic_midi.read_track_notes` if you also need the underlying MIDI events.
+
+### Set a Compressor sidechain source
+
+With the Mixer visible and transport stopped, read an occupied stock Compressor’s insert reference. Use `get_sidechain_verified` to read its source and available bus choices, then use `set_sidechain_verified` with the exact choice and previous source. [Compressor sidechain commands](docs/API.md#set-a-stock-compressor-sidechain-source)
 
 ### Adjust a specific mixer strip
 
