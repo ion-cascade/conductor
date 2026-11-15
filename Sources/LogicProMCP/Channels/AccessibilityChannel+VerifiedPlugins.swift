@@ -6575,6 +6575,14 @@ extension AccessibilityChannel {
         guard preInventory[insert] == nil, targetSlot.isEmpty else {
             return (.transientSetupFailure(stage: "target_slot_no_longer_empty"), trace)
         }
+        let appendProject: AXPluginTrackBinding.ProjectObservation?
+        if let target = authorizedPluginTrack, insert == preInventory.count,
+           AXHelpers.getDescription(targetSlot.element, runtime: runtime.ax) == "audio plug-in",
+           AXHelpers.getSize(targetSlot.element, runtime: runtime.ax)?.height == 11 {
+            appendProject = AXPluginTrackBinding.projectObservation(target, runtime: runtime)
+        } else {
+            appendProject = nil
+        }
         trace["target_slot_found"] = true
 
         // One element must carry BOTH the authorisation and the actuation. Enumerating the custom
@@ -6748,10 +6756,19 @@ extension AccessibilityChannel {
         #endif
 
         let poll = await pollStripInventoryUntil(
-            track: track, runtime: runtime, timeoutMs: 4_000
+            track: track, runtime: runtime, timeoutMs: 2_000
         ) { inv in
             newlyMountedSlot(pluginID: pluginID, pre: preInventory, post: inv) != nil
                 || newlyMountedAnyPlugin(pre: preInventory, post: inv) != nil
+        }
+        if poll.satisfied == nil,
+           let original = authorizedPluginTrack, let project = appendProject,
+           let appended = observeMountedAppend(track: track, slot: insert, pluginID: pluginID,
+                preInventory: preInventory, original: original, project: project, runtime: runtime) {
+            trace["post_commit_inventory"] = "fresh_mixer_original_arrange_header"
+            trace["observed_slot"] = insert
+            trace["observed_name"] = appended.name ?? NSNull()
+            return (.mounted(slot: insert, pluginID: pluginID, observedName: appended.name), trace)
         }
         guard let postInventory = poll.satisfied ?? poll.lastReadable else {
             return (.readbackUnavailable, trace)
@@ -7628,7 +7645,7 @@ extension AccessibilityChannel {
 
     /// One readable, occupied insert slot observed during a strip inventory pass:
     /// physical slot index → (canonical plugin id, display name).
-    struct InventoryEntry: Sendable {
+    struct InventoryEntry: Sendable, Equatable {
         let pluginID: String?
         let name: String?
     }
@@ -7644,8 +7661,14 @@ extension AccessibilityChannel {
         track: Int, runtime: AXLogicProElements.Runtime
     ) -> [Int: InventoryEntry]? {
         guard let target = boundPluginTrack(track: track, runtime: runtime) else { return nil }
+        return fullStripInventory(in: target.strip, runtime: runtime)
+    }
+
+    private static func fullStripInventory(
+        in strip: AXUIElement, runtime: AXLogicProElements.Runtime
+    ) -> [Int: InventoryEntry]? {
         // #982: a strip whose children did not read is not an empty chain.
-        guard let slots = AXLogicProElements.audioPluginInsertSlots(in: target.strip, runtime: runtime.ax),
+        guard let slots = AXLogicProElements.audioPluginInsertSlots(in: strip, runtime: runtime.ax),
               !slots.isEmpty,
               !slots.contains(where: { $0.readStatus == .occupiedUnreadable || $0.readStatus == .unclassified }) else {
             return nil
@@ -7659,6 +7682,29 @@ extension AccessibilityChannel {
             )
         }
         return result
+    }
+
+    /// The native append rebuilds the Mixer presentation. Renew read access
+    /// only through the same saved Arrange document and original track header,
+    /// and require the complete pre-existing chain to survive the append.
+    private static func observeMountedAppend(
+        track: Int, slot: Int, pluginID: String, preInventory: [Int: InventoryEntry],
+        original: AXPluginTrackBinding.Binding, project: AXPluginTrackBinding.ProjectObservation,
+        runtime: AXLogicProElements.Runtime
+    ) -> InventoryEntry? {
+        guard !Task.isCancelled,
+              let mixer = AXLogicProElements.mixerAreaLookup(runtime: runtime).mixer,
+              let target = AXPluginTrackBinding.resolve(track: track, mixer: mixer, runtime: runtime),
+              CFEqual(target.window, original.window), CFEqual(target.header, original.header),
+              AXPluginTrackBinding.owningWindow(target, runtime: runtime).map({ CFEqual($0, original.window) }) == true,
+              AXPluginTrackBinding.projectObservation(target, runtime: runtime) == project,
+              let first = fullStripInventory(in: target.strip, runtime: runtime),
+              let mounted = first[slot], mounted.pluginID == pluginID,
+              first.count == preInventory.count + 1,
+              preInventory.allSatisfy({ first[$0.key] == $0.value }),
+              fullStripInventory(in: target.strip, runtime: runtime) == first,
+              AXPluginTrackBinding.projectObservation(target, runtime: runtime) == project else { return nil }
+        return mounted
     }
 
     /// Poll `fullStripInventory` until it is readable or the timeout elapses
