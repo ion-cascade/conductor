@@ -40,10 +40,10 @@ extension AccessibilityChannel {
         let operation = "project.edit_region"
         let reference = parameters["target_ref"] ?? ""
         func refuse(_ error: HonestContract.FailureError, _ hint: String,
-                    restored: Bool = true) -> ChannelResult {
+                    restored: Bool = true, trackSelectionChanged: Bool = false) -> ChannelResult {
             .error(HonestContract.encodeStateC(error: error, hint: hint, extras: [
                 "operation": operation, "target_ref": reference, "write_attempted": false,
-                "viewport_restored": restored,
+                "viewport_restored": restored, "track_selection_changed": trackSelectionChanged,
             ]))
         }
         guard let snapshot = regionScan, ContinuousClock.now < snapshot.expires,
@@ -85,6 +85,15 @@ extension AccessibilityChannel {
         }
 
         let ax = runtime.ax
+        let trackWasSelected = Self.exclusiveEditTrack(held, in: scope)
+        if !trackWasSelected {
+            let selected = Self.selectExactEditTrack(held, in: scope)
+            if !selected {
+                let restored = await scope.show(scope.originalPage, replacing: held.page)
+                return refuse(.readbackUnavailable, "The region's exact track could not be selected for an in-lane edit.",
+                              restored: restored, trackSelectionChanged: Self.exclusiveEditTrack(held, in: scope))
+            }
+        }
         guard let before = Self.regionEditCensus(scope: scope),
               before.count == initial.count,
               before.filter({ Self.sameRegionObservation(held, item: $0.item, info: $0.info) }).count == 1,
@@ -97,24 +106,27 @@ extension AccessibilityChannel {
                   return Self.ownsRegionGesture(hit, held: held, edge: change.edge, runtime: ax)
               }),
               scope.holdsArrange(), scope.page()?.matches(held.page) == true,
+              Self.exclusiveEditTrack(held, in: scope),
               OperationTraceContext.claimDeadlineEffect("region_drag")
         else {
             let restored = await scope.show(scope.originalPage, replacing: held.page)
             return refuse(.readbackUnavailable,
                 "The region and requested boundary must fit a writable Arrange viewport. The current edit mode and neighbors must allow the gesture without changing other regions.",
-                restored: restored)
+                restored: restored, trackSelectionChanged: !trackWasSelected)
         }
 
         regionScan = nil
         let mouse = AXMouseHelper.Runtime.production
         _ = mouse.postMouseEvent(.mouseMoved, drag.start, 0)
-        mouse.sleepMicros(70_000)
+        mouse.sleepMicros(110_000)
         guard scope.holdsArrange(), scope.page()?.matches(held.page) == true, scope.selectionIsOriginal(),
+              Self.exclusiveEditTrack(held, in: scope),
               case .success(.some(let ready)) = hitTest(scope.app, drag.start),
               Self.ownsRegionGesture(ready, held: held, edge: change.edge, runtime: ax),
               mouse.postMouseEvent(.leftMouseDown, drag.start, 1) else {
             let restored = await scope.show(scope.originalPage, replacing: held.page)
-            return refuse(.axWriteFailed, "The exact region could not be actuated.", restored: restored)
+            return refuse(.axWriteFailed, "The exact region could not be actuated.", restored: restored,
+                          trackSelectionChanged: !trackWasSelected)
         }
         // The matching release belongs to the exact down event even if the
         // client cancels. The intermediate drag steps stay in the held lane.
@@ -127,15 +139,9 @@ extension AccessibilityChannel {
             mouse.sleepMicros(25_000)
         }
         posted = mouse.postMouseEvent(.leftMouseUp, drag.end, 1) && posted
-        mouse.sleepMicros(180_000)
-        // A hovered resize handle replaces the region's ordinary AXHelp.
-        // Move off the region before reading its actual post-edit evidence.
-        if let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
-           let current: AXUIElement = AXHelpers.getAttribute(scope.app, kAXMainWindowAttribute, runtime: ax),
-           CFEqual(current, scope.window), let frame = scope.frame(scope.window) {
-            let resting = CGPoint(x: frame.minX + frame.width / 2, y: frame.minY + 12)
-            _ = mouse.postMouseEvent(.mouseMoved, resting, 0)
-        }
+        // Let Logic finish the gesture before reading its new position.
+        // The held region can report its bounds with trim-tool help text.
+        mouse.sleepMicros(350_000)
 
         var observed: RegionInfo?
         var peersVerified = false
@@ -158,7 +164,7 @@ extension AccessibilityChannel {
             "observed_start": observed?.startPosition.map { $0 as Any } ?? NSNull(),
             "observed_end": observed?.endPosition.map { $0 as Any } ?? NSNull(),
             "neighboring_regions_verified": peersVerified, "viewport_restored": restored,
-            "reference_reread_required": true,
+            "reference_reread_required": true, "track_selection_changed": !trackWasSelected,
         ]
         guard posted, restored, peersVerified, observed?.startPosition == change.start,
               observed?.endPosition == change.end else {
@@ -187,6 +193,37 @@ extension AccessibilityChannel {
                     && previous.info.endPosition == $0.info.endPosition
             }.count == 1
         }
+    }
+
+    private static func exclusiveEditTrack(_ held: HeldRegion, in scope: ArrangeRegionScope) -> Bool {
+        scope.headers.allSatisfy { header in
+            AXValueExtractors.extractSelectedState(header, runtime: scope.runtime.ax) == CFEqual(header, held.header)
+        }
+    }
+
+    private static func selectExactEditTrack(_ held: HeldRegion, in scope: ArrangeRegionScope) -> Bool {
+        let ax = scope.runtime.ax
+        guard case .success(let children) = AXHelpers.childrenResult(held.header, runtime: ax),
+              let name = try? AXValueExtractors.extractTrackNameResult(from: held.header, runtime: ax).get(),
+              let nameField = children.first(where: {
+                  AXHelpers.getRole($0, runtime: ax) == kAXTextFieldRole
+                      && AXHelpers.getDescription($0, runtime: ax) == name
+              }),
+              let frame = scope.frame(nameField), let hitTest = ax.elementAtPosition else { return false }
+        let point = CGPoint(x: frame.midX, y: frame.midY)
+        guard scope.holdsArrange(), scope.holdsHeaders(), scope.page()?.matches(held.page) == true,
+              case .success(.some(let hit)) = hitTest(scope.app, point),
+              CFEqual(hit, nameField) || CFEqual(hit, held.header),
+              OperationTraceContext.claimDeadlineEffect("region_track_selection"),
+              AXMouseHelper.click(at: point)
+        else { return false }
+        for _ in 0..<8 {
+            AXMouseHelper.Runtime.production.sleepMicros(50_000)
+            if exclusiveEditTrack(held, in: scope) {
+                return scope.holdsArrange() && scope.page()?.matches(held.page) == true
+            }
+        }
+        return false
     }
 
     private static func ownsRegionGesture(_ hit: AXUIElement, held: HeldRegion, edge: RegionChange.Edge,
