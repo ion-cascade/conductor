@@ -74,6 +74,95 @@ extension AccessibilityChannel {
         return (states, stop())
     }
 
+    /// Logic 13 Mixer switches are direct AXButton/AXSwitch children. Their
+    /// native Boolean strings are English in the qualified layout.
+    private static func mixerSwitch(
+        in strip: AXUIElement, named name: String, runtime: AXHelpers.Runtime
+    ) -> AXUIElement? {
+        guard case .success(let children) = AXHelpers.childrenResult(strip, runtime: runtime) else { return nil }
+        var match: AXUIElement?
+        for child in children {
+            guard let role = AXHelpers.getRole(child, runtime: runtime) else { return nil }
+            guard role == kAXButtonRole as String else { continue }
+            let subrole: Result<String?, AXHelpers.AXStatusError> =
+                AXHelpers.getAttributeResult(child, kAXSubroleAttribute as String, runtime: runtime)
+            switch subrole {
+            case .success(.some("AXSwitch")):
+                guard case .success(.some(let description)) = AXHelpers.getAttributeResult(
+                    child, kAXDescriptionAttribute as String, runtime: runtime
+                ) as Result<String?, AXHelpers.AXStatusError> else { return nil }
+                if description == name {
+                    guard match == nil else { return nil }
+                    match = child
+                }
+            case .success: continue
+            case .failure(let error):
+                guard error.isDefinitiveAbsence else { return nil }
+            }
+        }
+        return match
+    }
+
+    private static func readMixerSwitch(_ element: AXUIElement, runtime: AXHelpers.Runtime) -> Bool? {
+        switch AXHelpers.getValue(element, runtime: runtime) as? String {
+        case "on": return true
+        case "off": return false
+        default: return nil
+        }
+    }
+
+    static func setMixerSwitch(
+        operation: String, params: [String: String], runtime: AXLogicProElements.Runtime
+    ) async -> ChannelResult {
+        let name = operation == "mixer.set_mute" ? "mute" : "solo"
+        var evidence: [String: Any] = ["operation": operation, "control": name, "write_attempted": false]
+        func refusal(_ error: HonestContract.FailureError, _ hint: String) -> ChannelResult {
+            .error(HonestContract.encodeStateC(error: error, hint: hint, extras: evidence))
+        }
+        guard let token = params["enabled"], let desired = Bool(token), let source = AXMixerStripBinding.current,
+              let index = source.currentIndex(runtime: runtime) else {
+            return refusal(.staleTargetReference, "The referenced Mixer strip is no longer current.")
+        }
+        evidence["mixer_strip_index"] = index
+        evidence["requested"] = desired
+        let ax = runtime.ax
+        guard let button = mixerSwitch(in: source.strip, named: name, runtime: ax) else {
+            return refusal(.readbackUnavailable, "The exact Mixer strip switch is unavailable or ambiguous.")
+        }
+        func current() -> Bool {
+            guard source.currentIndex(runtime: runtime) == index,
+                  let observed = mixerSwitch(in: source.strip, named: name, runtime: ax) else { return false }
+            return CFEqual(observed, button)
+        }
+        guard current(), let before = readMixerSwitch(button, runtime: ax) else {
+            return refusal(.readbackUnavailable, "The original state of the exact Mixer strip switch could not be verified.")
+        }
+        evidence["observed_before"] = before
+        if before == desired {
+            evidence["observed"] = before
+            return .success(HonestContract.encodeStateA(extras: evidence))
+        }
+        guard AXHelpers.getAttribute(button, kAXEnabledAttribute as String, runtime: ax) as Bool? == true,
+              AXHelpers.getActionNames(button, runtime: ax).contains(kAXPressAction as String),
+              current(), readMixerSwitch(button, runtime: ax) == before,
+              OperationTraceContext.claimDeadlineEffect(operation) else {
+            return refusal(.readbackUnavailable, "The exact Mixer strip switch cannot safely be pressed.")
+        }
+        evidence["write_attempted"] = true
+        evidence["verify_source"] = "ax_switch_value"
+        _ = AXHelpers.performAction(button, kAXPressAction, runtime: ax)
+        for _ in 0..<6 {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            guard current() else { break }
+            if readMixerSwitch(button, runtime: ax) == desired {
+                evidence["observed"] = desired
+                return .success(HonestContract.encodeStateA(extras: evidence))
+            }
+        }
+        evidence["safe_to_retry"] = false
+        return .success(HonestContract.encodeStateB(reason: .readbackUnavailable, extras: evidence))
+    }
+
     /// The full and request-owned readers share extraction from an already-bound population.
     static func readChannelStrips(
         from strips: [AXUIElement], runtime: AXLogicProElements.Runtime,
@@ -162,6 +251,10 @@ extension AccessibilityChannel {
                 )
                 state.volumeReadback = scalars.observedVolume
                 state.panReadback = scalars.observedPan
+                state.isMuted = mixerSwitch(in: strip, named: "mute", runtime: runtime.ax)
+                    .flatMap { readMixerSwitch($0, runtime: runtime.ax) }
+                state.isSoloed = mixerSwitch(in: strip, named: "solo", runtime: runtime.ax)
+                    .flatMap { readMixerSwitch($0, runtime: runtime.ax) }
                 if let window, let mixer, let document {
                     state.physicalBinding = .init(window: window, mixer: mixer, strip: strip, document: document)
                 }

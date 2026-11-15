@@ -116,6 +116,8 @@ extension ChannelRouter {
         "mixer.get_state":            [.mcu, .accessibility],
         "mixer.set_volume":           [.accessibility],
         "mixer.set_pan":              [.accessibility],
+        "mixer.set_mute":             [.accessibility],
+        "mixer.set_solo":             [.accessibility],
         // #291 R2: the output popup and the slot it is read back from are AX only.
         "mixer.set_output_verified":  [.accessibility],
         "mixer.get_output_verified":  [.accessibility],

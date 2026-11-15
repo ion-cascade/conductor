@@ -2308,6 +2308,9 @@ actor AccessibilityChannel: Channel {
             return runtime.setMixerValue(params, .volume)
         case "mixer.set_pan":
             return runtime.setMixerValue(params, .pan)
+        case "mixer.set_mute", "mixer.set_solo":
+            return await AccessibilityChannel.setMixerSwitch(
+                operation: operation, params: params, runtime: runtime.logicRuntime)
         case "mixer.set_output_verified":
             return await AccessibilityChannel.setOutputVerified(params: params, runtime: runtime.logicRuntime)
         case "mixer.get_output_verified":

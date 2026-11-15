@@ -446,6 +446,11 @@ extension ResourceHandlers {
                 object.removeValue(forKey: key)
                 unavailable.append(key)
             }
+            for (key, value) in [("isMuted", strip.isMuted), ("isSoloed", strip.isSoloed)] {
+                if isCurrent, strip.physicalBinding != nil, value != nil { continue }
+                object.removeValue(forKey: key)
+                unavailable.append(key)
+            }
             object["unavailable_fields"] = unavailable
         }
         return object

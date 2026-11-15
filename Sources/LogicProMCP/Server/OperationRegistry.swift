@@ -14,6 +14,8 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case transportToggleAutopunch = "transport.toggle_autopunch"
     case mixerSetVolume = "mixer.set_volume"
     case mixerSetPan = "mixer.set_pan"
+    case mixerSetMute = "mixer.set_mute"
+    case mixerSetSolo = "mixer.set_solo"
     case mixerSetMasterVolume = "mixer.set_master_volume"
     case mixerSetPluginParam = "mixer.set_plugin_param"
     case mixerInsertPlugin = "mixer.insert_plugin"
@@ -323,7 +325,7 @@ enum OperationRegistry {
             "transport.set_cycle_range", "transport.toggle_count_in", "transport.toggle_autopunch",
         ],
         ToolID.logicMixer.rawValue: [
-            "mixer.set_volume", "mixer.set_pan", "mixer.set_master_volume",
+            "mixer.set_volume", "mixer.set_pan", "mixer.set_mute", "mixer.set_solo", "mixer.set_master_volume",
             "mixer.set_plugin_param", "mixer.insert_plugin", "mixer.bank",
             "mixer.set_output_verified", "mixer.get_output_verified", "mixer.get_input_bus_verified", "mixer.set_input_bus_verified", "mixer.get_send_destination_verified", "mixer.set_send_output_verified", "mixer.get_send_bypass_verified", "mixer.set_send_bypass_verified", "mixer.set_send_level_verified", "mixer.set_send_mode_verified",
         ],
@@ -586,6 +588,8 @@ enum OperationRegistry {
             ["index", "track", "value", "volume"]
         ),
         (.mixerSetPan, "set_pan", .none, .acceptsStableTarget, ["index", "pan", "track", "value"]),
+        (.mixerSetMute, "set_mute", .none, .acceptsStableTarget, ["enabled"]),
+        (.mixerSetSolo, "set_solo", .none, .acceptsStableTarget, ["enabled"]),
         (.mixerSetMasterVolume, "set_master_volume", .none, .none, ["value", "volume"]),
         (
             .mixerSetPluginParam,

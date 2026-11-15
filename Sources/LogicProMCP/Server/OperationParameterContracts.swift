@@ -214,6 +214,12 @@ extension OperationRegistry {
                 "index": index(), "track": index(), "target_ref": targetRef, "project_ref": projectRef,
                 "value": .enforced(.number, .int(0)), "pan": .enforced(.number, .int(0)),
             ], required: [indexGroup, ["value", "pan"]]),
+            "mixer.set_mute": .init(params: [
+                "target_ref": targetRef, "project_ref": projectRef, "enabled": .enforced(.boolean, .bool(true)),
+            ], required: [["target_ref"], ["enabled"]]),
+            "mixer.set_solo": .init(params: [
+                "target_ref": targetRef, "project_ref": projectRef, "enabled": .enforced(.boolean, .bool(true)),
+            ], required: [["target_ref"], ["enabled"]]),
             "mixer.set_master_volume": .init(params: ["value": .enforced(.number, .double(0.5)), "volume": .enforced(.number, .double(0.5))],
                                              required: [["value", "volume"]]),
             "mixer.bank": .init(params: ["direction": .enforced(.scalar, .string("right"), allowed: MixerDispatcher.bankDirections),

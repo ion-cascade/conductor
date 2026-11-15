@@ -202,6 +202,8 @@ struct ChannelStripState: Sendable, Codable {
     /// decoded or unread scalar values cannot protect an approved routing footprint.
     var volumeReadback: ScalarReadback? = nil
     var panReadback: ScalarReadback? = nil
+    var isMuted: Bool? = nil
+    var isSoloed: Bool? = nil
     /// The strip's sends, when they have been READ (#291).
     ///
     /// This was `[SendState] = []`, so every strip of every project serialised `"sends": []` — and
@@ -247,7 +249,7 @@ struct ChannelStripState: Sendable, Codable {
     var pluginsFullyObserved: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
-        case trackIndex, name, volume, pan, sends, input, output, eqEnabled, plugins
+        case trackIndex, name, volume, pan, isMuted, isSoloed, sends, input, output, eqEnabled, plugins
         case nameReadError = "name_read_error"
         case sendSlots = "send_slots"
         case inputObservation = "input_observation"
