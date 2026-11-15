@@ -250,8 +250,22 @@ extension AccessibilityChannel {
     private static func safeDragMode(scope: ArrangeRegionScope, held: HeldRegion, change: RegionChange,
                                      census: [EditRegionRow]) -> Bool {
         let ax = scope.runtime.ax
-        let controls = AXHelpers.findAllDescendants(of: scope.window, role: kAXPopUpButtonRole, maxDepth: 12, runtime: ax)
-            .filter { AXHelpers.getDescription($0, runtime: ax) == "Drag Mode" }
+        // Logic 13 exposes Drag Mode directly under Window → Tracks → Tracks.
+        // Descending through the whole Arrange tree can enter track editors.
+        func tracksGroup(in parent: AXUIElement) -> AXUIElement? {
+            guard case .success(let children) = AXHelpers.childrenResult(parent, runtime: ax) else { return nil }
+            let groups = children.filter {
+                AXHelpers.getRole($0, runtime: ax) == kAXGroupRole
+                    && AXHelpers.getDescription($0, runtime: ax) == "Tracks"
+            }
+            return groups.count == 1 ? groups.first : nil
+        }
+        guard let outer = tracksGroup(in: scope.window), let inner = tracksGroup(in: outer),
+              case .success(let children) = AXHelpers.childrenResult(inner, runtime: ax) else { return false }
+        let controls = children.filter {
+            AXHelpers.getRole($0, runtime: ax) == kAXPopUpButtonRole
+                && AXHelpers.getDescription($0, runtime: ax) == "Drag Mode"
+        }
         guard controls.count == 1, let control = controls.first,
               let mode: String = AXHelpers.getAttribute(control, kAXValueAttribute, runtime: ax),
               ["Overlap", "No Overlap"].contains(mode),
