@@ -389,7 +389,7 @@ enum OperationRegistry {
             "toggle_autopunch",
         ],
         ToolID.logicMixer.rawValue: [
-            "set_volume", "set_pan", "set_master_volume", "set_plugin_param", "insert_plugin",
+            "set_volume", "set_pan", "set_mute", "set_solo", "set_master_volume", "set_plugin_param", "insert_plugin",
             "bank", "set_output_verified", "get_output_verified", "get_input_bus_verified", "set_input_bus_verified", "get_send_destination_verified", "set_send_output_verified", "get_send_bypass_verified", "set_send_bypass_verified", "set_send_level_verified", "set_send_mode_verified",
         ],
         ToolID.logicNavigate.rawValue: [
