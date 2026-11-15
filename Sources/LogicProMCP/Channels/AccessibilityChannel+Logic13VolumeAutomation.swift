@@ -58,6 +58,7 @@ extension AccessibilityChannel {
             "points": points.map { point -> [String: Any] in
                 ["position": point.position, "value": point.value]
             },
+            "selected_positions": points.filter(\.selected).map(\.position),
             "verify_source": "ax_automation_event_list",
             "write_attempted": false,
         ]))
@@ -82,6 +83,18 @@ extension AccessibilityChannel {
         guard matchingIndices.count == 1, let index = matchingIndices.first, points[index].value == expected else {
             return refusal(.staleSnapshot, "The position and expected value do not identify one current Volume event.")
         }
+        let affected = points[index].selected ? points.indices.filter { points[$0].selected } : [index]
+        var authorizedPositions = Set([position])
+        if let linkedPosition = params["linked_position"] {
+            guard authorizedPositions.insert(linkedPosition).inserted else {
+                return refusal(.invalidParams, "The linked position must differ from the primary position.")
+            }
+        }
+        guard affected.count == authorizedPositions.count,
+              Set(affected.map { points[$0].position }) == authorizedPositions,
+              affected.allSatisfy({ points[$0].value == expected }) else {
+            return refusal(.staleSnapshot, "The selected Volume points and their values do not match the requested edit. Read the lane again.")
+        }
         guard (requested - expected).isMultiple(of: 10) else {
             return refusal(.invalidParams, "This editor supports changes in steps of 10 Logic fader units.")
         }
@@ -93,6 +106,7 @@ extension AccessibilityChannel {
         func result(_ value: Int, attempted: Bool) -> [String: Any] {
             ["operation": operation, "lane": "volume", "position": position, "unit": "logic_fader_value",
              "before": expected, "observed": value, "requested": requested,
+             "affected_positions": affected.map { points[$0].position },
              "changed": value != expected, "write_attempted": attempted]
         }
         func uncertain(_ value: Int, stage: String, actual: Int? = nil, actionAccepted: Bool? = nil) -> ChannelResult {
@@ -118,7 +132,8 @@ extension AccessibilityChannel {
             return zip(points, fresh).enumerated().allSatisfy { pair in
                 let (original, live) = pair.element
                 return original.position == live.position
-                    && (pair.offset == index ? value : original.value) == live.value
+                    && original.selected == live.selected
+                    && (affected.contains(pair.offset) ? value : original.value) == live.value
             }
         }
         while observed != requested {
@@ -163,6 +178,7 @@ private struct Logic13VolumeEventList {
     struct Point {
         let position: String
         let value: Int
+        let selected: Bool
         let slider: AXUIElement
     }
 
@@ -234,8 +250,9 @@ private struct Logic13VolumeEventList {
             else { onRefusal("event_position"); return nil }
             guard let slider = hitInCell(cells[6], column: 6, role: kAXSliderRole as String),
                   let value: Int = AXHelpers.getAttribute(slider, kAXValueAttribute as String, runtime: runtime),
+                  let selected: Bool = AXHelpers.getAttribute(row, kAXSelectedAttribute as String, runtime: runtime),
                   (0...127).contains(value) else { onRefusal("event_value"); return nil }
-            points.append(Point(position: position, value: value, slider: slider))
+            points.append(Point(position: position, value: value, selected: selected, slider: slider))
         }
         return points
     }
