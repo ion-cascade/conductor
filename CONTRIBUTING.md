@@ -162,6 +162,25 @@ docs/                    public setup, API, troubleshooting, README media, and p
 artifacts/               generated local artifacts; only explicitly published fixtures belong in git
 ```
 
+## File size and organization
+
+Aim for at most 1,500 lines in each authored source, test, script, and guide. Split a growing
+file by responsibility while keeping related types, fixtures, or protocol code together. When a
+split would make a change harder to verify, describe the reason in the pull request and identify the
+boundary to revisit. Existing oversize files can be split alongside focused maintenance.
+
+Run the following from the repository root to find oversized tracked code and Markdown files:
+
+```sh
+git ls-files -z -- '*.swift' '*.py' '*.sh' '*.js' '*.md' | xargs -0 wc -l |
+  awk '$1 > 1500 && !($2 == "total" && NF == 2)' | sort -nr
+```
+
+Preserve the original files for native observations, serialized fixtures, generated references and
+release history. Their formats, provenance, or consumers can depend on a complete artifact.
+`AXLocalePolicy.swift` is a legacy authored exception while the locale generation and guard scripts
+consume that single source. Move those readers together with any future split.
+
 ## Documentation Policy
 
 Keep `docs/` intentionally public-facing. Default end-user docs are `SETUP.md`, `API.md`, and `TROUBLESHOOTING.md`; README media is limited to the demo GIF/MP4 plus the registry/social thumbnail. Public issue PRDs and ticket checklists may live under `docs/prd/` and `docs/tickets/` when they explain active or shipped user-visible remediation. Release detail belongs in `CHANGELOG.md` or GitHub Releases, maintainer process belongs in `CONTRIBUTING.md`, and architecture summaries belong in README/API unless they become too large.
