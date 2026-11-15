@@ -20,6 +20,7 @@ actor AccessibilityChannel: Channel {
     private let libraryScans = LibraryScanCache()
     private var lastRoutedCategory: String? = nil
     private var lastRoutedPreset: String? = nil
+    var regionScan: RegionScanSnapshot?
 
     enum MixerTarget {
         case volume
@@ -2435,6 +2436,10 @@ actor AccessibilityChannel: Channel {
             return runtime.projectInfo()
 
         // MARK: - Regions
+        case "region.scan":
+            return await inspectArrangeRegions(runtime: runtime.logicRuntime)
+        case "region.edit_by_reference":
+            return await editArrangeRegion(parameters: params, runtime: runtime.logicRuntime)
         case "region.get_regions":
             return AccessibilityChannel.defaultGetRegions(runtime: runtime.logicRuntime)
         case "region.move_to_playhead":

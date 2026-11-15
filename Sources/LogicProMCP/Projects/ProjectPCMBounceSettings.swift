@@ -16,12 +16,14 @@ struct ProjectPCMBounceSettings: Codable, Sendable, Equatable {
     let sampleRate: Int
     let bitDepth: Int
     let includeAudioTail: Bool
+    var range: ProjectBounceRange? = nil
 
     enum CodingKeys: String, CodingKey {
         case format
         case sampleRate = "sample_rate"
         case bitDepth = "bit_depth"
         case includeAudioTail = "include_audio_tail"
+        case range
     }
 
     var sampleRateLabel: String { sampleRate == 44_100 ? "44.1 kHz" : "\(sampleRate / 1000) kHz" }
@@ -29,7 +31,7 @@ struct ProjectPCMBounceSettings: Codable, Sendable, Equatable {
     static func parse(_ raw: Value?, artifacts: [String]) throws -> Self? {
         guard let raw else { return nil }
         guard case .object(let values) = raw,
-              Set(values.keys).isSubset(of: ["format", "sample_rate", "bit_depth", "include_audio_tail"]),
+              Set(values.keys).isSubset(of: ["format", "sample_rate", "bit_depth", "include_audio_tail", "range"]),
               artifacts.contains("bounce"),
               case .string(let label) = values["format"],
               let format = Format(rawValue: label),
@@ -44,7 +46,8 @@ struct ProjectPCMBounceSettings: Codable, Sendable, Equatable {
         case .bool(let requested): includeTail = requested
         default: throw ExportPlanError.invalid("bounce_settings.include_audio_tail must be a Boolean")
         }
-        return Self(format: format, sampleRate: sampleRate, bitDepth: bitDepth, includeAudioTail: includeTail)
+        let range = try ProjectBounceRange.parse(values["range"])
+        return Self(format: format, sampleRate: sampleRate, bitDepth: bitDepth, includeAudioTail: includeTail, range: range)
     }
 
     func matchesFile(_ path: String) -> Bool {
@@ -72,5 +75,33 @@ struct ProjectPCMBounceSettings: Codable, Sendable, Equatable {
               AudioFileGetProperty(file, kAudioFilePropertyDataFormat, &streamSize, &stream) == noErr,
               stream.mFormatID == kAudioFormatLinearPCM else { return nil }
         return (type, stream)
+    }
+}
+
+
+struct ProjectBounceRange: Codable, Sendable, Equatable {
+    let start: String
+    let end: String
+
+    static func parse(_ value: Value?) throws -> Self? {
+        guard let value else { return nil }
+        guard case .object(let fields) = value, Set(fields.keys) == ["start", "end"],
+              case .string(let start) = fields["start"], case .string(let end) = fields["end"],
+              let first = position(start), let last = position(end), first.lexicographicallyPrecedes(last) else {
+            throw ExportPlanError.invalid("bounce_settings.range requires ascending start and end in bar.beat.division.tick format")
+        }
+        return .init(start: start, end: end)
+    }
+
+    static func position(_ text: String) -> [Int]? {
+        let parts = text.split(separator: ".", omittingEmptySubsequences: false)
+        let limits = [9999, 99, 99, 960]
+        guard parts.count == limits.count else { return nil }
+        var values: [Int] = []
+        for (part, limit) in zip(parts, limits) {
+            guard let value = Int(part), (1...limit).contains(value), String(value) == part else { return nil }
+            values.append(value)
+        }
+        return values
     }
 }

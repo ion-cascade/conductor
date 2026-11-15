@@ -186,7 +186,8 @@ extension AccessibilityChannel {
     /// element handle. Shared across `defaultGetRegions`,
     /// `selectedRegionInfo`, and `lastRegionInfo`.
     static func enumerateRegionItems(
-        runtime: AXLogicProElements.Runtime = .production
+        runtime: AXLogicProElements.Runtime = .production,
+        includeOffscreen: Bool = false
     ) -> Result<RegionEnumerationResult, RegionEnumerationError> {
         guard let window = AXLogicProElements.mainWindow(runtime: runtime) else {
             return .failure(RegionEnumerationError("Cannot locate Logic Pro main window"))
@@ -275,9 +276,9 @@ extension AccessibilityChannel {
             } else { help = AXHelpers.getHelp(item, runtime: runtime.ax) ?? "" }
             let isRegion = AXLocalePolicy.regionHelpKeyword.containsAny(in: help)
             guard isRegion else { nonRegionCount += 1; continue }
-            guard isVisibleArrangeRegion(item, within: window, runtime: runtime.ax) else {
+            if !isVisibleArrangeRegion(item, within: window, runtime: runtime.ax) {
                 regionItemsOutsideViewport += 1
-                continue
+                if !includeOffscreen { continue }
             }
 
             let name = AXHelpers.getDescription(item, runtime: runtime.ax) ?? ""

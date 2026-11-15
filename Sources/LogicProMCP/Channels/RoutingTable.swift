@@ -307,6 +307,8 @@ extension ChannelRouter {
         // is a statement that an operation is real and says which surfaces may carry it; for these
         // it advertised a contract to a caller who could only ever be told no. The rows come back
         // when there is something behind them.
+        "region.scan":                [.accessibility],
+        "region.edit_by_reference":   [.accessibility],
         "region.get_regions":         [.accessibility],
         // Reserved for a future region-editor tool that picks up the freshly
         // imported region and aligns it to the playhead. Currently unused by

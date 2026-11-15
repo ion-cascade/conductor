@@ -112,8 +112,12 @@ struct ProjectLogic13Bounce {
             }
             owned = dialog
             try await configure(dialog, settings: settings)
+            if let range = settings.range {
+                try await configureRange(range, in: dialog)
+            }
             let okay = try button("OK", in: dialog)
-            guard holdsProject(), focused(dialog), enabled(okay) else {
+            guard holdsProject(), focused(dialog), enabled(okay),
+                  settings.range.map({ rangeIsObserved($0, in: dialog) }) ?? true else {
                 throw Failure.unavailable("settings_commit_scope")
             }
             _ = AXHelpers.performAction(okay, kAXPressAction, runtime: runtime.ax)
@@ -147,6 +151,83 @@ struct ProjectLogic13Bounce {
             }
             return .failure("pcm_bounce_\(detail)", bounceFired: fired)
         }
+    }
+
+    private struct RangeField {
+        let group: AXUIElement
+        let slider: AXUIElement
+        let position: String
+    }
+
+    private func rangeField(_ caption: String, in dialog: AXUIElement) -> RangeField? {
+        let controls = children(dialog)
+        let labels = controls.filter { role($0) == kAXStaticTextRole && text($0, kAXValueAttribute) == caption }
+        guard labels.count == 1, let label = labels.first,
+              let origin = AXHelpers.getPosition(label, runtime: runtime.ax) else { return nil }
+        let fields = controls.filter {
+            guard role($0) == kAXGroupRole, text($0, kAXRoleDescriptionAttribute) == "scrubber group",
+                  let point = AXHelpers.getPosition($0, runtime: runtime.ax) else { return false }
+            return point.x > origin.x && abs(point.y - origin.y) <= 4
+        }
+        guard fields.count == 1, let field = fields.first,
+              let raw = text(field, kAXValueAttribute),
+              text(field, kAXDescriptionAttribute) == raw else { return nil }
+        let position = raw.split(whereSeparator: \.isWhitespace).joined(separator: ".")
+        guard ProjectBounceRange.position(position) != nil else { return nil }
+        let sliders = children(field).filter {
+            role($0) == kAXSliderRole && text($0, kAXDescriptionAttribute) == "Segment 0"
+        }
+        guard sliders.count == 1, let slider = sliders.first,
+              let parent: AXUIElement = AXHelpers.getAttribute(slider, kAXParentAttribute, runtime: runtime.ax),
+              CFEqual(parent, field) else { return nil }
+        return .init(group: field, slider: slider, position: position)
+    }
+
+    private func rangeIsObserved(_ range: ProjectBounceRange, in dialog: AXUIElement) -> Bool {
+        rangeField("Start:", in: dialog)?.position == range.start
+            && rangeField("End:", in: dialog)?.position == range.end
+            && holdsProject() && focused(dialog)
+    }
+
+    // Logic 13 exposes the slider as fixed-point ticks, starting at bar 1
+    // plus ten bars of native offset. This adapter qualifies the observed
+    // 4/4, 1/16 grid by checking the host's independent musical display.
+    private func arrangeSliderValue(_ position: String) -> Int64? {
+        guard let parts = ProjectBounceRange.position(position), parts[1] <= 4, parts[2] <= 4, parts[3] <= 240
+        else { return nil }
+        let ticks = (parts[0] + 9) * 3840 + (parts[1] - 1) * 960 + (parts[2] - 1) * 240 + parts[3] - 1
+        return Int64(ticks) << 32
+    }
+
+    private func configureRange(_ range: ProjectBounceRange, in dialog: AXUIElement) async throws {
+        guard let first = rangeField("Start:", in: dialog), let last = rangeField("End:", in: dialog),
+              arrangeSliderValue(range.start) != nil, arrangeSliderValue(range.end) != nil,
+              let requestedStart = ProjectBounceRange.position(range.start),
+              let originalEnd = ProjectBounceRange.position(last.position) else {
+            throw Failure.unavailable("range_controls_or_musical_grid")
+        }
+        let entries = [("Start:", first, range.start), ("End:", last, range.end)]
+        let order = requestedStart.lexicographicallyPrecedes(originalEnd) ? entries : Array(entries.reversed())
+        for (label, original, requested) in order {
+            guard holdsProject(), focused(dialog), !Task.isCancelled,
+                  let current = rangeField(label, in: dialog), CFEqual(current.group, original.group),
+                  CFEqual(current.slider, original.slider), let value = arrangeSliderValue(requested),
+                  let oldValue: NSNumber = AXHelpers.getAttribute(current.slider, kAXValueAttribute, runtime: runtime.ax),
+                  oldValue.int64Value == arrangeSliderValue(current.position) else {
+                throw Failure.unavailable("range_control_changed")
+            }
+            if current.position == requested { continue }
+            guard enabled(current.slider),
+                  AXHelpers.setAttribute(current.slider, kAXValueAttribute, NSNumber(value: value), runtime: runtime.ax)
+            else { throw Failure.unavailable("range_setter_refused") }
+            _ = try await wait("range_readback") {
+                guard self.holdsProject(), self.focused(dialog),
+                      let read = self.rangeField(label, in: dialog), CFEqual(read.group, current.group),
+                      CFEqual(read.slider, current.slider) else { throw Failure.unavailable("range_control_changed") }
+                return read.position == requested ? read.group : nil
+            }
+        }
+        guard rangeIsObserved(range, in: dialog) else { throw Failure.unavailable("range_readback_mismatch") }
     }
 
     private func configure(_ dialog: AXUIElement, settings: ProjectPCMBounceSettings) async throws {

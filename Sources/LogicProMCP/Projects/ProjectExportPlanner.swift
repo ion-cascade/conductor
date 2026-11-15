@@ -72,6 +72,7 @@ enum ProjectExportPlanner {
             schema: schema,
             runID: deterministicRunID(projects: projects, outputRoot: outputRoot, artifacts: artifacts + (bounceSettings.map {
                 ["\($0.format.rawValue):\($0.sampleRate):\($0.bitDepth):\($0.includeAudioTail)"]
+                    + ($0.range.map { ["bounce_range:\($0.start):\($0.end)"] } ?? [])
             } ?? []) + (stemSettings.map {
                 ["stems:\($0.includeAudioTail):\($0.includeVolumePanAutomation)"]
             } ?? [])),
