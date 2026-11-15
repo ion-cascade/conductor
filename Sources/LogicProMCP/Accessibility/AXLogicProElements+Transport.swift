@@ -20,6 +20,18 @@ extension AXLogicProElements {
         observingExposure: AXTrackBinding.Exposure? = nil,
         checking check: () throws -> Void
     ) throws -> ObservedTransportActivity? {
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
+            try check()
+            guard let bar = logic13ControlBarContainer(in: window, runtime: runtime.ax),
+                  let play = directToolbarControl(AXLocalePolicy.transportPlayControl, in: bar, runtime: runtime.ax),
+                  let record = directToolbarControl(AXLocalePolicy.transportRecordControl, in: bar, runtime: runtime.ax),
+                  !CFEqual(play, record),
+                  let playing = AXValueExtractors.extractButtonState(play, runtime: runtime.ax),
+                  let recording = AXValueExtractors.extractButtonState(record, runtime: runtime.ax)
+            else { return nil }
+            try check()
+            return .init(controlBar: bar, play: play, record: record, isPlaying: playing, isRecording: recording)
+        }
         let permits = { (try? check()) != nil }
         func text(_ element: AXUIElement, _ attribute: String) throws -> String? {
             try check()

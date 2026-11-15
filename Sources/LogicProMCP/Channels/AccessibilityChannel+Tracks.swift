@@ -537,7 +537,7 @@ extension AccessibilityChannel {
                   let selected = Self.selectedHeaders(headers, ax: logic.ax) else {
                 Log.info("Population navigation acquisition unavailable: focus or selection", subsystem: "ax"); return nil
             }
-            guard let viewport = Self.readViewport(window, ax: logic.ax) else {
+            guard let viewport = Self.readViewport(window, trackRail: rail, ax: logic.ax) else {
                 Log.info("Population navigation acquisition unavailable: viewport", subsystem: "ax"); return nil
             }
             guard let transport = try? AXLogicProElements.observedTransportActivity(in: window, runtime: logic,
@@ -765,20 +765,72 @@ extension AccessibilityChannel {
             return true
         }
 
-        private static func readViewport(_ rail: AXUIElement, ax: AXHelpers.Runtime,
+        private static func readViewport(_ window: AXUIElement, trackRail: AXUIElement, ax: AXHelpers.Runtime,
                                          exposure: AXTrackBinding.Exposure? = nil) -> [Viewport]? {
-            guard case .success(let census) = AXHelpers.censusDescendantResult(of: rail, role: kAXScrollBarRole as String,
-                maxDepth: 32, runtime: ax, requiresCompleteTraversal: true,
-                observingRole: { exposure?.observeRole(element: $0, role: $1) },
-                observingChildren: { exposure?.observeChildren(element: $0, children: $1) }) else { return nil }
+            let scrollbars: [AXUIElement]
+            if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
+                guard let observed = arrangeScrollbars(window, trackRail: trackRail, ax: ax) else { return nil }
+                scrollbars = observed
+            } else {
+                guard case .success(let census) = AXHelpers.censusDescendantResult(of: window, role: kAXScrollBarRole as String,
+                    maxDepth: 32, runtime: ax, requiresCompleteTraversal: true,
+                    observingRole: { exposure?.observeRole(element: $0, role: $1) },
+                    observingChildren: { exposure?.observeChildren(element: $0, children: $1) }) else { return nil }
+                scrollbars = census.matches
+            }
             var values: [Viewport] = []
-            for control in census.matches {
+            for control in scrollbars {
                 guard case .success(.some(let value)) = AXHelpers.getAttributeResult(
                     control, kAXValueAttribute as String, runtime: ax) as Result<NSNumber?, AXHelpers.AXStatusError>,
                       value.doubleValue.isFinite else { return nil }
                 values.append(.init(control: control, value: value.doubleValue))
             }
             return values
+        }
+
+        private static func arrangeScrollbars(
+            _ window: AXUIElement, trackRail: AXUIElement, ax: AXHelpers.Runtime
+        ) -> [AXUIElement]? {
+            // The Tracks workspace and header are sibling scroll areas on Logic 13.
+            // Count only the two axes of that exact document workspace.
+            guard let headerScroll: AXUIElement = AXHelpers.getAttribute(trackRail, kAXParentAttribute as String, runtime: ax),
+                  AXHelpers.getRole(headerScroll, runtime: ax) == kAXScrollAreaRole as String,
+                  case .success(let headerChildren) = AXHelpers.childrenResult(headerScroll, runtime: ax),
+                  headerChildren.filter({ CFEqual($0, trackRail) }).count == 1,
+                  let split: AXUIElement = AXHelpers.getAttribute(headerScroll, kAXParentAttribute as String, runtime: ax),
+                  AXHelpers.getRole(split, runtime: ax) == kAXSplitGroupRole as String,
+                  case .success(let siblings) = AXHelpers.childrenResult(split, runtime: ax),
+                  siblings.filter({ CFEqual($0, headerScroll) }).count == 1
+            else { return nil }
+
+            var viewports: [[AXUIElement]] = []
+            for sibling in siblings where !CFEqual(sibling, headerScroll) {
+                guard let role = AXHelpers.getRole(sibling, runtime: ax) else { return nil }
+                if role != kAXScrollAreaRole as String { continue }
+                guard case .success(let children) = AXHelpers.childrenResult(sibling, runtime: ax) else { return nil }
+                var contents = 0
+                var axes: [String: AXUIElement] = [:]
+                for child in children {
+                    guard let role = AXHelpers.getRole(child, runtime: ax) else { return nil }
+                    if role == kAXGroupRole as String,
+                       AXLocalePolicy.trackContentExplicit.matches(AXHelpers.getDescription(child, runtime: ax)) {
+                        contents += 1
+                    }
+                    if role == kAXScrollBarRole as String {
+                        guard let orientation: String = AXHelpers.getAttribute(child, kAXOrientationAttribute as String, runtime: ax),
+                              let owner: AXUIElement = AXHelpers.getAttribute(child, kAXWindowAttribute as String, runtime: ax),
+                              let parent: AXUIElement = AXHelpers.getAttribute(child, kAXParentAttribute as String, runtime: ax),
+                              CFEqual(owner, window), CFEqual(parent, sibling), axes[orientation] == nil else { return nil }
+                        axes[orientation] = child
+                    }
+                }
+                if contents == 0 { continue }
+                guard contents == 1, axes.count == 2,
+                      let horizontal = axes[kAXHorizontalOrientationValue as String],
+                      let vertical = axes[kAXVerticalOrientationValue as String] else { return nil }
+                viewports.append([horizontal, vertical])
+            }
+            return viewports.count == 1 ? viewports[0] : nil
         }
 
         private func same(_ a: [AXUIElement], _ b: [AXUIElement]) -> Bool {
@@ -856,7 +908,7 @@ extension AccessibilityChannel {
             guard let currentValue = value(target), expectedValue.map({ $0 == currentValue }) ?? true else {
                 Log.info("Population navigation ownership unavailable: held control value", subsystem: "ax"); return false
             }
-            let sampledViewport = Self.readViewport(window, ax: logic.ax, exposure: forwardExposure)
+            let sampledViewport = Self.readViewport(window, trackRail: rail, ax: logic.ax, exposure: forwardExposure)
             guard let currentViewport = sampledViewport, currentViewport.count == viewport.count,
                   zip(currentViewport, viewport).allSatisfy({ CFEqual($0.control, $1.control) && $0.value == $1.value }) else {
                 Log.info("Population navigation ownership unavailable: viewport", subsystem: "ax"); return false
@@ -1056,6 +1108,20 @@ extension AccessibilityChannel {
                 // held-control value, membership, focus and custody readback.
                 _ = AXHelpers.performAction(leaf, kAXPressAction as String, runtime: logic.ax)
                 completedClickFocus = (target, [])
+                return true
+            }
+            if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+               hiddenControl.map({ !CFEqual($0, target.disclosure) }) ?? true {
+                guard await owned(target: target, expectedHeaders: expectedHeaders, expectedValue: expectedValue, stoppingWhen: stop),
+                      AXHelpers.getActionNames(target.disclosure, runtime: logic.ax).contains(kAXPressAction as String)
+                else { return false }
+                let controls = passiveFocusControls(target)
+                guard await owned(target: target, expectedHeaders: expectedHeaders, expectedValue: expectedValue, stoppingWhen: stop),
+                      !stop(), (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil else { return false }
+                effects.navigationPerformed = true; effects.restoration = "not_restored"
+                if !effects.attempted.contains("stack_disclosure") { effects.attempted.append("stack_disclosure") }
+                _ = AXHelpers.performAction(target.disclosure, kAXPressAction as String, runtime: logic.ax)
+                completedClickFocus = (target, controls)
                 return true
             }
             guard await owned(target: target, expectedHeaders: expectedHeaders, expectedValue: expectedValue, stoppingWhen: stop),
