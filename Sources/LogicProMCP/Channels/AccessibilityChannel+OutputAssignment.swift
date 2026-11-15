@@ -64,7 +64,7 @@ extension AccessibilityChannel {
             ))
         }
         let physical = AXMixerStripBinding.current
-        var outputAssociation: HeldSelectionAssociation.Pair?
+        let outputAssociation: HeldSelectionAssociation.Pair?
         if let physical, let pair = AXMixerStripBinding.outputAssociation,
            pair.strip.matches(physical), pair.track.currentIndex() != nil { outputAssociation = pair }
         else { outputAssociation = nil }
@@ -351,39 +351,13 @@ extension AccessibilityChannel {
             }
         }
 
-        // A direct physical-strip reference can recover a redraw when the
-        // selected Arrange header and this exact strip survive a checked
-        // away-and-back association challenge before the popup.
-        if outputAssociation == nil, let physical, AXMixerStripBinding.outputAssociation == nil,
-           ApprovedSessionRepair.current == nil, ApprovedSessionRepair.outputLeafPermission == nil,
-           ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
-           let observation = HeldSelectionAssociation(window: physical.window, logic: runtime,
-               expectedProject: nil, requiresProjectReference: false, allowsSelectedChildRailEntry: true,
-               retainedMixerSource: physical),
-           CFEqual(observation.mixer, physical.mixer),
-           observation.document.utf8.elementsEqual(physical.document.utf8) {
-            let current: @Sendable () -> Bool = {
-                (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil
-            }
-            let pairs = await observation.observe(referenceIsCurrent: current,
-                stoppingWhen: { !current() }, allHeldHeaders: true, observingPeerHeaders: [])
-            let effects = observation.effects
-            if effects.navigationPerformed, effects.restoration != "restored" {
-                return refusal(.readbackUnavailable,
-                    "The Mixer association did not restore the original presentation. No output destination was selected.",
-                    ["association_restoration": effects.restoration])
-            }
-            let candidates = pairs.filter { $0.strip.matches(physical) }
-            if candidates.count == 1, let pair = candidates.first, effects.restoration == "restored",
-               CFEqual(pair.track.header, observation.headers[observation.originalIndex]) {
-                outputAssociation = pair
-            }
-            guard current(), physical.currentIndex(runtime: runtime) == index,
-                  AXLogicProElements.outputSlotDestination(in: physical.strip, runtime: runtime.ax) == beforeLabel
-            else {
-                return refusal(.staleSnapshot, "The source changed during Mixer association readback. No destination was selected.")
-            }
-        }
+        let redrawWitness: SelectedOutputRedrawWitness? = {
+            guard let physical, ApprovedSessionRepair.current == nil,
+                  ApprovedSessionRepair.outputLeafPermission == nil,
+                  ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1"
+            else { return nil }
+            return SelectedOutputRedrawWitness(original: physical, strips: strips, runtime: runtime)
+        }()
 
         // Keep the actual pre-popup presentation duty. The destination can
         // retire the strip or move the omitted native Mixer bars; sampling only
@@ -583,7 +557,16 @@ extension AccessibilityChannel {
                 }
             }
             after = afterLabel.flatMap(OutputAssignment.observed(slotLabel:))
-            if !attemptedAssociation, let physical, let outputAssociation,
+            if afterLabel == nil, Date() >= associationReadbackStart, let redrawWitness,
+               let renewed = redrawWitness.readReplacement(runtime: runtime) {
+                afterLabel = renewed.label
+                after = OutputAssignment.observed(slotLabel: renewed.label)
+                populationAfter = renewed.strips
+                extras["source_renewal"] = "held_mixer_selected_child"
+                extras["reference_reread_required"] = true
+                extras["source_index_after"] = renewed.index
+            }
+            if after != destination, !attemptedAssociation, let physical, let outputAssociation,
                Date() >= associationReadbackStart, enumeration?.strips.count == strips.count {
                 let currentIndex = physical.currentIndex(runtime: runtime)
                 let retired = afterLabel == nil && currentIndex == nil
@@ -651,6 +634,111 @@ extension AccessibilityChannel {
             return .success(HonestContract.encodeStateB(reason: .readbackUnavailable, extras: extras))
         }
         return .success(HonestContract.encodeStateA(extras: extras))
+    }
+
+    /// Logic 13 can retire the selected strip during routing. Only the same
+    /// native Mixer selection, unchanged Arrange selection and retained adjacent
+    /// strips carry the receipt across the redraw. No old handle is rebound.
+    private struct SelectedOutputRedrawWitness {
+        let original: AXMixerStripBinding.Binding
+        let originalStrips: [AXUIElement]
+        let previous: AXUIElement?
+        let next: AXUIElement?
+        let focus: AXUIElement
+        let rail: AXUIElement
+        let headers: [AXUIElement]
+        let selectedHeader: AXUIElement
+        let selectedPresentation: Data
+
+        init?(original: AXMixerStripBinding.Binding, strips: [AXUIElement], runtime: AXLogicProElements.Runtime) {
+            guard strips.count > 1,
+                  strips.filter({ CFEqual($0, original.strip) }).count == 1,
+                  let index = strips.firstIndex(where: { CFEqual($0, original.strip) }),
+                  let app = AXLogicProElements.appRoot(runtime: runtime),
+                  let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedUIElementAttribute as String, runtime: runtime.ax),
+                  let rail = AXLogicProElements.uniqueTrackHeaderRail(in: original.window, runtime: runtime),
+                  CFEqual(focus, rail),
+                  case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: original.window, runtime: runtime),
+                  let header = Self.selectedChild(of: rail, within: headers, runtime: runtime.ax),
+                  let presentation = AXTrackBinding.presentation(of: header, runtime: runtime.ax),
+                  let strip = Self.selectedChild(of: original.mixer, within: strips, runtime: runtime.ax),
+                  CFEqual(strip, original.strip) else { return nil }
+            self.original = original
+            self.originalStrips = strips
+            self.previous = index > 0 ? strips[index - 1] : nil
+            self.next = index + 1 < strips.count ? strips[index + 1] : nil
+            self.focus = focus
+            self.rail = rail
+            self.headers = headers
+            self.selectedHeader = header
+            self.selectedPresentation = presentation
+            guard scopeIsCurrent(runtime: runtime), original.currentIndex(runtime: runtime) != nil else { return nil }
+        }
+
+        private static func selectedChild(of parent: AXUIElement, within rows: [AXUIElement],
+                                          runtime: AXHelpers.Runtime) -> AXUIElement? {
+            guard case .success(.elements(let selection)) = AXHelpers.getAXUIElementArrayRead(
+                parent, kAXSelectedChildrenAttribute as String, runtime: runtime),
+                  selection.count == 1, let selected = selection.first,
+                  rows.filter({ CFEqual($0, selected) }).count == 1,
+                  let owner: AXUIElement = AXHelpers.getAttribute(selected, kAXParentAttribute as String, runtime: runtime),
+                  CFEqual(parent, owner) else { return nil }
+            return selected
+        }
+
+        private func scopeIsCurrent(runtime: AXLogicProElements.Runtime) -> Bool {
+            guard (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
+                  let pid = runtime.logicProPID(), pid == runtime.focusedApplicationPID(),
+                  let app = AXLogicProElements.appRoot(runtime: runtime),
+                  let main: AXUIElement = AXHelpers.getAttribute(app, kAXMainWindowAttribute as String, runtime: runtime.ax),
+                  let front: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute as String, runtime: runtime.ax),
+                  CFEqual(main, original.window), CFEqual(front, main),
+                  let currentFocus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedUIElementAttribute as String, runtime: runtime.ax),
+                  CFEqual(currentFocus, focus),
+                  AXLogicProElements.uniqueTrackHeaderRail(in: main, runtime: runtime).map({ CFEqual($0, rail) }) == true,
+                  case .read(let currentHeaders) = AXLogicProElements.allTrackHeadersVerifiedRead(in: main, runtime: runtime),
+                  Self.same(currentHeaders, headers),
+                  let selected = Self.selectedChild(of: rail, within: currentHeaders, runtime: runtime.ax),
+                  CFEqual(selected, selectedHeader),
+                  AXTrackBinding.presentation(of: selected, runtime: runtime.ax) == selectedPresentation,
+                  !AXLogicProElements.dialogPresent(runtime: runtime),
+                  case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(main, runtime: runtime),
+                  document.utf8.elementsEqual(original.document.utf8) else { return false }
+            return true
+        }
+
+        private static func same(_ lhs: [AXUIElement], _ rhs: [AXUIElement]) -> Bool {
+            lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { CFEqual($0, $1) }
+        }
+
+        private func replacement(runtime: AXLogicProElements.Runtime)
+            -> (binding: AXMixerStripBinding.Binding, strips: [AXUIElement], index: Int)? {
+            guard scopeIsCurrent(runtime: runtime),
+                  let enumeration = AXLogicProElements.mixerChannelStripsIfCompletelyRead(
+                    in: original.mixer, runtime: runtime.ax),
+                  enumeration.strips.count == originalStrips.count,
+                  !enumeration.strips.contains(where: { CFEqual($0, original.strip) }),
+                  let selected = Self.selectedChild(of: original.mixer, within: enumeration.strips, runtime: runtime.ax),
+                  !originalStrips.contains(where: { CFEqual($0, selected) }),
+                  let position = enumeration.strips.firstIndex(where: { CFEqual($0, selected) }),
+                  previous.map({ position > 0 && CFEqual($0, enumeration.strips[position - 1]) }) ?? (position == 0),
+                  next.map({ position + 1 < enumeration.strips.count && CFEqual($0, enumeration.strips[position + 1]) })
+                    ?? (position == enumeration.strips.count - 1)
+            else { return nil }
+            let binding = AXMixerStripBinding.Binding(window: original.window, mixer: original.mixer,
+                strip: selected, document: original.document)
+            guard let index = binding.currentIndex(runtime: runtime), enumeration.strips.indices.contains(index),
+                  CFEqual(enumeration.strips[index], selected) else { return nil }
+            return (binding, enumeration.strips, index)
+        }
+
+        func readReplacement(runtime: AXLogicProElements.Runtime) -> (label: String, strips: [AXUIElement], index: Int)? {
+            guard let before = replacement(runtime: runtime),
+                  let label = AXLogicProElements.outputSlotDestination(in: before.binding.strip, runtime: runtime.ax),
+                  let after = replacement(runtime: runtime), before.binding.matches(after.binding),
+                  before.index == after.index, Self.same(before.strips, after.strips) else { return nil }
+            return (label, after.strips, after.index)
+        }
     }
 
     /// One post-press observation under the existing operation's gate/deadline.
