@@ -5871,6 +5871,7 @@ struct QualificationRunnerTests {
             // as State A makes the producer's evidence disagree with its retained payload.
             let responseEnvelope = (try? JSONSerialization.jsonObject(with: response))
                 as? [String: Any]
+            let bareRead = spec.id == .midiListPorts || spec.id == .projectScanRegions
             return (
                 spec.id.rawValue,
                 QualificationOperationResult(
@@ -5884,11 +5885,11 @@ struct QualificationRunnerTests {
                     state: spec.id == nonObjectResponseOperationID ? nil
                         : isMutation ? "C"
                         : responseEnvelope?["state"] as? String
-                            ?? (spec.id == .midiListPorts ? nil : "A"),
+                            ?? (bareRead ? nil : "A"),
                     error: isMutation ? "invalid_params" : responseEnvelope?["error"] as? String,
                     hint: nil,
                     writeAttempted: responseEnvelope?["write_attempted"] as? Bool
-                        ?? (spec.id == .midiListPorts ? nil : false),
+                        ?? (bareRead ? nil : false),
                     readbackSource: spec.id == .midiListPorts
                         ? QualificationSemanticReadbackValidator.coreMIDIPortReadbackSource
                         : spec.id == .projectExportStatus

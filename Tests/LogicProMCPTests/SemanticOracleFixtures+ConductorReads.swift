@@ -21,7 +21,7 @@ extension SemanticOracleFixtures {
             readback: #"{"independent_readback":false}"#
         ),
         .projectGetPatternStep: .init(
-            response: #"{"operation":"project.get_pattern_step","state":"A","success":true,"verified":true,"write_attempted":false,"address":{"project_path":"/tmp/Pattern.logicx","region_name":"Pattern","region_location":"1.1.1.1","track":"Drums","row":"Kick","step":2},"enabled":true,"velocity":64,"visible_grid":[{"name":"Kick","steps":[1,2]}]}"#,
+            response: #"{"operation":"project.get_pattern_step","state":"A","success":true,"verified":true,"write_attempted":false,"address":{"project_path":"/tmp/Pattern.logicx","region_name":"Pattern","region_location":"1.1.1.1","track":"Drums","row":"Kick","step":2},"enabled":true,"velocity":64,"visible_grid":[{"row":"Kick","steps":[1,2]}]}"#,
             readback: #"{"independent_readback":false}"#
         ),
         .projectScanRegions: .init(

@@ -43,6 +43,10 @@ extension SemanticOracleTable {
             .integerMinimum(key: "velocity", min: 0),
             .numericRange(key: "velocity", min: 0, max: 127),
             .nonEmptyArray(key: "visible_grid"),
+            .arrayElements(key: "visible_grid", constraints: [
+                .typedField(key: "row", type: .string),
+                .nonEmptyArray(key: "steps"),
+            ]),
         ],
         reason: "Project info cannot independently identify the selected pattern cell or verify its enabled state and velocity."
     )
@@ -56,6 +60,10 @@ extension SemanticOracleTable {
             .valueEquals(key: "restoration", expected: .string("restored")),
             .typedField(key: "regions", type: .array),
             .nonEmptyArray(key: "sampled_pages"),
+            .arrayElements(key: "sampled_pages", constraints: [
+                .numericRange(key: "horizontal", min: 0, max: 1),
+                .numericRange(key: "vertical", min: 0, max: 1),
+            ]),
             .nonEmptyArray(key: "reasons"),
         ],
         independentReadbackDeferral: .init(code: .semanticValidatorUnavailable,
@@ -67,7 +75,7 @@ extension SemanticOracleTable {
 
     static let projectExportStatus = OperationOracle(
         .projectExportStatus,
-        strength: .value,
+        strength: .shapeAndDomain,
         constraints: [
             .valueEquals(key: "schema", expected: .string("logic_pro_mcp_delivery_status.v1")),
             .valueEquals(key: "operation", expected: .string("project.export_status")),
@@ -111,7 +119,11 @@ extension SemanticOracleTable {
             .valueEquals(key: "position_format", expected: .string("bar.beat.division.tick")),
             .valueEquals(key: "verify_source", expected: .string("ax_automation_event_list")),
             .integerMinimum(key: "track", min: 0),
-            .typedField(key: "points", type: .array),
+            .arrayElements(key: "points", constraints: [
+                .typedField(key: "position", type: .string),
+                .integerMinimum(key: "value", min: 0),
+                .numericRange(key: "value", min: 0, max: 127),
+            ]),
             .typedField(key: "selected_positions", type: .array),
         ], reason: "The qualification harness has no separate observation of the owned \(lane) event list. Track resource values do not describe automation points and their positions.")
     }
