@@ -775,6 +775,13 @@ extension AccessibilityChannel {
             }
         }
 
+        private func preservesSelection(_ selection: [AXUIElement], in headers: [AXUIElement]) -> Bool {
+            guard let originalPresentation else { return same(selection, selected) }
+            guard let current = Self.presentation(of: headers, runtime: logic.ax) else { return false }
+            return selectedPresentation(selection, in: headers, descriptions: current)
+                == selectedPresentation(selected, in: originalHeaders, descriptions: originalPresentation)
+        }
+
         private func selectedTracksRemainVisible(_ selected: [AXUIElement]) -> Bool {
             for header in selected {
                 guard case .success(let children) = AXHelpers.childrenResult(header, runtime: logic.ax) else { return false }
@@ -945,7 +952,10 @@ extension AccessibilityChannel {
                     guard presentation.filter({ original.contains($0) }) == originalPresentation,
                           selectedTracksRemainVisible(currentSelection) else { return false }
                 } else {
-                    guard presentation == expected else { return false }
+                    guard presentation == expected else {
+                        Log.info("Population navigation ownership unavailable: held row presentation changed", subsystem: "ax")
+                        return false
+                    }
                 }
             } else if hiddenViewCleanup {
                 guard restorationStarted, acquired.isEmpty, isBoundHiddenMenuTarget(target),
@@ -1116,7 +1126,8 @@ extension AccessibilityChannel {
                   !usingOriginal || same(rows, originalHeaders),
                   rows.filter({ CFEqual($0, completed.target.header) }).count == 1,
                   same(rows.filter { row in originalHeaders.contains { CFEqual($0, row) } }, originalHeaders),
-                  let currentSelection = Self.selectedHeaders(rows, ax: logic.ax), same(currentSelection, selected),
+                  let currentSelection = Self.selectedHeaders(rows, ax: logic.ax),
+                  preservesSelection(currentSelection, in: rows),
                   completed.controls.filter({ CFEqual($0.element, focus) }).count == 1,
                   AXHelpers.getRole(focus, runtime: logic.ax) == held.role,
                   isPassiveFocusControl(focus, expectedRole: held.role, sliderValue: held.sliderValue),
@@ -1272,8 +1283,12 @@ extension AccessibilityChannel {
                     revealedPresentation = nil
                     newlyExposed = headers.filter { row in !beforeHeaders.contains { CFEqual($0, row) } }
                 }
-                guard acceptHeldGestureFocus(target),
-                      await owned(target: target, expectedHeaders: headers, expectedValue: 1,
+                guard acceptHeldGestureFocus(target) else {
+                    Log.info("Population navigation ownership unavailable: focus after disclosure", subsystem: "ax")
+                    exposure?.end()
+                    effects.reason = "stack_navigation_ownership_lost"; return
+                }
+                guard await owned(target: target, expectedHeaders: headers, expectedValue: 1,
                           expectedPresentation: afterPresentation, stoppingWhen: stop) else {
                     exposure?.end()
                     effects.reason = "stack_navigation_ownership_lost"; return
