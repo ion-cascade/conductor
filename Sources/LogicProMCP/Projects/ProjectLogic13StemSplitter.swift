@@ -128,12 +128,20 @@ struct ProjectLogic13StemSplitter {
             _ = AXHelpers.performAction(apply, kAXPressAction, runtime: runtime.ax)
             sheet = nil
 
+            var readbackStage = "splitter_project_readback_unavailable"
             for _ in 0..<95 {
                 try await Task.sleep(for: .milliseconds(350))
-                guard holdsProject() else { throw Failure.unavailable("project_changed_after_split") }
-                guard sheets().isEmpty, let files = directoryFiles(),
-                      Set(files.map(\.path)) == Set((directory + expected).map(\.path)),
-                      let regionEvidence = observedRegions(binding: binding) else { continue }
+                // Logic can briefly stop answering AX during native analysis.
+                // Read only and wait for the same window and document to return.
+                if case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
+                   current != document { throw Failure.unavailable("project_changed_after_split") }
+                guard holdsProject(), focusedWindow(), sheets().isEmpty else { continue }
+                readbackStage = "splitter_assets_not_observed"
+                guard let files = directoryFiles(),
+                      Set(files.map(\.path)) == Set((directory + expected).map(\.path)) else { continue }
+                readbackStage = "splitter_arrangement_not_observed"
+                guard let regionEvidence = observedRegions(binding: binding) else { continue }
+                readbackStage = "splitter_audio_extent_not_observed"
                 let outputs = expected.compactMap(audioFile)
                 guard outputs.count == expected.count, outputs.allSatisfy({ $0.rate == source.rate
                     && $0.channels == source.channels && $0.frames == source.frames }) else { continue }
@@ -150,7 +158,7 @@ struct ProjectLogic13StemSplitter {
                     },
                 ]))
             }
-            throw Failure.unavailable("splitter_outputs_not_verified")
+            throw Failure.unavailable(readbackStage)
         } catch {
             let stage: String
             if case Failure.unavailable(let detail) = error { stage = detail } else { stage = "cancelled_or_interrupted" }
