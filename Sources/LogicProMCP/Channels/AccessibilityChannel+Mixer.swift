@@ -38,15 +38,18 @@ extension AccessibilityChannel {
     ) -> (states: [ChannelStripState]?, yielded: Bool) {
         enum PollYield: Error { case requested }
         if stop() { return (nil, true) }
-        guard case .found(let window) = AXLogicProElements.arrangeWindowRead(runtime: runtime)
+        guard case .found(let arrange) = AXLogicProElements.arrangeWindowRead(runtime: runtime)
         else { return (nil, false) }
         let lookup: AXLogicProElements.MixerAreaLookup
+        let window: AXUIElement
+        func check() throws {
+            if stop() { throw PollYield.requested }
+        }
         do {
-            let shallow = try AXLogicProElements.shallowOwnedMixerPopulationAreaBinding(
-                in: window, runtime: runtime, checking: {
-                    if stop() { throw PollYield.requested }
-                }
-            )
+            let floating = try AXLogicProElements.focusedFloatingMixer(in: arrange, runtime: runtime, checking: check)
+            window = floating?.window ?? arrange
+            let shallow = try floating?.binding ?? AXLogicProElements.shallowOwnedMixerPopulationAreaBinding(
+                in: window, runtime: runtime, checking: check)
             if let shallow {
                 lookup = .found(shallow.mixer)
             } else if ProcessInfo.processInfo.environment["LOGIC_MCP_BOUNDED_MIXER_POLL"] == "1" {
@@ -54,10 +57,7 @@ extension AccessibilityChannel {
                 return (nil, false)
             } else {
                 lookup = try AXLogicProElements.mixerPopulationAreaLookup(
-                    in: window, runtime: runtime, checking: {
-                        if stop() { throw PollYield.requested }
-                    }
-                ).lookup
+                    in: window, runtime: runtime, checking: check).lookup
             }
         } catch PollYield.requested {
             return (nil, true)

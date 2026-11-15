@@ -43,16 +43,22 @@ enum AXMixerStripBinding {
 
         func currentIndex(runtime: AXLogicProElements.Runtime) -> Int? {
             guard !Task.isCancelled,
-                  case .found(let currentWindow) = AXLogicProElements.arrangeWindowRead(runtime: runtime),
-                  CFEqual(window, currentWindow),
+                  case .found(let arrange) = AXLogicProElements.arrangeWindowRead(runtime: runtime),
                   let app = AXLogicProElements.appRoot(runtime: runtime),
                   case .success(.elements(let windows)) = AXHelpers.getAXUIElementArrayRead(
                     app, kAXWindowsAttribute as String, runtime: runtime.ax),
                   windows.contains(where: { CFEqual($0, window) }),
                   case .success(.some(let currentDocument)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
-                  document.utf8.elementsEqual(currentDocument.utf8),
-                  case .found(let currentMixer) = currentMixerLookup(runtime: runtime),
-                  CFEqual(mixer, currentMixer),
+                  document.utf8.elementsEqual(currentDocument.utf8) else { return nil }
+            let currentMixer: AXUIElement?
+            if let floating = try? AXLogicProElements.focusedFloatingMixer(in: arrange, runtime: runtime) {
+                currentMixer = CFEqual(window, floating.window) ? floating.binding.mixer : nil
+            } else if CFEqual(window, arrange) {
+                currentMixer = currentMixerLookup(runtime: runtime).mixer
+            } else {
+                currentMixer = nil
+            }
+            guard let currentMixer, CFEqual(mixer, currentMixer),
                   let enumeration = AXLogicProElements.mixerChannelStripsIfCompletelyRead(in: mixer, runtime: runtime.ax)
             else { return nil }
             let matching = enumeration.strips.indices.filter { CFEqual(enumeration.strips[$0], strip) }
@@ -312,6 +318,34 @@ extension AXLogicProElements {
             }
             .first
         return best.map { .init(mixer: $0.element, owners: $0.owners, path: $0.path) }
+    }
+
+    /// Logic 13 exposes a separate document window with a direct Mixer group.
+    /// Only the focused window of the same saved document can supersede the Arrange Mixer.
+    static func focusedFloatingMixer(
+        in arrange: AXUIElement, runtime: Runtime, checking check: () throws -> Void = {}
+    ) throws -> (window: AXUIElement, binding: MixerAreaBinding)? {
+        guard ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" else { return nil }
+        try check()
+        let ax = runtime.ax
+        guard let app = appRoot(runtime: runtime),
+              let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute as String, runtime: ax),
+              !CFEqual(focused, arrange),
+              AXHelpers.getRole(focused, runtime: ax) == kAXWindowRole as String,
+              AXHelpers.getAttribute(focused, kAXSubroleAttribute as String, runtime: ax) as String? == kAXStandardWindowSubrole as String,
+              AXHelpers.getTitle(focused, runtime: ax)?.contains(" - Mixer: ") == true,
+              case .success(.some(let document)) = projectPickerDocumentRead(arrange, runtime: runtime),
+              projectPickerDocumentRead(focused, runtime: runtime) == .success(document),
+              let binding = try shallowOwnedMixerPopulationAreaBinding(in: focused, runtime: runtime, checking: check),
+              case .success(.elements(let windows)) = AXHelpers.getAXUIElementArrayRead(
+                app, kAXWindowsAttribute as String, runtime: ax),
+              windows.filter({ CFEqual($0, focused) }).count == 1,
+              windows.filter({ CFEqual($0, arrange) }).count == 1,
+              let renewed: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute as String, runtime: ax),
+              CFEqual(renewed, focused),
+              projectPickerDocumentRead(focused, runtime: runtime) == .success(document)
+        else { return nil }
+        return (window: focused, binding: binding)
     }
 
     /// #107: the per-track volume fader inside the track HEADER (an AXSlider
