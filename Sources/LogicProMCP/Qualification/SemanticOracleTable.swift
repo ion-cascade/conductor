@@ -262,7 +262,7 @@ enum SemanticOracleTable {
     /// UNION the B2 transport/navigate increment UNION the B3
     /// project/tracks/system/midi increment UNION the B4 plugin-insert / export /
     /// cleanup / edit increment, UNION anything registered after B4 closed the
-    /// inventory. This set, the structural exclusions and the pending write oracles
+    /// inventory. This set, the structural exclusions and the fixture qualification cases
     /// account for every supported write.
     static var coveredMutatingOperationIDs: Set<OperationID> {
         phaseB1MutatingOperationIDs
@@ -283,23 +283,25 @@ enum SemanticOracleTable {
         )
     }
 
-    /// Writes tracked separately from structural exclusions. Each row has a scoped
-    /// native release check and still needs a harness recipe for independent readback.
-    static let pendingConductorWriteOracles: [OperationID: String] = [
-        .mixerSetMute: "#39 · same-name strip mute and restore",
-        .mixerSetSolo: "#39 · same-name strip solo and restore",
-        .pluginsSetPresetVerified: "#39 · stock Compressor preset on a held insert",
-        .tracksCreateVolumeAutomation: "#39 · event-list observations at region borders",
-        .tracksSetVolumeAutomationPoint: "#39 · exact volume event address and value",
-        .tracksSplitSelectedAudio: "#39 · generated assets and source mute after reopen",
-        .projectEditRegion: "#39 · exact region boundaries and unchanged peers",
-        .tracksCreatePanAutomation: "#39 · new Pan event address and value",
-        .tracksSetPanAutomationPoint: "#39 · exact existing Pan event address and value",
-        .pluginsSetBypassVerified: "#39 · occupied slot and same-name peer preservation",
-        .projectSetPatternStepEnabled: "#39 · exact step, velocity and unchanged peers",
-        .pluginsSetSidechainVerified: "#39 · held Compressor insert and keyed/control audio",
-        .projectSetRegionGain: "1.8 native fixture · exact Inspector gain and control/edited bounce",
-        .projectSetRegionFade: "1.8 native fixture · exact fade times and control/edited bounce",
+    /// Writes exercised by the fixture-based release runner. Cataloging a case does
+    /// not grant semantic or live credit in the generic read/restore sweep. The
+    /// fixture matrix emits evidence for the exact executable after each owned
+    /// project closes and cleanup is checked.
+    static let conductorWriteQualificationCases: [OperationID: String] = [
+        .mixerSetMute: "mixer",
+        .mixerSetSolo: "mixer",
+        .pluginsSetPresetVerified: "preset",
+        .tracksCreateVolumeAutomation: "volume",
+        .tracksSetVolumeAutomationPoint: "volume",
+        .tracksSplitSelectedAudio: "splitter",
+        .projectEditRegion: "region_edit",
+        .tracksCreatePanAutomation: "pan",
+        .tracksSetPanAutomationPoint: "pan",
+        .pluginsSetBypassVerified: "bypass",
+        .projectSetPatternStepEnabled: "pattern",
+        .pluginsSetSidechainVerified: "sidechain",
+        .projectSetRegionGain: "region_parameters",
+        .projectSetRegionFade: "region_parameters",
     ]
 
     /// Every operation the table may legitimately carry an oracle for: the FULLY
@@ -317,7 +319,7 @@ enum SemanticOracleTable {
     /// imply an unrun live proof. Kept EXPLICIT so the exclusion is a reviewed
     /// decision, not an accidental gap: the census asserts each is a real
     /// mutating spec, is DISJOINT from the covered set, and carries a reason —
-    /// with further pending work tracked by `pendingConductorWriteOracles`.
+    /// and remains separate from `conductorWriteQualificationCases`.
     static let structurallyUnverifiedMutatingOperationIDs: [OperationID: String] = [
         .systemSetupMIDIKeyCommands:
             "the public surface is check-only and drives Logic's Key Commands UI, but its exact-row "

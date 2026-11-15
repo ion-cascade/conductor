@@ -9,3 +9,4 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - run: python3 -m unittest discover -s tools -p 'test_*.py' -v
+      - run: python3 -m unittest discover -s Scripts/qualification_writes -p 'test_*.py' -v

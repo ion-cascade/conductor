@@ -646,17 +646,18 @@ struct SemanticOracleCensusTests {
         // Exact membership above also covers post-closure operations.
     }
 
-    /// Any supported write needs an oracle, an audited structural exclusion, or a tracked
-    /// deferral with the evidence still needed. Deferrals confer no qualification credit.
+    /// Each supported write has an oracle, a fixture recipe, or an audited structural exclusion.
+    /// The fixture catalog does not grant credit in the generic sweep.
     @Test func everyMutatingSpecIsCoveredOrAuditedExcluded() {
         let covered = SemanticOracleTable.coveredMutatingOperationIDs
         let excluded = Set(SemanticOracleTable.structurallyUnverifiedMutatingOperationIDs.keys)
-        let deferrals = SemanticOracleTable.pendingConductorWriteOracles
-        let deferred = Set(deferrals.keys)
+        let recipes = SemanticOracleTable.conductorWriteQualificationCases
+        let fixtureWrites = Set(recipes.keys)
         #expect(covered.isDisjoint(with: excluded))
-        #expect(covered.union(excluded).isDisjoint(with: deferred))
-        #expect(deferrals.values.allSatisfy { !$0.isEmpty })
-        let accounted = covered.union(excluded).union(deferred)
+        #expect(covered.union(excluded).isDisjoint(with: fixtureWrites))
+        #expect(fixtureWrites.count == 14)
+        #expect(recipes.values.allSatisfy { !$0.isEmpty })
+        let accounted = covered.union(excluded).union(fixtureWrites)
         #expect(accounted == SemanticOracleTable.mutatingSpecIDs)
         let unaccounted = SemanticOracleTable.mutatingSpecIDs.subtracting(accounted)
         #expect(unaccounted.isEmpty,
