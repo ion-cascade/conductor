@@ -663,7 +663,7 @@ extension AccessibilityChannel {
                   CFEqual(focus, rail),
                   case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: original.window, runtime: runtime),
                   let header = Self.selectedChild(of: rail, within: headers, runtime: runtime.ax),
-                  let presentation = AXTrackBinding.presentation(of: header, runtime: runtime.ax),
+                  let presentation = Self.routingNeutralPresentation(of: header, runtime: runtime.ax),
                   let strip = Self.selectedChild(of: original.mixer, within: strips, runtime: runtime.ax),
                   CFEqual(strip, original.strip) else {
                 Log.debug("Output redraw baseline: original Mixer selection or rail focus unavailable", subsystem: "ax")
@@ -682,6 +682,16 @@ extension AccessibilityChannel {
                 Log.debug("Output redraw baseline: initial scope unavailable", subsystem: "ax")
                 return nil
             }
+        }
+
+        private static func routingNeutralPresentation(of header: AXUIElement,
+                                                       runtime: AXHelpers.Runtime) -> Data? {
+            guard let value = AXTrackBinding.presentation(of: header, runtime: runtime) else { return nil }
+            // Logic 13 English appends this routing status to the Arrange
+            // header after committing No Output. Retain every other byte.
+            let annotation = Array(", no output".utf8)
+            guard value.suffix(annotation.count).elementsEqual(annotation) else { return value }
+            return value.dropLast(annotation.count)
         }
 
         private static func selectedChild(of parent: AXUIElement, within rows: [AXUIElement],
@@ -710,7 +720,7 @@ extension AccessibilityChannel {
                   Self.same(currentHeaders, headers),
                   let selected = Self.selectedChild(of: rail, within: currentHeaders, runtime: runtime.ax),
                   CFEqual(selected, selectedHeader),
-                  AXTrackBinding.presentation(of: selected, runtime: runtime.ax) == selectedPresentation,
+                  Self.routingNeutralPresentation(of: selected, runtime: runtime.ax) == selectedPresentation,
                   AXLogicProElements.dialogPresenceReason(runtime: runtime,
                     renewingRetiredNonMainWindowCensusAround: main) == .noBlockingWindow,
                   case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(main, runtime: runtime),
