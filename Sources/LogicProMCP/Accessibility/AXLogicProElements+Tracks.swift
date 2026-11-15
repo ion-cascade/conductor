@@ -710,10 +710,11 @@ extension AXLogicProElements {
             return .unavailable
         }
 
-        if observingExposure == nil,
-           ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+        if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
            let rail = logic13PrimaryTrackRail(in: window, runtime: runtime.ax) {
-            return enumerateTrackHeaderRows(in: rail, runtime: runtime.ax)
+            let result = enumerateTrackHeaderRows(in: rail, runtime: runtime.ax)
+            if case .read(let rows) = result { observingExposure?.observeHeaders(rows) }
+            return result
         }
 
         // Preserve this shared reader's historic tolerance for an unrelated

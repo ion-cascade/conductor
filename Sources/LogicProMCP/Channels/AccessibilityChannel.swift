@@ -1601,7 +1601,7 @@ actor AccessibilityChannel: Channel {
             var strips: [ChannelStripState]?
             var presentation: AXLogicProElements.MixerPresentationRead?
             let directToolbar: AXUIElement?
-            if exposure == nil, ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
+            if (!wantsStrips || exposure == nil), ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
                 directToolbar = AXLogicProElements.logic13ControlBarContainer(in: window, runtime: logic.ax)
             } else {
                 directToolbar = nil
