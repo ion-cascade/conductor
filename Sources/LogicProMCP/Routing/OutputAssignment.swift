@@ -97,11 +97,17 @@ enum OutputAssignment: Equatable, Sendable {
     static func observed(slotLabel: String) -> OutputAssignment? {
         let label = slotLabel.trimmingCharacters(in: .whitespacesAndNewlines)
         if AXLocalePolicy.noOutputLabel.matches(label, mode: .exact) { return .noOutput }
-        if AXLocalePolicy.stereoOutputLabel.matches(label, mode: .exact) { return .stereoOutput }
+        if isStereoOutputSlotLabel(label) { return .stereoOutput }
         let (classification, busNumber) = RoutingGraphPublication.classifyOutputLabel(label)
         if classification == .bus, let busNumber { return .bus(busNumber) }
         if let ports = pairPorts(ofRuntimeLabel: label) { return .physical(ports.0, ports.1) }
         return nil
+    }
+
+    static func isStereoOutputSlotLabel(_ label: String) -> Bool {
+        // In Logic 13's English Mixer the same output appears as "Stereo Out"
+        // on the strip and "Stereo Output" in the checked menu.
+        label == "Stereo Out" || AXLocalePolicy.stereoOutputLabel.matches(label, mode: .exact)
     }
 
     /// The bus number an entry of the output popup's Bus submenu names, or nil.

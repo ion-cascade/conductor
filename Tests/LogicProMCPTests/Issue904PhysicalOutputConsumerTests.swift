@@ -8,6 +8,13 @@ import Testing
 // These are synthetic cached observations, not fresh native qualification.
 @Suite("#904 physical output labels reach the existing routing consumers", .serialized)
 struct Issue904PhysicalOutputConsumerTests {
+    @Test("Logic 13's Stereo Out slot retains main output identity")
+    func logic13StereoOutSlotIsMainOutput() {
+        #expect(OutputAssignment.observed(slotLabel: "Stereo Out") == .stereoOutput)
+        #expect(RoutingGraphPublication.classifyOutputLabel("Stereo Out").0 == .physicalOutput)
+        #expect(OutputAssignment.observed(slotLabel: "Stereo Out alternate") == nil)
+    }
+
     @Test("German and English physical pairs agree across the existing readers",
           arguments: ["Ausgang 3-4", "Output 3-4"])
     func physicalPairLabelsAgreeAcrossExistingReaders(label: String) {

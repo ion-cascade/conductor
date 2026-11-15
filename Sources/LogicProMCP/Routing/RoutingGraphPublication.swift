@@ -371,7 +371,7 @@ enum RoutingGraphPublication {
         if AXLocalePolicy.noOutputLabel.matches(candidate, mode: .exact) {
             return (.noOutput, nil)
         }
-        if AXLocalePolicy.stereoOutputLabel.matches(candidate, mode: .exact) {
+        if OutputAssignment.isStereoOutputSlotLabel(candidate) {
             return (.physicalOutput, nil)
         }
         for remainder in remainders(of: candidate, after: AXLocalePolicy.busOutputLabelPrefix) {
