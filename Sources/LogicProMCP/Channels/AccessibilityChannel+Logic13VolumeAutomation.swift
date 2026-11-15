@@ -2,10 +2,12 @@ import ApplicationServices
 import Foundation
 
 extension AccessibilityChannel {
-    static func defaultReadTrackVolumeAutomation(
+    static func defaultTrackVolumeAutomation(
+        params: [String: String],
+        edit: Bool,
         runtime logic: AXLogicProElements.Runtime
-    ) -> ChannelResult {
-        let operation = "track.get_volume_automation"
+    ) async -> ChannelResult {
+        let operation = edit ? "track.set_volume_automation_point" : "track.get_volume_automation"
         func unavailable() -> ChannelResult {
             .error(HonestContract.encodeStateC(
                 error: .readbackUnavailable,
@@ -25,8 +27,25 @@ extension AccessibilityChannel {
         let read = Logic13VolumeEventList(app: app, editor: editor, arrange: binding.window,
             title: String(arrangeTitle.dropLast(" - Tracks".count)),
             trackName: trackName, runtime: logic.ax)
-        guard let points = read.points(), binding.currentIndex() == index,
-              logic.focusedApplicationPID() == pid, read.ownsEditor() else { return unavailable() }
+        func current() -> Bool {
+            guard !Task.isCancelled, binding.currentIndex() == index,
+                  case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(
+                    in: binding.window, runtime: logic),
+                  headers.indices.contains(index), CFEqual(headers[index], binding.header) else { return false }
+            var nameMatches = 0
+            for (offset, header) in headers.enumerated() {
+                guard case .success(.some(let name)) = AXValueExtractors.extractTrackNameResult(
+                    from: header, runtime: logic.ax),
+                    AXValueExtractors.extractSelectedState(header, runtime: logic.ax) == (offset == index) else { return false }
+                if name == trackName { nameMatches += 1 }
+            }
+            return nameMatches == 1 && logic.focusedApplicationPID() == pid && read.ownsEditor()
+        }
+        guard let points = read.points(), current() else { return unavailable() }
+        if edit {
+            return await changeTrackVolumePoint(params: params, points: points,
+                editor: read, current: current, logic: logic, operation: operation)
+        }
         return .success(HonestContract.encodeStateA(extras: [
             "operation": operation,
             "lane": "volume",
@@ -40,12 +59,89 @@ extension AccessibilityChannel {
             "write_attempted": false,
         ]))
     }
+
+    private static func changeTrackVolumePoint(
+        params: [String: String], points: [Logic13VolumeEventList.Point],
+        editor: Logic13VolumeEventList, current: () -> Bool,
+        logic: AXLogicProElements.Runtime, operation: String
+    ) async -> ChannelResult {
+        func refusal(_ error: HonestContract.FailureError, _ hint: String) -> ChannelResult {
+            .error(HonestContract.encodeStateC(error: error, hint: hint,
+                extras: ["operation": operation, "write_attempted": false]))
+        }
+        guard let position = params["position"],
+              let expected = params["expected_current"].flatMap(Int.init),
+              let requested = params["value"].flatMap(Int.init),
+              (0...127).contains(expected), (0...127).contains(requested) else {
+            return refusal(.invalidParams, "Supply an observed musical position, expected value and requested Logic fader value.")
+        }
+        let matches = points.indices.filter { points[$0].position == position }
+        guard matches.count == 1, let index = matches.first, points[index].value == expected else {
+            return refusal(.staleSnapshot, "The position and expected value do not identify one current Volume event.")
+        }
+        guard (requested - expected).isMultiple(of: 10) else {
+            return refusal(.invalidParams, "This editor supports changes in steps of 10 Logic fader units.")
+        }
+        func stopped() -> Bool {
+            guard let transport = try? AXLogicProElements.observedTransportActivity(
+                in: editor.arrange, runtime: logic, checking: {}) else { return false }
+            return !transport.isPlaying && !transport.isRecording
+        }
+        func result(_ value: Int, attempted: Bool) -> [String: Any] {
+            ["operation": operation, "lane": "volume", "position": position, "unit": "logic_fader_value",
+             "before": expected, "observed": value, "requested": requested,
+             "changed": value != expected, "write_attempted": attempted]
+        }
+        func uncertain(_ value: Int) -> ChannelResult {
+            var evidence = result(value, attempted: true)
+            evidence.removeValue(forKey: "observed")
+            evidence["last_verified_value"] = value
+            evidence["safe_to_retry"] = false
+            evidence["effect_unknown"] = true
+            return .success(HonestContract.encodeStateB(reason: .readbackMismatch, extras: evidence))
+        }
+        guard stopped(), current() else {
+            return refusal(.readbackUnavailable, "Stop playback and keep the referenced Track Automation Event List focused.")
+        }
+        let control = points[index].slider
+        let step = requested > expected ? 10 : -10
+        let action = step > 0 ? kAXIncrementAction : kAXDecrementAction
+        var observed = expected
+        var attempted = false
+        func matches(_ value: Int) -> Bool {
+            guard let fresh = editor.points(), points.count == fresh.count else { return false }
+            return zip(points, fresh).enumerated().allSatisfy { pair in
+                let (original, live) = pair.element
+                return original.position == live.position
+                    && (pair.offset == index ? value : original.value) == live.value
+                    && CFEqual(original.slider, live.slider)
+            }
+        }
+        while observed != requested {
+            guard matches(observed), stopped(), current(),
+                  OperationTraceContext.claimDeadlineEffect("track_volume_automation_edit") else {
+                return attempted ? uncertain(observed)
+                    : refusal(.staleSnapshot, "The native Volume event changed before the edit.")
+            }
+            attempted = true
+            _ = AXHelpers.performAction(control, action, runtime: logic.ax)
+            do { try await Task.sleep(for: .milliseconds(50)) }
+            catch { return uncertain(observed) }
+            let wanted = observed + step
+            guard matches(wanted), current() else { return uncertain(observed) }
+            observed = wanted
+        }
+        var evidence = result(observed, attempted: attempted)
+        evidence["verify_source"] = "ax_automation_event_list"
+        return .success(HonestContract.encodeStateA(extras: evidence))
+    }
 }
 
 private struct Logic13VolumeEventList {
     struct Point {
         let position: String
         let value: Int
+        let slider: AXUIElement
     }
 
     let app: AXUIElement
@@ -107,7 +203,7 @@ private struct Logic13VolumeEventList {
                   let slider = hitInCell(cells[6], column: 6, role: kAXSliderRole as String),
                   let value: Int = AXHelpers.getAttribute(slider, kAXValueAttribute as String, runtime: runtime),
                   (0...127).contains(value) else { return nil }
-            points.append(Point(position: position, value: value))
+            points.append(Point(position: position, value: value, slider: slider))
         }
         return points
     }

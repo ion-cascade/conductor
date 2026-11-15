@@ -67,6 +67,7 @@ extension ChannelRouter {
         "track.get_tracks":           [.accessibility],
         "track.get_selected":         [.accessibility],
         "track.get_volume_automation": [.accessibility],
+        "track.set_volume_automation_point": [.accessibility],
 
         // Track mutation — MCU for mute/solo/arm/select, KeyCmd for creation
         "track.select":               [.accessibility, .mcu],
