@@ -2110,6 +2110,8 @@ actor AccessibilityChannel: Channel {
             return runtime.tracks()
         case "track.get_selected":
             return runtime.selectedTrack()
+        case "track.get_volume_automation":
+            return Self.defaultReadTrackVolumeAutomation(runtime: runtime.logicRuntime)
 
         // MARK: - Track mutations
         case "track.select":

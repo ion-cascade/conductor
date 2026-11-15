@@ -134,6 +134,7 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case tracksRecordSequence = "tracks.record_sequence"
     case tracksSortVerified = "tracks.sort_verified"
     case tracksSetAutomation = "tracks.set_automation"
+    case tracksGetVolumeAutomation = "tracks.get_volume_automation"
     case tracksSetInstrument = "tracks.set_instrument"
     case tracksListLibrary = "tracks.list_library"
     case tracksScanLibrary = "tracks.scan_library"
@@ -377,7 +378,7 @@ enum OperationRegistry {
             "tracks.create_drummer", "tracks.create_external_midi", "tracks.delete",
             "tracks.duplicate", "tracks.rename", "tracks.mute", "tracks.solo", "tracks.arm",
             "tracks.arm_only", "tracks.record_sequence", "tracks.sort_verified", "tracks.set_automation",
-            "tracks.set_instrument", "tracks.list_library", "tracks.scan_library",
+            "tracks.get_volume_automation", "tracks.set_instrument", "tracks.list_library", "tracks.scan_library",
             "tracks.resolve_path", "tracks.scan_plugin_presets",
         ],
     ]
@@ -433,7 +434,7 @@ enum OperationRegistry {
             "select", "create_audio", "create_instrument", "create_drummer",
             "create_external_midi", "delete", "duplicate", "rename", "mute", "solo", "arm",
             "arm_only", "record_sequence", "sort_verified", "set_automation", "set_instrument", "list_library",
-            "scan_library", "resolve_path", "scan_plugin_presets",
+            "scan_library", "resolve_path", "scan_plugin_presets", "get_volume_automation",
         ],
     ]
 
@@ -1040,6 +1041,7 @@ enum OperationRegistry {
         // confirmation but accepts no track target reference.
         (.tracksSortVerified, "sort_verified", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.none, ["confirmed", "criterion", "expected_order"]),
         (.tracksSetAutomation, "set_automation", Mutability.`mutating`, DeadlineClass.short, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["index", "mode", "track"]),
+        (.tracksGetVolumeAutomation, "get_volume_automation", Mutability.readOnly, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, []),
         (.tracksSetInstrument, "set_instrument", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["category", "index", "path", "preset"]),
         (.tracksListLibrary, "list_library", Mutability.readOnly, DeadlineClass.long, VerificationPolicy.none, TargetPolicy.none, []),
         (.tracksScanLibrary, "scan_library", Mutability.readOnly, DeadlineClass.long, VerificationPolicy.none, TargetPolicy.none, ["mode"]),
