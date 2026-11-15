@@ -102,6 +102,7 @@ extension AccessibilityChannel {
 
         regionScan = nil
         let mouse = AXMouseHelper.Runtime.production
+        let priorPointer = CGEvent(source: nil)?.location
         _ = mouse.postMouseEvent(.mouseMoved, drag.start, 0)
         mouse.sleepMicros(70_000)
         guard scope.holdsArrange(), scope.page() == held.page, scope.selectionIsOriginal(),
@@ -122,6 +123,15 @@ extension AccessibilityChannel {
             mouse.sleepMicros(25_000)
         }
         posted = mouse.postMouseEvent(.leftMouseUp, drag.end, 1) && posted
+        // A hovered resize handle replaces the region's ordinary AXHelp.
+        // Move off the region before reading its actual post-edit evidence.
+        if let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
+           let current: AXUIElement = AXHelpers.getAttribute(scope.app, kAXMainWindowAttribute, runtime: ax),
+           CFEqual(current, scope.window), let frame = scope.frame(scope.window) {
+            let resting = priorPointer.flatMap { frame.contains($0) && abs($0.y - drag.end.y) > 24 ? $0 : nil }
+                ?? CGPoint(x: frame.minX + 180, y: frame.minY + 10)
+            _ = mouse.postMouseEvent(.mouseMoved, resting, 0)
+        }
 
         var observed: RegionInfo?
         var peersVerified = false
@@ -212,13 +222,7 @@ extension AccessibilityChannel {
 
     private static func regionDragPoints(_ held: HeldRegion, change: RegionChange, scope: ArrangeRegionScope)
         -> (start: CGPoint, end: CGPoint)? {
-        let ax = scope.runtime.ax
-        func frame(_ element: AXUIElement) -> CGRect? {
-            guard let p = AXHelpers.getPosition(element, runtime: ax), let s = AXHelpers.getSize(element, runtime: ax),
-                  p.x.isFinite, p.y.isFinite, s.width.isFinite, s.height.isFinite else { return nil }
-            return CGRect(origin: p, size: s)
-        }
-        guard let viewport = frame(scope.pane), let region = frame(held.item), viewport.contains(region),
+        guard let viewport = scope.frame(scope.pane), let region = scope.frame(held.item), viewport.contains(region),
               region.width > 12, region.height > 12,
               let start = held.info.startPosition.flatMap(ArrangeMusicalGrid.ticks),
               let end = held.info.endPosition.flatMap(ArrangeMusicalGrid.ticks),

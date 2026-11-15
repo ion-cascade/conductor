@@ -13,6 +13,7 @@ extension AccessibilityChannel {
         let headerPresentation: Data
         let info: RegionInfo
         let page: RegionPage
+        let fullFrameObserved: Bool
     }
 
     struct RegionScanSnapshot: @unchecked Sendable {
@@ -125,16 +126,49 @@ extension AccessibilityChannel {
             Self.regionSelection(content, runtime: runtime.ax).map { Self.same($0, originalSelection) } == true
         }
 
-        func show(_ page: RegionPage, replacing owned: RegionPage) async -> Bool {
-            guard holdsArrange(), self.page() == owned else { return false }
-            for (bar, before, value) in [(horizontal, owned.horizontal, page.horizontal), (vertical, owned.vertical, page.vertical)] {
-                if before == value { continue }
-                guard holdsArrange(), Self.value(bar, runtime: runtime.ax) == before,
-                      AXHelpers.setAttribute(bar, kAXValueAttribute, NSNumber(value: value), runtime: runtime.ax)
-                else { return false }
+        func frame(_ element: AXUIElement) -> CGRect? {
+            let ax = runtime.ax
+            guard let p = AXHelpers.getPosition(element, runtime: ax),
+                  let s = AXHelpers.getSize(element, runtime: ax),
+                  p.x.isFinite, p.y.isFinite, s.width.isFinite, s.height.isFinite,
+                  s.width > 0, s.height > 0 else { return nil }
+            return CGRect(origin: p, size: s)
+        }
+
+        struct ViewportTransition {
+            let reached: Bool
+            /// Exact observed page after an owned, verified setter. Missing if
+            /// the last write or an intervening change could not be determined.
+            let ownedPage: RegionPage?
+        }
+
+        func transition(to requested: RegionPage, replacing owned: RegionPage,
+                        tolerance: Double = 0) async -> ViewportTransition {
+            var before = owned
+            for (index, bar) in [horizontal, vertical].enumerated() {
+                guard holdsArrange(), page() == before else { return .init(reached: false, ownedPage: nil) }
+                let value = index == 0 ? requested.horizontal : requested.vertical
+                let current = index == 0 ? before.horizontal : before.vertical
+                if abs(current - value) <= tolerance { continue }
+                guard AXHelpers.setAttribute(bar, kAXValueAttribute, NSNumber(value: value), runtime: runtime.ax)
+                else { return .init(reached: false, ownedPage: page() == before ? before : nil) }
+                try? await Task.sleep(for: .milliseconds(100))
+                guard holdsArrange(), let after = page(),
+                      index == 0 ? after.vertical == before.vertical : after.horizontal == before.horizontal else {
+                    return .init(reached: false, ownedPage: nil)
+                }
+                let observed = index == 0 ? after.horizontal : after.vertical
+                guard abs(observed - value) <= tolerance else {
+                    Log.debug("Arrange viewport axis \(index) was set to \(value) and read \(observed)", subsystem: "ax")
+                    return .init(reached: false, ownedPage: after == before ? before : nil)
+                }
+                before = after
             }
-            try? await Task.sleep(for: .milliseconds(100))
-            return holdsArrange() && self.page() == page
+            return .init(reached: true, ownedPage: before)
+        }
+
+        func show(_ page: RegionPage, replacing owned: RegionPage) async -> Bool {
+            await transition(to: page, replacing: owned).reached
         }
     }
 
@@ -166,6 +200,7 @@ extension AccessibilityChannel {
         let grid = [0.0, 0.25, 0.5, 0.75, 1.0]
         var page = scope.originalPage
         var sampled: [RegionPage] = []
+        var custodyLost = false
         var observed: [HeldRegion] = []
         var reasons = ["sampled_viewports"]
         var stackGap = false
@@ -174,30 +209,42 @@ extension AccessibilityChannel {
         let pages = [scope.originalPage] + grid.flatMap { y in
             grid.map { x in RegionPage(horizontal: x, vertical: y) }
         }
-        for requested in pages where !sampled.contains(requested) {
-            guard (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
-                  scope.selectionIsOriginal(), await scope.show(requested, replacing: page)
-            else {
+        for requested in pages {
+            guard (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil, scope.selectionIsOriginal() else {
                 reasons.append("viewport_navigation_unverified")
                 break
             }
-            page = requested
+            let navigation = await scope.transition(to: requested, replacing: page, tolerance: 0.012)
+            if let owned = navigation.ownedPage { page = owned }
+            else { custodyLost = true }
+            guard navigation.reached else {
+                reasons.append("viewport_navigation_unverified")
+                if custodyLost { break }
+                continue
+            }
+            if sampled.contains(page) { continue }
             guard scope.holdsHeaders(), scope.selectionIsOriginal(),
                   case .success(let inventory) = Self.enumerateRegionItems(runtime: runtime),
-                  scope.holdsArrange(), scope.page() == requested else {
+                  scope.holdsArrange(), scope.page() == page else {
                 reasons.append("viewport_readback_unverified")
                 break
             }
-            sampled.append(requested)
+            sampled.append(page)
             stackGap = stackGap || inventory.trackHeadersWithStackVisibilityGaps > 0
+            let viewport = scope.frame(scope.pane)
             for row in inventory.regions {
                 let index = row.info.trackIndex
                 guard scope.headers.indices.contains(index),
-                      let presentation = AXTrackBinding.presentation(of: scope.headers[index], runtime: runtime.ax),
-                      !observed.contains(where: { Self.sameRegionObservation($0, item: row.item, info: row.info) })
+                      let presentation = AXTrackBinding.presentation(of: scope.headers[index], runtime: runtime.ax)
                 else { continue }
-                observed.append(.init(item: row.item, header: scope.headers[index],
-                                      headerPresentation: presentation, info: row.info, page: requested))
+                let full = viewport.map { visible in scope.frame(row.item).map { visible.contains($0) } == true } == true
+                let candidate = HeldRegion(item: row.item, header: scope.headers[index],
+                    headerPresentation: presentation, info: row.info, page: page, fullFrameObserved: full)
+                if let existing = observed.firstIndex(where: { Self.sameRegionObservation($0, item: row.item, info: row.info) }) {
+                    if full && !observed[existing].fullFrameObserved { observed[existing] = candidate }
+                } else {
+                    observed.append(candidate)
+                }
                 if observed.count >= 512 { break }
             }
             if observed.count >= 512 {
@@ -206,10 +253,13 @@ extension AccessibilityChannel {
             }
         }
         if stackGap { reasons.append("collapsed_or_unreadable_stack") }
-        let restored = await scope.show(scope.originalPage, replacing: page) && scope.selectionIsOriginal() && scope.holdsHeaders()
+        let restored: Bool
+        if !custodyLost, scope.selectionIsOriginal() {
+            restored = await scope.show(scope.originalPage, replacing: page) && scope.holdsHeaders()
+        } else { restored = false }
         var targets: [String: HeldRegion] = [:]
         let rows = observed.map { held -> RegionScanReport.Row in
-            guard restored, held.info.startPosition != nil, held.info.endPosition != nil,
+            guard restored, held.fullFrameObserved, held.info.startPosition != nil, held.info.endPosition != nil,
                   ["midi", "audio"].contains(held.info.kind),
                   observed.filter({ CFEqual($0.item, held.item) }).count == 1 else {
                 return .init(region: held.info, reference: nil)
@@ -224,7 +274,7 @@ extension AccessibilityChannel {
         } else {
             reasons.append("presentation_restoration_unverified")
         }
-        return Self.encodeResult(RegionScanReport(regions: rows, sampledPages: sampled, reasons: reasons,
+        return Self.encodeResult(RegionScanReport(regions: rows, sampledPages: sampled, reasons: reasons.reduce(into: []) { if !$0.contains($1) { $0.append($1) } },
                                                   restoration: restored ? "restored" : "unverified"))
     }
 

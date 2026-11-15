@@ -155,7 +155,7 @@ struct ProjectLogic13Bounce {
 
     private struct RangeField {
         let group: AXUIElement
-        let slider: AXUIElement
+        let sliders: [AXUIElement]
         let position: String
     }
 
@@ -174,13 +174,16 @@ struct ProjectLogic13Bounce {
               text(field, kAXDescriptionAttribute) == raw else { return nil }
         let position = raw.split(whereSeparator: \.isWhitespace).joined(separator: ".")
         guard ProjectBounceRange.position(position) != nil else { return nil }
-        let sliders = children(field).filter {
-            role($0) == kAXSliderRole && text($0, kAXDescriptionAttribute) == "Segment 0"
+        let controlsBySegment = children(field).filter { role($0) == kAXSliderRole }
+        var sliders: [AXUIElement] = []
+        for index in 0..<4 {
+            let matches = controlsBySegment.filter { text($0, kAXDescriptionAttribute) == "Segment \(index)" }
+            guard matches.count == 1, let slider = matches.first,
+                  let parent: AXUIElement = AXHelpers.getAttribute(slider, kAXParentAttribute, runtime: runtime.ax),
+                  CFEqual(parent, field) else { return nil }
+            sliders.append(slider)
         }
-        guard sliders.count == 1, let slider = sliders.first,
-              let parent: AXUIElement = AXHelpers.getAttribute(slider, kAXParentAttribute, runtime: runtime.ax),
-              CFEqual(parent, field) else { return nil }
-        return .init(group: field, slider: slider, position: position)
+        return .init(group: field, sliders: sliders, position: position)
     }
 
     private func rangeIsObserved(_ range: ProjectBounceRange, in dialog: AXUIElement) -> Bool {
@@ -207,25 +210,53 @@ struct ProjectLogic13Bounce {
         let entries = [("Start:", first, range.start), ("End:", last, range.end)]
         let order = requestedStart.lexicographicallyPrecedes(originalEnd) ? entries : Array(entries.reversed())
         for (label, original, requested) in order {
-            guard holdsProject(), focused(dialog), !Task.isCancelled,
-                  let current = rangeField(label, in: dialog), CFEqual(current.group, original.group),
-                  CFEqual(current.slider, original.slider), let value = arrangeSliderValue(requested),
-                  let oldValue: NSNumber = AXHelpers.getAttribute(current.slider, kAXValueAttribute, runtime: runtime.ax),
-                  oldValue.int64Value == arrangeSliderValue(current.position) else {
-                throw Failure.unavailable("range_control_changed")
-            }
-            if current.position == requested { continue }
-            guard enabled(current.slider),
-                  AXHelpers.setAttribute(current.slider, kAXValueAttribute, NSNumber(value: value), runtime: runtime.ax)
-            else { throw Failure.unavailable("range_setter_refused") }
-            _ = try await wait("range_readback") {
-                guard self.holdsProject(), self.focused(dialog),
-                      let read = self.rangeField(label, in: dialog), CFEqual(read.group, current.group),
-                      CFEqual(read.slider, current.slider) else { throw Failure.unavailable("range_control_changed") }
-                return read.position == requested ? read.group : nil
-            }
+            try await setRangeField(label, original: original, requested: requested, in: dialog)
         }
         guard rangeIsObserved(range, in: dialog) else { throw Failure.unavailable("range_readback_mismatch") }
+    }
+
+    private func setRangeField(
+        _ label: String, original: RangeField, requested: String, in dialog: AXUIElement
+    ) async throws {
+        guard let target = arrangeSliderValue(requested) else { throw Failure.unavailable("range_musical_grid") }
+        let units: [Int64] = [3_840, 960, 240, 1]
+        func read() throws -> (RangeField, Int64) {
+            guard holdsProject(), focused(dialog), !Task.isCancelled,
+                  let field = rangeField(label, in: dialog), CFEqual(field.group, original.group),
+                  zip(field.sliders, original.sliders).allSatisfy({ CFEqual($0.0, $0.1) }),
+                  let value = arrangeSliderValue(field.position),
+                  field.sliders.allSatisfy({ slider in
+                      let raw: NSNumber? = AXHelpers.getAttribute(slider, kAXValueAttribute, runtime: runtime.ax)
+                      return raw?.int64Value == value
+                  }) else { throw Failure.unavailable("range_control_changed") }
+            return (field, value)
+        }
+        // Logic uses the AX setter as a one-unit step on the selected segment.
+        // AX increment and decrement can advance ten units at a time.
+        for _ in 0..<96 {
+            let (field, old) = try read()
+            if old == target { return }
+            let delta = (target >> 32) - (old >> 32)
+            guard let index = units.firstIndex(where: { $0 <= abs(delta) }),
+                  enabled(field.sliders[index]) else { throw Failure.unavailable("range_setter_refused") }
+            let slider = field.sliders[index]
+            if abs(delta) >= 10 * units[index] {
+                let action = delta > 0 ? kAXIncrementAction : kAXDecrementAction
+                _ = AXHelpers.performAction(slider, action, runtime: runtime.ax)
+            } else {
+                guard AXHelpers.setAttribute(slider, kAXValueAttribute, NSNumber(value: target), runtime: runtime.ax)
+                else { throw Failure.unavailable("range_setter_refused") }
+            }
+            _ = try await wait("range_readback") {
+                let (observed, value) = try read()
+                if value == old { return nil }
+                guard delta > 0 ? value > old && value <= target : value < old && value >= target else {
+                    throw Failure.unavailable("range_control_stepped_outside_target")
+                }
+                return observed.group
+            }
+        }
+        if try read().1 != target { throw Failure.unavailable("range_step_budget") }
     }
 
     private func configure(_ dialog: AXUIElement, settings: ProjectPCMBounceSettings) async throws {
