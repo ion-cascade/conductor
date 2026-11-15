@@ -121,7 +121,11 @@ struct ProjectLogic13Bounce {
             }
             _ = AXHelpers.performAction(popup, kAXPressAction, runtime: runtime.ax)
             let menu = try await wait("settings_popup:\(caption)") {
-                try unique(children(popup).filter { role($0) == kAXMenuRole }, "settings_popup", optional: true)
+                let current = try labeledPopup(caption, dialog: dialog)
+                guard CFEqual(current, popup) else {
+                    throw Failure.unavailable("settings_control_replaced:\(caption)")
+                }
+                return try unique(children(current).filter { role($0) == kAXMenuRole }, "settings_popup", optional: true)
             }
             do {
                 let choice = try required(children(menu).filter {
@@ -132,9 +136,13 @@ struct ProjectLogic13Bounce {
                     throw Failure.unavailable("settings_choice_scope:\(caption)")
                 }
                 _ = AXHelpers.performAction(choice, kAXPressAction, runtime: runtime.ax)
+                // Choosing the container rebuilds the PCM options. The value
+                // can update before the old popup and its event tracking retire.
+                try await Task.sleep(for: .milliseconds(400))
                 _ = try await wait("settings_readback:\(caption)") {
                     let current = try labeledPopup(caption, dialog: dialog)
-                    return text(current, kAXValueAttribute) == value && focused(dialog) ? current : nil
+                    let noPopup = runtime.onScreenWindowList().map { LogicOnScreenWindows.popupMenuCount($0, logicPID: pid) == 0 }
+                    return text(current, kAXValueAttribute) == value && focused(dialog) && noPopup == true ? current : nil
                 }
             } catch {
                 if holdsProject(), windows()?.contains(dialog) == true, children(popup).contains(menu) {
