@@ -979,7 +979,7 @@ actor LogicProServer {
             && command == "read_selected_region_events"
         let mutatingCommand = isMutatingCommand(tool: tool, command: command)
         let ownedObservationRead = freshPopulationRead
-            || (tool == "logic_project" && command == "scan_regions")
+            || (tool == "logic_project" && (command == "scan_regions" || command == "get_pattern_step"))
             || selectedRegionEventRead
             || (tool == "logic_mixer" && (command == "get_input_bus_verified" || command == "get_send_bypass_verified"))
         if ownedObservationRead && Task.isCancelled {

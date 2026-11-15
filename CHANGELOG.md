@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.5.0] — 2026-11-15
+
+- Inspect one selected Step Sequencer step, read its native on/off state and velocity, and set its on/off state using the returned address and expected current value. The response reports the grid addresses Logic exposes. ([#32](https://github.com/ion-cascade/conductor/issues/32))
+- Document the native qualification limits for velocity writes and Flex Time marker edits. ([#32](https://github.com/ion-cascade/conductor/issues/32), [#33](https://github.com/ion-cascade/conductor/issues/33))
+
 ## [1.4.0] — 2026-11-15
 
 - Export a specified group of tracks as 24-bit WAVE stems, with one independently bound native export per track. Separate directories preserve same-name files. ([#29](https://github.com/ion-cascade/conductor/issues/29))

@@ -376,9 +376,19 @@ If a delivery is interrupted, reopen the same saved project and inspect its trac
 
 ### `logic_project`
 
-Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `scan_regions`, `edit_region`, `export_plan`, `export_run`, `export_resume`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
+Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `get_pattern_step`, `set_pattern_step_enabled`, `scan_regions`, `edit_region`, `export_plan`, `export_run`, `export_resume`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
 
 File-writing paths require confirmation. `save_as` verifies the resulting `.logicx` package. `audit` marks GM Device and External MIDI tracks with MIDI regions as export blockers. Use the read-only `export_plan` and confirmed `export_run` to produce audio. The standalone `bounce` command is unsupported.
+
+#### Inspect and toggle one pattern step
+
+On desktop Logic Pro 13, open one saved Drum Machine Designer Pattern region with a 16-step grid in the split Step Sequencer. Show the local inspector, select one step and open the inspector’s Step tab. Stop transport and preview. Turn off Mono Mode and step recording.
+
+Call `logic_project.get_pattern_step` with empty parameters. The response includes the selected step’s `address`, `enabled` and `velocity`, plus the grid row names and step numbers Logic exposes in `visible_grid`. Step numbers are one-based. The inspector supplies values for the selected step.
+
+Call `logic_project.set_pattern_step_enabled` with the unmodified `address`, the observed Boolean as `expected_enabled`, and the desired Boolean as `enabled`. Conductor compares the live selection and previous value before pressing the inspector’s On/Off control, then reads the same step again. An already-matching value returns without pressing the control. Save the project in Logic to retain the change. Read again after reopening or changing the selection.
+
+Velocity is read-only. See the [compatibility matrix](conductor/compatibility.md#15-production-editors) for the tested editor scope and Flex Time findings.
 
 #### Sample Arrange viewports and edit one region
 

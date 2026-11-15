@@ -83,7 +83,11 @@ Keep recordings and projects on your own machines. Conductor's bridge uses your 
 
 ## Tested status
 
-Conductor 1.4 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
+Conductor 1.5 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
+
+### Turn a selected drum step on or off
+
+Open a 16-step Drum Machine Designer Pattern region in the split Step Sequencer, open the local Step inspector, and select one step. Read it with `logic_project.get_pattern_step` and pass its returned address and current on/off state to `set_pattern_step_enabled`. The read includes the selected step’s velocity. [Step Sequencer commands](docs/API.md#inspect-and-toggle-one-pattern-step)
 
 ### Render and export from Logic 13
 

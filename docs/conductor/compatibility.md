@@ -1,6 +1,6 @@
-# Conductor 1.4 compatibility
+# Conductor 1.5 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.4 and the checks from earlier releases.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.5 and the checks from earlier releases.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -13,6 +13,17 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 | Permissions | Accessibility and keyboard event access in the Terminal context. macOS Automation approval for project commands when requested. |
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
+
+
+## 1.5 Production editors
+
+| Workflow | Mac mini qualification |
+| --- | --- |
+| Step Sequencer | On a saved Drum Machine Designer pattern, read the native grid addresses and selected step values. Toggled Kick 1 step 2, verified velocity 64, checked Kick 1 step 1 and Snare 1 step 2, then read the saved step again after reopening. |
+| Velocity | The Step inspector exposed the selected velocity. The tested native grid increment, inspector numeric entry and inspector drag did not produce the requested value. Velocity remains read-only. |
+| Flex Time | With Automatic (Polyphonic), a native marker gesture shifted a synthetic transient from 1.00 to 1.49 seconds in a 44.1 kHz render. The timing persisted after reopening. The source WAVE checksum and three neighboring region identities and bounds matched. The tested Accessibility paths exposed the region and algorithm without a readable marker position, so Flex Time editing is outside the MCP API. |
+
+The Step Sequencer adapter covers the split editor’s visible 16-step grid with one pattern region and one step selected, the Step inspector open, and preview, recording and Mono Mode off. [Step Sequencer commands](../API.md#inspect-and-toggle-one-pattern-step)
 
 
 ## 1.4 Selective stem delivery

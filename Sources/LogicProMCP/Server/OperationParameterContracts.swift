@@ -575,6 +575,15 @@ extension OperationRegistry {
                 "new_name": .unconstrained("read as text when names is absent"),
                 "names": .unconstrained("an array of strings or comma-separated text; checked against the plan step"),
             ], required: [["step_id", "stepId"], ["confirmed"]]),
+            "project.set_pattern_step_enabled": .init(params: [
+                "address": .enforced(.object, .object([
+                    "project_path": .string("/tmp/Pattern.logicx"), "region_name": .string("Beat"),
+                    "region_location": .string("Region starts at 1 bar  and ends at 2 bars "),
+                    "track": .string("Track 1 “Kit”"), "row": .string("01: Kick 1 - C1"), "step": .int(1),
+                ])),
+                "expected_enabled": .enforced(.boolean, .bool(false)),
+                "enabled": .enforced(.boolean, .bool(true)),
+            ], required: [["address"], ["expected_enabled"], ["enabled"]]),
             "project.edit_region": .init(params: [
                 "target_ref": .enforced(.string, .string("reg_test")),
                 "expected_start": .enforced(.string, .string("1.1.1.1")),
