@@ -165,9 +165,20 @@ extension AccessibilityChannel {
 
         var observed: RegionInfo?
         var peersVerified = false
-        for _ in 0..<6 {
-            try? await Task.sleep(for: .milliseconds(150))
-            guard let after = Self.regionEditCensus(scope: scope) else { continue }
+        var settledScope: ArrangeRegionScope?
+        for _ in 0..<20 {
+            try? await Task.sleep(for: .milliseconds(250))
+            if Task.isCancelled { break }
+            // Audio-region trimming can redraw the Arrange pane after the
+            // cursor has been cleared. Bind the new presentation to the same
+            // window, track and viewport before accepting a post-edit census.
+            guard let current = ArrangeRegionScope(runtime: runtime),
+                  CFEqual(current.window, scope.window), current.document == scope.document,
+                  current.headers.indices.contains(held.info.trackIndex),
+                  CFEqual(current.headers[held.info.trackIndex], held.header),
+                  current.page()?.matches(held.page) == true else { continue }
+            settledScope = current
+            guard let after = Self.regionEditCensus(scope: current) else { continue }
             let matches = after.filter {
                 CFEqual($0.item, held.item) && $0.info.trackIndex == held.info.trackIndex
                     && $0.info.name.utf8.elementsEqual(held.info.name.utf8)
@@ -177,7 +188,7 @@ extension AccessibilityChannel {
             peersVerified = Self.sameRegionPeers(before, after, ignoring: held.item)
             if observed?.startPosition == change.start && observed?.endPosition == change.end && peersVerified { break }
         }
-        let restored = await scope.show(scope.originalPage, replacing: held.page)
+        let restored = await (settledScope ?? scope).show(scope.originalPage, replacing: held.page)
         let fields: [String: Any] = [
             "operation": operation, "target_ref": reference, "write_attempted": true,
             "requested_start": change.start, "requested_end": change.end,
