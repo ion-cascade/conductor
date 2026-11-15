@@ -1,6 +1,6 @@
-# Conductor 1.1 compatibility
+# Conductor 1.2 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the host used to qualify Conductor 1.1. The 1.0 installation and workflow results are included below as the previous release baseline.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.2. It also records the results from Conductor 1.1 and 1.0.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -14,6 +14,19 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
+
+## 1.2 arrangement and bounce
+
+| Workflow | Mac mini qualification |
+| --- | --- |
+| Arrange discovery | Sampled 25 viewport positions across both axes on a 21-track project with repeated region names, a hidden track and a collapsed six-track stack. The scan reported partial coverage and restored the starting view. Collapsed lanes remained undisclosed. |
+| Reference-bound edit | Moved and trimmed an offscreen MIDI region and a lower audio region. Native readback checked the target, other observed regions and the restored viewport. Reopened both saved edits through a fresh connection. Stale references refused before editing. |
+| Constant-tempo bounce | Bounced the edited audio at `55.3.1.1`–`57.1.1.1`. Independent decoding counted 144,000 stereo frames at 48 kHz. The sampled waveform matched the portion of the synthetic source remaining after the left trim. |
+| Tempo-change bounce | Logic’s Tempo List showed 120 BPM at bar 1 and 60 BPM at bar 2 after reopening. Bounced `1.2.1.1`–`2.3.1.1`. Independent decoding counted 168,000 stereo frames at 48 kHz and identified the expected pitches on each side of the change. |
+| Delivery guards | A native Open dialog and descending positions produced zero files. An occupied destination was preserved byte for byte. The Swift executor test separately exercised a wrong-document identity readback. |
+| Managed connection | Installed 1.2.0 from the versioned source and repeated the workflow through the configured SSH stdio launcher. |
+
+The verified edit and explicit-range path uses the English Logic 13 interface and a 4/4, 1/16 position grid. To edit an ordinary audio or MIDI region, the scan must obtain a writable position in Arrange that fits the region and its requested edit. Snap and zoom affect how precisely Logic can apply a gesture. [Arrange and bounce parameters](../API.md#sample-arrange-viewports-and-edit-one-region)
 
 ## 1.1 Logic workflows
 
