@@ -118,7 +118,8 @@ Qualification is specific to the build, host and workflow. Current local work us
 | Read-after-write state | Explicit core refreshes replace stale track data; unread transport defaults are omitted. |
 | Playback and mixer panel | Play/Stop and mixer hide/show were verified in a disposable session. |
 | MIDI-to-audio workflow | The Mac mini tests loaded Studio Grand through MCP, imported four-note fixtures at bars one and three, and read them back from Logic’s MIDI export. Pitch, onset, duration, velocity and channel matched at 480 PPQ before and after reopening. Independent checks verified both native stereo AIFF renders, including the 3.715-second render through the configured SSH launcher after a bridge restart. |
-| Automated checks | The 0.2 candidate passed 254 focused Swift tests and 16 Python tests. The bridge tests cover concurrent clients, reconnects, cancellation, disconnects and duplicate startup. |
+| Audio delivery | Conductor 0.5 verified stereo PCM bounce, two aligned track exports with repeatable audio, and six native Splitter assets with region and mute readback after reopen. |
+| Automated checks | Conductor 0.5 passed 404 focused Swift tests and 16 Python tests. The bridge tests cover concurrent clients, reconnects, cancellation, disconnects and duplicate startup. |
 
 ### Render and export from Logic 13
 
