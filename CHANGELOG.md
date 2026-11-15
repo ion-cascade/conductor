@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [0.5.0] — 2026-11-15
+
+- Request a native stereo WAVE or AIFF bounce at 44.1, 48 or 96 kHz and 16 or 24 bits. Verify delivery settings and completed audio and refuse to overwrite an existing destination.
+- Export project-length 24-bit WAVE stems with track inserts, optional volume and pan automation, and a native tail option. Verify track-to-file mapping and common frame length.
+- Run Logic’s Separate All Stems preset on a selected audio region. Verify the generated assets, their arrangement positions and the muted source.
+
 ## [0.4.0] — 2026-11-15
 
 - Bind Logic Pro 13 insert operations to the visible Mixer and distinguish instrument and MIDI-effect controls from audio inserts. Verify an appended stock insert against the refreshed effect chain.

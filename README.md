@@ -120,6 +120,12 @@ Qualification is specific to the build, host and workflow. Current local work us
 | MIDI-to-audio workflow | The Mac mini tests loaded Studio Grand through MCP, imported four-note fixtures at bars one and three, and read them back from Logic’s MIDI export. Pitch, onset, duration, velocity and channel matched at 480 PPQ before and after reopening. Independent checks verified both native stereo AIFF renders, including the 3.715-second render through the configured SSH launcher after a bridge restart. |
 | Automated checks | The 0.2 candidate passed 254 focused Swift tests and 16 Python tests. The bridge tests cover concurrent clients, reconnects, cancellation, disconnects and duplicate startup. |
 
+### Render and export from Logic 13
+
+Use the same `logic_project` parameters for the read-only `export_plan` and the confirmed `export_run`. Set `artifacts` to `["bounce"]` and supply `bounce_settings` for explicit stereo PCM delivery. For aligned per-track WAVE files, use `artifacts: ["stem"]` and provide `stem_settings`. Conductor returns the verified Mac paths, including the private output directory used for stems.
+
+Logic’s Stem Splitter is a separate workflow. Select an audio region in a saved project and use `logic_tracks.split_selected_audio` with the project, track and exact region bounds. Conductor checks the six resulting files and the arrangement edit. [Delivery parameters and supported scope](docs/API.md#explicit-stereo-pcm-bounce)
+
 ### Import onto an existing instrument
 
 On the Logic 13 candidate, select the Studio Grand track and keep its Inspector visible. Pass its current zero-based index as `target_track` and its unique current name as `target_expected_name` to `logic_tracks.record_sequence`. The note string contains pitch, offset in milliseconds, duration in milliseconds, velocity and a one-based MIDI channel.
@@ -159,7 +165,7 @@ For the Compressor threshold, `get_param_verified` and `set_param_verified` use 
 - Mixer readback depends on the visible layout. For example, Master has no observed pan control and Stereo Out has no observed solo switch in the tested Mixer.
 - Short per-track exports can finish between progress observations. The 0.2 candidate verifies a stable, decodable WAV or AIFF in its own run directory with one independently bound subject. General multi-track file attribution remains unverified.
 - MIDI note readback uses the native Standard MIDI File export and reports ticks from the SMF origin. The bar-three fixture keeps its leading space. Its region spans bars one through four, and the first note falls at tick 3840 at 480 PPQ.
-- Factory patch qualification covers Studio Grand. Arbitrary instruments and effects, Stem Splitter and general export workflows remain outside this qualification.
+- Factory patch qualification covers Studio Grand. Other factory patches and arbitrary effects need their own native qualification.
 - Screenshots were unavailable in the current remote Mac environment. Live qualification used MCP responses and separate native Accessibility probes; no visual or listening approval is implied.
 
 See [development notes](docs/conductor/development.md) for the source layout and validation approach. The inherited [technical API reference](docs/API.md) describes the broader command surface; its operation-specific requirements still apply.

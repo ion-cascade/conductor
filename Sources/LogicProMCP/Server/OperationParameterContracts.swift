@@ -533,6 +533,14 @@ extension OperationRegistry {
                 required: [["track", "target_ref"], ["insert", "target_ref"], ["plugin", "plugin_id", "plugin_name"], ["param"],
                            ["value"], ["mode"], ["project_expected_path"]]),
 
+            "tracks.split_selected_audio": .init(params: [
+                "project_ref": projectRef, "target_ref": targetRef,
+                "region_name": .enforced(.string, .string("Audio Region")),
+                "start": .enforced(.string, .string("1.1.1.1")),
+                "end": .enforced(.string, .string("2.1.1.1")),
+                "confirmed": .enforced(.boolean, .bool(false)),
+            ], required: [["project_ref"], ["target_ref"], ["region_name"], ["start"], ["end"], ["confirmed"]]),
+
             // logic_project
             "project.quit": .init(params: ["confirmed": .enforced(.boolean, .bool(false))], required: []),
             "project.close": .init(params: [
