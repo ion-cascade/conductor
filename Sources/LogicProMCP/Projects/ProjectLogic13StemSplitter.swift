@@ -1,5 +1,6 @@
 @preconcurrency import ApplicationServices
 import AVFoundation
+import Darwin
 import Foundation
 
 /// Measured Logic 13 path for a single selected audio region in a saved package.
@@ -112,9 +113,16 @@ struct ProjectLogic13StemSplitter {
                   regionName(region) == name, audioBounds(region) == bounds else {
                 throw Failure.unavailable("splitter_selected_source_changed")
             }
-            guard expected.allSatisfy({ !FileManager.default.fileExists(atPath: $0.path) }),
-                  OperationTraceContext.claimDeadlineEffect("stem_splitter_apply") else {
-                throw Failure.unavailable("splitter_apply_boundary")
+            // Logic reserves the six names with 512-byte placeholder files
+            // as soon as the sheet opens. Before the menu action, those names
+            // were all absent. Check that the sheet created only this set.
+            guard let reserved = directoryFiles(),
+                  Set(reserved.map(\.path)) == Set((directory + expected).map(\.path)),
+                  expected.allSatisfy(isNativeReservation) else {
+                throw Failure.unavailable("splitter_output_reservations")
+            }
+            guard !Task.isCancelled, OperationTraceContext.claimDeadlineEffect("stem_splitter_apply") else {
+                throw Failure.unavailable("splitter_apply_deadline")
             }
             attempted = true
             _ = AXHelpers.performAction(apply, kAXPressAction, runtime: runtime.ax)
@@ -124,7 +132,7 @@ struct ProjectLogic13StemSplitter {
                 try await Task.sleep(for: .milliseconds(350))
                 guard holdsProject() else { throw Failure.unavailable("project_changed_after_split") }
                 guard sheets().isEmpty, let files = directoryFiles(),
-                      Set(files) == Set(directory + expected),
+                      Set(files.map(\.path)) == Set((directory + expected).map(\.path)),
                       let regionEvidence = observedRegions(binding: binding) else { continue }
                 let outputs = expected.compactMap(audioFile)
                 guard outputs.count == expected.count, outputs.allSatisfy({ $0.rate == source.rate
@@ -212,6 +220,13 @@ struct ProjectLogic13StemSplitter {
             includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]), urls.count <= 512
         else { return nil }
         return urls
+    }
+
+    private func isNativeReservation(_ url: URL) -> Bool {
+        var info = stat()
+        return url.path.withCString { lstat($0, &info) } == 0
+            && info.st_mode & S_IFMT == S_IFREG && info.st_nlink == 1
+            && info.st_uid == getuid() && info.st_size == 512
     }
 
     private func audioFile(_ url: URL) -> (rate: Double, channels: UInt32, frames: Int64)? {
