@@ -92,6 +92,26 @@ struct ProjectExportExecutionGuardrailTests {
         #expect(!FileManager.default.fileExists(atPath: bouncePath))
     }
 
+    @Test("explicit PCM waits for unreadable windows but refuses a witnessed dialog")
+    func explicitPCMOpenPreflight() async {
+        var options = fastOptions(identity: { nil })
+        let settled = BoolFlag()
+        options.sleep = { _ in settled.set() }
+        options.pcmDialogDecision = {
+            settled.isSet ? (.noBlockingWindow, nil) : (.appNotYetAddressable, -25204)
+        }
+        let blocker = await options.pcmOpenBlocker(rechecking: { !settled.isSet })
+        #expect(blocker == nil)
+        #expect(settled.isSet)
+
+        let waitedWithDialog = BoolFlag()
+        options.sleep = { _ in waitedWithDialog.set() }
+        options.pcmDialogDecision = { (.blockingWindowFound, nil) }
+        let modal = await options.pcmOpenBlocker(rechecking: { true })
+        #expect(modal?.reason == .blockingWindowFound)
+        #expect(!waitedWithDialog.isSet)
+    }
+
     @Test("open failure fails closed and never bounces")
     func openFailureFailsClosed() async throws {
         let projDir = try makeExecTempDir()
