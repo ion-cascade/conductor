@@ -101,11 +101,21 @@ struct ProjectLogic13StemSplitter {
                 let checkbox = try control(label, role: kAXCheckBoxRole, in: controls)
                 guard value(checkbox) == 1 else { throw Failure.unavailable("stem_selection:\(label)") }
             }
-            guard holdsProject(), focusedWindow(), sheets().count == 1, sheets().contains(panel), enabled(apply),
-                  selectedSource(binding).map({ CFEqual($0, region) }) == true,
-                  expected.allSatisfy({ !FileManager.default.fileExists(atPath: $0.path) }),
-                  OperationTraceContext.claimDeadlineEffect("stem_splitter_apply")
-            else { throw Failure.unavailable("splitter_apply_scope") }
+            guard holdsProject(), sheets().count == 1, sheets().contains(panel), isSplitterSheet(panel) else {
+                throw Failure.unavailable("splitter_sheet_ownership")
+            }
+            guard enabled(apply) else { throw Failure.unavailable("splitter_apply_disabled") }
+            // The modal sheet owns the original Arrange window. Its focus
+            // suppresses ordinary track-reference resolution while it is open.
+            // Recheck the retained region itself under the same document.
+            guard (AXHelpers.getAttribute(region, kAXSelectedAttribute, runtime: runtime.ax) as Bool?) == true,
+                  regionName(region) == name, audioBounds(region) == bounds else {
+                throw Failure.unavailable("splitter_selected_source_changed")
+            }
+            guard expected.allSatisfy({ !FileManager.default.fileExists(atPath: $0.path) }),
+                  OperationTraceContext.claimDeadlineEffect("stem_splitter_apply") else {
+                throw Failure.unavailable("splitter_apply_boundary")
+            }
             attempted = true
             _ = AXHelpers.performAction(apply, kAXPressAction, runtime: runtime.ax)
             sheet = nil
