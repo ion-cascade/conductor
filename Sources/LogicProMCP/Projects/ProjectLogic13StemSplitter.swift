@@ -60,6 +60,7 @@ struct ProjectLogic13StemSplitter {
                   !transport.isPlaying, !transport.isRecording,
                   let region = selectedSource(binding), let directory = directoryFiles()
             else { throw Failure.unavailable("selected_audio_region") }
+            let originalTrackName = trackName(binding.header)
             let input = directory.filter {
                 $0.deletingPathExtension().lastPathComponent == name && ["wav", "aif", "aiff"].contains($0.pathExtension.lowercased())
             }
@@ -129,18 +130,18 @@ struct ProjectLogic13StemSplitter {
             sheet = nil
 
             var readbackStage = "splitter_project_readback_unavailable"
-            for _ in 0..<95 {
-                try await Task.sleep(for: .milliseconds(350))
-                // Logic can briefly stop answering AX during native analysis.
-                // Read only and wait for the same window and document to return.
-                if case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
-                   current != document { throw Failure.unavailable("project_changed_after_split") }
-                guard holdsProject(), focusedWindow(), sheets().isEmpty else { continue }
+            for _ in 0..<80 {
+                try await Task.sleep(for: .milliseconds(750))
+                // Logic can rebuild its Arrange presentation after splitting.
+                // Reacquire read-only custody from the same process and exact
+                // document, then use that single window for the observations.
+                guard let observedWindow = readbackWindow() else { continue }
                 readbackStage = "splitter_assets_not_observed"
                 guard let files = directoryFiles(),
                       Set(files.map(\.path)) == Set((directory + expected).map(\.path)) else { continue }
                 readbackStage = "splitter_arrangement_not_observed"
-                guard let regionEvidence = observedRegions(binding: binding) else { continue }
+                guard let regionEvidence = observedRegions(in: observedWindow, original: region,
+                    header: binding.header, originalTrackName: originalTrackName) else { continue }
                 readbackStage = "splitter_audio_extent_not_observed"
                 let outputs = expected.compactMap(audioFile)
                 guard outputs.count == expected.count, outputs.allSatisfy({ $0.rate == source.rate
@@ -197,15 +198,24 @@ struct ProjectLogic13StemSplitter {
         return region
     }
 
-    private func observedRegions(binding: AXTrackBinding.Binding) -> [Int]? {
-        guard case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: window, runtime: runtime),
-              headers.indices.contains(trackIndex), CFEqual(headers[trackIndex], binding.header),
-              let content = AXLogicProElements.logic13TrackContent(in: window, runtime: runtime),
+    private func observedRegions(
+        in observedWindow: AXUIElement, original retainedRegion: AXUIElement,
+        header retainedHeader: AXUIElement, originalTrackName: String?
+    ) -> [Int]? {
+        guard case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: observedWindow, runtime: runtime),
+              headers.indices.contains(trackIndex),
+              let content = AXLogicProElements.logic13TrackContent(in: observedWindow, runtime: runtime),
               let items = AXLogicProElements.logic13RegionItems(in: content, runtime: runtime.ax) else { return nil }
         let originals = items.filter { regionName($0) == name + ", muted" && audioBounds($0) == bounds }
         guard originals.count == 1, let original = originals.first,
               AXLogicProElements.logic13RegionTrackIndex(original, in: content, headers: headers, runtime: runtime.ax) == trackIndex
         else { return nil }
+        if !CFEqual(original, retainedRegion), !CFEqual(headers[trackIndex], retainedHeader) {
+            // Rebuilt AX objects need another positive witness for the same lane.
+            let names = headers.compactMap(trackName)
+            guard let originalTrackName, names.count == headers.count, names[trackIndex] == originalTrackName,
+                  names.filter({ $0 == originalTrackName }).count == 1 else { return nil }
+        }
         var tracks: [Int] = []
         for label in Self.labels {
             let matches = items.filter { regionName($0) == "\(name) (\(label))" && audioBounds($0) == bounds }
@@ -287,6 +297,27 @@ struct ProjectLogic13StemSplitter {
             role($0) == kAXStaticTextRole && text($0, kAXValueAttribute) == "Stem Splitter"
         }.count == 1
     }
+    private func readbackWindow() -> AXUIElement? {
+        guard runtime.onScreenWindowList() != nil, runtime.logicProPID() == pid,
+              let currentApp = AXLogicProElements.appRoot(runtime: runtime),
+              let windows: [AXUIElement] = AXHelpers.getAttribute(currentApp, kAXWindowsAttribute, runtime: runtime.ax)
+        else { return nil }
+        let matches = windows.filter { candidate in
+            guard role(candidate) == kAXWindowRole,
+                  text(candidate, kAXSubroleAttribute) == kAXStandardWindowSubrole,
+                  case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(candidate, runtime: runtime)
+            else { return false }
+            return current == document
+        }
+        guard matches.count == 1, let match = matches.first,
+              !children(match).contains(where: { role($0) == kAXSheetRole && isSplitterSheet($0) }) else { return nil }
+        return match
+    }
+
+    private func trackName(_ header: AXUIElement) -> String? {
+        try? AXValueExtractors.extractTrackNameResult(from: header, runtime: runtime.ax).get()
+    }
+
     private func focusedWindow() -> Bool {
         guard let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: runtime.ax) else { return false }
         return CFEqual(focused, window) || sheets().contains(focused)
