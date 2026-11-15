@@ -2897,7 +2897,7 @@ extension AccessibilityChannel {
         let slot = slots[insert]
         if let failed = pluginInsertReferenceGuard(params: params, slot: slot, operation: operation) { return failed }
 
-        func context(sameSlotElement: Bool = true) -> Bool {
+        func context() -> Bool {
             guard !Task.isCancelled, runtime.focusedApplicationPID() == pid,
                   case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(arrange, runtime: runtime),
                   current == document, AXPluginTrackBinding.isStable(target, runtime: runtime),
@@ -2905,7 +2905,7 @@ extension AccessibilityChannel {
                   latest.indices.contains(insert),
                   !latest.contains(where: { $0.readStatus == .occupiedUnreadable }),
                   latest.filter({ $0.name == "Compressor" }).count == 1, latest[insert].name == "Compressor",
-                  !sameSlotElement || CFEqual(slot.element, latest[insert].element),
+                  CFEqual(slot.element, latest[insert].element),
                   let list = runtime.onScreenWindowList() else { return false }
             if writing {
                 guard let transport = try? AXLogicProElements.observedTransportActivity(in: arrange, runtime: runtime, checking: {}),
@@ -3035,19 +3035,46 @@ extension AccessibilityChannel {
             cancelOwned(); return refuse(.readbackUnavailable, "preset_before_pick")
         }
         _ = AXHelpers.performAction(piano[0], "AXPick", runtime: ax)
-        try? await Task.sleep(for: .milliseconds(350))
-        for _ in 0..<2 {
-            guard nativeMenus().isEmpty else {
-                cancelOwned()
-                return uncertain("preset_menu_still_open", observed: setting()?.1)
+        func refreshedChainMatches() -> Bool {
+            guard !Task.isCancelled, runtime.focusedApplicationPID() == pid,
+                  case .found(let currentWindow) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: runtime),
+                  CFEqual(currentWindow, arrange),
+                  case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(arrange, runtime: runtime),
+                  current == document,
+                  let currentMixer = AXLogicProElements.shallowMixerAreaLookup(in: arrange, runtime: runtime).mixer,
+                  let fresh = AXPluginTrackBinding.resolve(track: track, mixer: currentMixer, runtime: runtime),
+                  CFEqual(fresh.window, arrange), CFEqual(fresh.header, target.header), fresh.trackName == expectedName,
+                  let latest = AXLogicProElements.audioPluginInsertSlots(in: fresh.strip, runtime: ax),
+                  latest.count == slots.count, latest.indices.contains(insert)
+            else { return false }
+            return zip(slots, latest).allSatisfy { before, after in
+                before.index == after.index && before.name == after.name
+                    && before.readStatus == after.readStatus && before.isBypassed == after.isBypassed
             }
-            let observed = setting()?.1
-            guard context(sameSlotElement: false),
-                  let active = windows(), active.count == 2, active.contains(arrange), active.contains(editor),
-                  focused(editor) || focused(arrange) else {
-                return uncertain("preset_scope_after_pick", observed: observed)
-            }
-            guard observed == "Piano" else { return uncertain("preset_value_after_pick", observed: observed) }
+        }
+        var confirmed = 0
+        var stage = "preset_menu_still_open"
+        var observed: String?
+        for _ in 0..<8 {
+            do { try await Task.sleep(for: .milliseconds(120)) }
+            catch { return uncertain("cancelled_after_preset_pick", observed: observed) }
+            let popupCount = runtime.onScreenWindowList().map { LogicOnScreenWindows.popupMenuCount($0, logicPID: pid) }
+            guard popupCount == 0 else { confirmed = 0; continue }
+            stage = "preset_window_after_pick"
+            guard let active = windows(), active.count == 2,
+                  active.contains(arrange), active.contains(editor), editorIdentified()
+            else { confirmed = 0; continue }
+            stage = "preset_value_after_pick"
+            observed = setting()?.1
+            guard observed == "Piano" else { confirmed = 0; continue }
+            stage = "preset_chain_after_pick"
+            guard refreshedChainMatches() else { confirmed = 0; continue }
+            confirmed += 1
+            if confirmed == 2 { break }
+        }
+        guard confirmed == 2 else {
+            cancelOwned()
+            return uncertain(stage, observed: observed)
         }
         return evidence("Piano", attempted: true)
     }
