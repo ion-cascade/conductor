@@ -33,7 +33,7 @@ Our focus is practical music work with trustworthy feedback: a command being acc
 | **Tracks** | Inspect names and exposed controls; select, mute, solo, create and rename tracks |
 | **Mixer** | Channel strips, faders, inserts, sends and guarded routing operations |
 | **MIDI** | Sequence creation and import, MIDI messages, region-event inspection and guarded MIDI export |
-| **Projects** | Open, save, inspect regions, plan exports and verify produced artifacts |
+| **Projects** | Open, save, inspect exact region boundaries, plan exports and verify produced artifacts |
 | **Audio analysis** | File format, duration, levels and spectrum measurements |
 | **Remote access** | Owner-only Mac socket with an SSH relay for MCP clients on another machine |
 
@@ -125,11 +125,24 @@ On the Logic 13 candidate, select the Studio Grand track and keep its Inspector 
 
 Logic creates a staging track when it imports the Standard MIDI File. Conductor verifies Arrange keyboard focus before copying and pasting the new region onto the selected instrument track. It then checks the result against the previous arrangement. When Conductor closes the Library to transfer the region, the receipt reports whether it verified that the Library reopened. The receipt identifies the retained staging track. Reacquire track references before reading the notes or deleting the staging track, especially when both tracks have the same name. After an interrupted or unverified write, inspect the arrangement before another import.
 
+### Place and move a MIDI region
+
+1. Open a saved project, stop playback, and show hidden tracks with `logic_navigate.toggle_view` using `view: "hidden_tracks"` and `visible: true`.
+2. Select one MIDI region in Arrange. Read `logic_project.get_regions` and check its selection and exact boundaries.
+3. Call `logic_transport.goto_position` with a position such as `3.2.3.17` for bar, beat, division and tick. Confirm the tool observed that exact position.
+4. Call `logic_edit.move_to_playhead` and check its verified start and end positions. Save and reopen to check persistence. Use `logic_midi.read_track_notes` if you also need the underlying MIDI events.
+
+### Adjust a specific mixer strip
+
+With the Mixer open, read `logic://mixer` and take the `mixer_strip_ref` from the intended strip. Use it as `target_ref` with `logic_mixer` and the `set_volume`, `set_pan`, `set_mute` or `set_solo` command. A mute or solo request also takes a Boolean `enabled`. Read the strip again to check its new state.
+
+For Arrange controls, use a track reference from `logic_project.inspect_session`. Review coverage before deciding which tracks exist and reacquire references when opening a different project or exposing a different set of tracks. A control listed in `unavailable_fields` needs fresh native evidence before use.
+
 ### Current limits
 
-- The qualified track-selection adapter currently expects English UI labels and an exposed, contiguous track rail in a single project window.
-- Track and routing inventories can be partial. Hidden tracks and collapsed stacks require their own evidence.
-- Pan controls depend on the visible layout; missing controls are not verified centre pan.
+- The track-selection adapter uses English UI labels and an exposed, contiguous track rail in one Arrange window. Logic's track search can omit tracks marked hidden even while their headers are shown.
+- Track inventories can be partial when tracks are concealed, stacks are collapsed or the viewport cannot prove the end of the rail. Routing completeness has separate requirements.
+- Mixer readback depends on the visible layout. For example, Master has no observed pan control and Stereo Out has no observed solo switch in the tested Mixer.
 - Short per-track exports can finish between progress observations. The 0.2 candidate verifies a stable, decodable WAV or AIFF in its own run directory with one independently bound subject. General multi-track file attribution remains unverified.
 - MIDI note readback uses the native Standard MIDI File export and reports ticks from the SMF origin. The bar-three fixture keeps its leading space. Its region spans bars one through four, and the first note falls at tick 3840 at 480 PPQ.
 - Factory patch qualification covers Studio Grand. Arbitrary instruments and effects, Stem Splitter and general export workflows remain outside this qualification.

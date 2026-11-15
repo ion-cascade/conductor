@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [0.3.0] — 2026-11-15
+
+- Read Logic 13 playhead and MIDI region positions at bar, beat, division and tick resolution. Verify exact movement of a selected region against fresh native boundaries and restore the LCD presentation after temporary changes.
+- Renew issued track references through native track identity, including tracks with the same displayed name. Report incomplete track coverage when the exposed rail cannot prove membership and refuse stale references before a write.
+- Use native strip references for fader, pan, mute and solo on the embedded and focused floating Mixer. Report unreadable or missing controls as unavailable in coherent reads.
+- Keep Arrange fader, pan, mute and solo operations bound to the issued track, including restoration to the observed original value.
+
 ## [0.2.0] — 2026-11-14
 
 - Verify MIDI import through MCP on Logic Pro 13, including transfer to a selected Studio Grand track and exact note readback from native SMF export. Verify Arrange keyboard focus during the transfer and report whether the Library was restored when temporarily closed.
