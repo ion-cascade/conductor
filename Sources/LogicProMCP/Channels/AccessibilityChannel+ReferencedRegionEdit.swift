@@ -95,25 +95,27 @@ extension AccessibilityChannel {
                               restored: restored, trackSelectionChanged: Self.exclusiveEditTrack(held, in: scope))
             }
         }
+        func refuseFromHeldPage(_ hint: String) async -> ChannelResult {
+            let restored = await scope.show(scope.originalPage, replacing: held.page)
+            return refuse(.readbackUnavailable, hint, restored: restored, trackSelectionChanged: !trackWasSelected)
+        }
         guard let before = Self.regionEditCensus(scope: scope),
-              before.count == initial.count,
               before.filter({ Self.sameRegionObservation(held, item: $0.item, info: $0.info) }).count == 1,
-              Self.sameRegionPeers(initial, before, ignoring: held.item),
-              scope.selectionIsOriginal(),
-              Self.safeDragMode(scope: scope, held: held, change: change, census: before),
-              let hitTest = ax.elementAtPosition,
+              Self.sameRegionPeers(initial, before, ignoring: held.item), scope.selectionIsOriginal() else {
+            return await refuseFromHeldPage("The held region, selection or neighboring regions changed during navigation.")
+        }
+        guard Self.safeDragMode(scope: scope, held: held, change: change, census: before) else {
+            return await refuseFromHeldPage("The Arrange Drag Mode or nearby regions do not allow this edit.")
+        }
+        guard let hitTest = ax.elementAtPosition,
               let drag = Self.regionDragPoints(held, change: change, scope: scope, hitTest: { point in
                   guard case .success(.some(let hit)) = hitTest(scope.app, point) else { return false }
                   return Self.ownsRegionGesture(hit, held: held, edge: change.edge, runtime: ax)
               }),
               scope.holdsArrange(), scope.page()?.matches(held.page) == true,
               Self.exclusiveEditTrack(held, in: scope),
-              OperationTraceContext.claimDeadlineEffect("region_drag")
-        else {
-            let restored = await scope.show(scope.originalPage, replacing: held.page)
-            return refuse(.readbackUnavailable,
-                "The region and requested boundary must fit a writable Arrange viewport. The current edit mode and neighbors must allow the gesture without changing other regions.",
-                restored: restored, trackSelectionChanged: !trackWasSelected)
+              OperationTraceContext.claimDeadlineEffect("region_drag") else {
+            return await refuseFromHeldPage("The region and requested boundary must fit a writable Arrange viewport.")
         }
 
         regionScan = nil
@@ -259,7 +261,7 @@ extension AccessibilityChannel {
                                      census: [EditRegionRow]) -> Bool {
         let ax = scope.runtime.ax
         // The held pane sits below the Arrange group's two split views.
-        // Follow its owners so a separate Tracks group cannot supply Drag Mode.
+        // Follow its owners and inspect the toolbar beside the held pane.
         func parent(_ element: AXUIElement) -> AXUIElement? {
             AXHelpers.getAttribute(element, kAXParentAttribute, runtime: ax)
         }
@@ -272,10 +274,22 @@ extension AccessibilityChannel {
                       && AXHelpers.getDescription($0, runtime: ax) == "Tracks"
               }),
               parent(outer).map({ CFEqual($0, scope.window) }) == true,
-              case .success(let children) = AXHelpers.childrenResult(inner, runtime: ax) else { return false }
-        let controls = children.filter {
-            AXHelpers.getRole($0, runtime: ax) == kAXPopUpButtonRole
-                && AXHelpers.getDescription($0, runtime: ax) == "Drag Mode"
+              case .success(let groups) = AXHelpers.childrenResult(outer, runtime: ax),
+              groups.contains(where: { CFEqual($0, inner) }) else { return false }
+        let arrangeGroups = groups.filter {
+            AXHelpers.getRole($0, runtime: ax) == kAXGroupRole
+                && AXHelpers.getDescription($0, runtime: ax) == "Tracks"
+        }
+        guard arrangeGroups.count <= 4 else { return false }
+        var controls: [AXUIElement] = []
+        for group in arrangeGroups {
+            guard parent(group).map({ CFEqual($0, outer) }) == true,
+                  case .success(let children) = AXHelpers.childrenResult(group, runtime: ax) else { return false }
+            controls.append(contentsOf: children.filter {
+                AXHelpers.getRole($0, runtime: ax) == kAXPopUpButtonRole
+                    && AXHelpers.getDescription($0, runtime: ax) == "Drag Mode"
+                    && parent($0).map({ CFEqual($0, group) }) == true
+            })
         }
         guard controls.count == 1, let control = controls.first,
               let mode: String = AXHelpers.getAttribute(control, kAXValueAttribute, runtime: ax),
