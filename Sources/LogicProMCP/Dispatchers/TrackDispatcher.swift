@@ -99,11 +99,11 @@ struct TrackDispatcher: OperationTraceDispatching {
         switch command {
         case "split_selected_audio":
             let operation = "track.\(command)"
-            guard let target = nonEmptyString(params, "target_ref"),
-                  nonEmptyString(params, "project_ref") != nil,
-                  let name = nonEmptyString(params, "region_name"),
-                  let start = nonEmptyString(params, "start"),
-                  let end = nonEmptyString(params, "end"), start != end else {
+            guard let target = params["target_ref"]?.stringValue,
+                  params["project_ref"]?.stringValue?.isEmpty == false,
+                  let name = params["region_name"]?.stringValue,
+                  let start = params["start"]?.stringValue,
+                  let end = params["end"]?.stringValue, !target.isEmpty, !name.isEmpty, !start.isEmpty, !end.isEmpty, start != end else {
                 return toolInvalidParamsResult(
                     "split_selected_audio requires project_ref, target_ref, region_name, start and end",
                     extras: ["operation": operation, "write_attempted": false])
