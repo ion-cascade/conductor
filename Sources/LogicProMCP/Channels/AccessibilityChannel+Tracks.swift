@@ -1110,20 +1110,8 @@ extension AccessibilityChannel {
                 completedClickFocus = (target, [])
                 return true
             }
-            if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
-               hiddenControl.map({ !CFEqual($0, target.disclosure) }) ?? true {
-                guard await owned(target: target, expectedHeaders: expectedHeaders, expectedValue: expectedValue, stoppingWhen: stop),
-                      AXHelpers.getActionNames(target.disclosure, runtime: logic.ax).contains(kAXPressAction as String)
-                else { return false }
-                let controls = passiveFocusControls(target)
-                guard await owned(target: target, expectedHeaders: expectedHeaders, expectedValue: expectedValue, stoppingWhen: stop),
-                      !stop(), (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil else { return false }
-                effects.navigationPerformed = true; effects.restoration = "not_restored"
-                if !effects.attempted.contains("stack_disclosure") { effects.attempted.append("stack_disclosure") }
-                _ = AXHelpers.performAction(target.disclosure, kAXPressAction as String, runtime: logic.ax)
-                completedClickFocus = (target, controls)
-                return true
-            }
+            // Logic 13 advertises AXPress on a stack disclosure but accepts it
+            // without changing its value. Use the hit-tested gesture on the held triangle.
             guard await owned(target: target, expectedHeaders: expectedHeaders, expectedValue: expectedValue, stoppingWhen: stop),
                   let frame = frame(target),
                   let pair = mouse.prepareMouseClick(CGPoint(x: frame.midX, y: frame.midY), 1) else { return false }
@@ -1158,16 +1146,16 @@ extension AccessibilityChannel {
             return true
         }
 
-        /// Posting the paired events does not mean Logic has processed them.
-        /// Observe only the same held disclosure, with at most three attempts;
-        /// subsequent capture/inverse authorization still requires full custody.
+        /// Observe only the same held disclosure. On Logic 13 give the event
+        /// up to 250 ms to land before capture or an inverse may be authorized.
         private func observeCompletedClick(target: Disclosure, expectedValue: Int,
                                            stoppingWhen stop: @Sendable () -> Bool) async -> Bool {
-            for attempt in 0..<3 {
+            let attempts = ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" ? 11 : 3
+            for attempt in 0..<attempts {
                 guard !stop(), (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
                       let observed = value(target) else { return false }
                 if observed == expectedValue { return true }
-                guard attempt < 2 else { return false }
+                guard attempt + 1 < attempts else { return false }
                 do { try await Task.sleep(for: .milliseconds(25)) }
                 catch { return false }
             }
