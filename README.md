@@ -83,11 +83,13 @@ Keep recordings and projects on your own machines. Conductor's bridge uses your 
 
 ## Tested status
 
-Conductor 1.3 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
+Conductor 1.4 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
 
 ### Render and export from Logic 13
 
 Use the same `logic_project` parameters for the read-only `export_plan` and the confirmed `export_run`. Set `artifacts` to `["bounce"]` and supply `bounce_settings` for explicit stereo PCM delivery. For aligned per-track WAVE files, use `artifacts: ["stem"]` and provide `stem_settings`. Conductor returns the verified Mac paths, including the private output directory used for stems.
+
+For a selective delivery, pass fresh Arrange track references in `stem_settings.track_refs` and keep the delivery UUID. Each selected track gets its own verified file, including tracks that share a name. After reopening the same saved project, use `export_resume` with fresh references to reuse completed files and export the remaining tracks. [Selective stem parameters](docs/API.md#selective-stem-delivery)
 
 Logic’s Stem Splitter is a separate workflow. Select an audio region in a saved project and use `logic_tracks.split_selected_audio` with the project, track and exact region bounds. Conductor checks the six resulting files and the arrangement edit. [Delivery parameters and supported scope](docs/API.md#explicit-stereo-pcm-bounce)
 

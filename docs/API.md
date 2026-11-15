@@ -351,6 +351,29 @@ Common commands: `goto_bar`, `goto_marker`, `create_marker`, `delete_marker`, `r
 
 `delete_marker` and indexed `goto_marker` require explicit indices. `rename_marker` is not implemented on Logic 12.x and returns State C `not_implemented`. `set_zoom` accepts `in`, `out`, `fit`, or integer levels `1..10`. Its optional `axis` defaults to `horizontal`, preserving existing behavior. Use `{"command":"set_zoom","params":{"level":"in","axis":"vertical"}}` to increase track height when small track headers hide their volume and pan controls. Vertical zoom accepts `in`, `out`, or levels `1..10`, not `fit`; it requires a unique writable control bound to the original Tracks window and project, independently reads back the requested level, and never substitutes a horizontal zoom key command. This does not enable track-header components that are disabled in Logic.
 
+### Selective stem delivery
+
+Use `export_plan`, `export_run` and `export_resume` with one saved `.logicx` project already open in Logic. Stop transport and expose the selected tracks in Arrange with one track selected. Use 1–16 live `trk_…` references from `inspect_session`. Use track names with ASCII letters, digits, spaces, underscores or hyphens. Choose a UUID for the delivery and keep it for resume.
+
+```json
+{
+  "projects": ["/Users/you/Music/Example.logicx"],
+  "output_root": "/Users/you/Music/Stems",
+  "artifacts": ["stem"],
+  "stem_settings": {
+    "track_refs": ["trk_…", "trk_…"],
+    "delivery_id": "50ea956b-a26e-4ca7-bddb-900d9d11bf5c",
+    "range": {"start": "1.1.1.1", "end": "3.1.1.1"},
+    "include_audio_tail": false,
+    "include_volume_pan_automation": true
+  }
+}
+```
+
+Run and resume take `confirmed: true`. The output root must exist. For a range, enable Cycle in Logic and set both locators to the exact requested boundaries with the Custom control-bar display visible. Each subject gets one 24-bit WAVE export from its own native track selection. The response lists the track index, actual path, sample rate, frame count and SHA-256. Distinct track references can carry the same display name.
+
+If a delivery is interrupted, reopen the same saved project and inspect its tracks again. Resume with the same delivery ID, output root, track order, range and export settings, using the fresh references. Conductor checks the saved edit data, bundled media and completed-file checksums before exporting more tracks. Bundle source audio in the Logic project for a verifiable resume. Existing valid files are marked `reused`.
+
 ### `logic_project`
 
 Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `scan_regions`, `edit_region`, `export_plan`, `export_run`, `export_resume`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.

@@ -1,6 +1,6 @@
-# Conductor 1.3 compatibility
+# Conductor 1.4 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.3 and the checks from earlier releases.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.4 and the checks from earlier releases.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -14,6 +14,19 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
+
+## 1.4 Selective stem delivery
+
+| Workflow | Mac mini qualification |
+| --- | --- |
+| Selective attribution | Exported two tracks named `Twin` and one piano track by their fresh Arrange references. Independent PCM analysis matched each file to its track. A separate export confirmed the omitted track was audible. |
+| Exact musical range | Native Cycle locators read `1.1.1.1`–`3.1.1.1`, with 120 BPM at bar 1 and 60 BPM at bar 2. Each selected 24-bit WAVE file measured 264,600 frames at 44.1 kHz, or six seconds. |
+| Audio tails | Logic accepted Include Audio Tail with Cycle Range Only. This fixture still produced 264,600 frames for each track. Tail length depends on Logic’s native export behavior. |
+| Inserts and automation | With Channel EQ, Compressor and ChromaVerb enabled, the native Volume/Pan Automation option changed the rendered stereo balance while preserving the exact two-second range. Native inventory confirmed all three inserts remained enabled. |
+| Interrupted resume | Stopped the test bridge after the first stem was recorded, reopened the saved project, and connected again. Conductor verified and reused the original WAV and exported only the two missing stems. Stale references, a changed range, changed automation settings and an altered WAV were refused. |
+| Compressor sidechain feasibility | A separate key track exposed `Bus 2 ← Audio 1` in the stock Compressor. The immediate read still showed `Internal`. The saved project showed `Bus 2` after reopening. [Issue #28](https://github.com/ion-cascade/conductor/issues/28) remains open. |
+
+The range adapter requires active Cycle and the Custom control-bar display with exact native locator readback. Resume requires the same saved project, selected track order, output root and export settings. [Selective stem parameters](../API.md#selective-stem-delivery)
 
 ## 1.3 Pan automation and insert bypass
 

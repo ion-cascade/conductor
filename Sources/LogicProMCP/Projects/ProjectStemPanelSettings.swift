@@ -65,7 +65,7 @@ enum ProjectStemPanelSettings {
         }
 
         let popupLabels = [
-            ("Range:", "Extend File Length to Project End"), ("File Type:", "WAVE"),
+            ("Range:", settings.range == nil ? "Extend File Length to Project End" : "Export Cycle Range Only"), ("File Type:", "WAVE"),
             ("Bit Depth:", "24-bit"), ("Normalize:", "Off"),
             ("Multi-Output Software Instruments:", "One File per Track"),
         ]

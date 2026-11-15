@@ -9,7 +9,8 @@ struct ProjectIsolatedStemExportResult: Sendable {
 enum ProjectIsolatedStemExport {
     static func live(
         root: String, expectedCount: Int,
-        aligned: (ProjectAlignedStemSettings, [ProjectExportStemSubject], String)? = nil
+        aligned: (ProjectAlignedStemSettings, [ProjectExportStemSubject], String)? = nil,
+        surface: AXSurface = AXSurface()
     ) async -> ProjectIsolatedStemExportResult {
         let witness: ProjectStemExportFileWitness
         do {
@@ -21,7 +22,7 @@ enum ProjectIsolatedStemExport {
         }
         let outcome = await ProjectStemExportPanelDriver.drive(
             destination: witness.directory,
-            surface: AXSurface(),
+            surface: surface,
             progressPollAttempts: 80,
             sleep: { try? await Task.sleep(nanoseconds: $0) },
             pollIntervalNanos: 250_000_000,

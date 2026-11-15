@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.4.0] — 2026-11-15
+
+- Export a specified group of tracks as 24-bit WAVE stems, with one independently bound native export per track. Separate directories preserve same-name files. ([#29](https://github.com/ion-cascade/conductor/issues/29))
+- Request a musical range by verifying both native Cycle locators and the track export panel’s cycle-range setting. ([#30](https://github.com/ion-cascade/conductor/issues/30))
+- Resume an interrupted selective delivery with its original settings, fresh track references and independently verified file checksums. ([#31](https://github.com/ion-cascade/conductor/issues/31))
+
 ## [1.3.0] — 2026-11-15
 
 ### Added

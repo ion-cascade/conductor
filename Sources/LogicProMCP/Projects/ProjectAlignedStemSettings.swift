@@ -4,8 +4,16 @@ import MCP
 struct ProjectAlignedStemSettings: Codable, Equatable, Sendable {
     let includeAudioTail: Bool
     let includeVolumePanAutomation: Bool
+    let range: ProjectBounceRange?
+
+    init(includeAudioTail: Bool, includeVolumePanAutomation: Bool, range: ProjectBounceRange? = nil) {
+        self.includeAudioTail = includeAudioTail
+        self.includeVolumePanAutomation = includeVolumePanAutomation
+        self.range = range
+    }
 
     enum CodingKeys: String, CodingKey {
+        case range
         case includeAudioTail = "include_audio_tail"
         case includeVolumePanAutomation = "include_volume_pan_automation"
     }

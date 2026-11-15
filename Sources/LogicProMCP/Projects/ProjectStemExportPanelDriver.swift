@@ -328,6 +328,7 @@ enum ProjectStemExportPanelDriver {
 }
 
 final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable {
+    private let selectedTrack: (@Sendable () -> Bool)?
     private let runtime: AXLogicProElements.Runtime
     private let directoryListing: @Sendable (String) -> DirectoryListing
     private let navigationNowNanos: @Sendable () -> UInt64
@@ -352,6 +353,7 @@ final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable
 
     init(
         runtime: AXLogicProElements.Runtime = .production,
+        selectedTrack: (@Sendable () -> Bool)? = nil,
         directoryListing: @escaping @Sendable (String) -> DirectoryListing = { path in
             do {
                 return try FileManager.default.contentsOfDirectory(atPath: path).isEmpty
@@ -369,13 +371,14 @@ final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable
         }
     ) {
         self.runtime = runtime
+        self.selectedTrack = selectedTrack
         self.directoryListing = directoryListing
         self.navigationNowNanos = navigationNowNanos
         self.navigationSleep = navigationSleep
     }
 
     func openFileMenu() -> Bool {
-        guard case .found(let item) = fileMenuItem() else { return false }
+        guard selectedTrack?() != false, case .found(let item) = fileMenuItem() else { return false }
         // Status is not evidence that the menu materialised. The submenu read
         // verifies the surface after the opening attempt.
         _ = AXHelpers.performAction(item, kAXPressAction as String, runtime: runtime.ax)
@@ -409,7 +412,8 @@ final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable
     }
 
     func pickStemLeaf() {
-        guard case .found(let leaf) = stemMenuItem(), stemLeafIsEnabled(leaf) else { return }
+        guard selectedTrack?() != false,
+              case .found(let leaf) = stemMenuItem(), stemLeafIsEnabled(leaf) else { return }
         // AXPress is a silent no-op for this leaf. The panel appearance,
         // rather than the AXPick status, is the evidence of activation.
         _ = AXHelpers.performAction(leaf, ProjectStemExportPanelDriver.stemLeafPickAction, runtime: runtime.ax)
@@ -560,7 +564,8 @@ final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable
         }
         guard matches.count == 1, let owner = matches.first else { return false }
         return await ProjectStemPanelSettings.apply(settings, subjects: subjects, panel: panel, runtime: runtime) {
-            guard !Task.isCancelled, self.runtime.focusedApplicationPID() == pid,
+            guard !Task.isCancelled, self.selectedTrack?() != false,
+                  self.runtime.focusedApplicationPID() == pid,
                   let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: self.runtime.ax),
                   CFEqual(focused, panel),
                   let current: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: self.runtime.ax),
@@ -573,7 +578,7 @@ final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable
     }
 
     func pressExport() {
-        guard case let .success(assessments) = panelAssessments(),
+        guard selectedTrack?() != false, case let .success(assessments) = panelAssessments(),
               assessments.count == 1,
               case let .recognized(_, export, _) = assessments[0] else {
             return
@@ -919,6 +924,9 @@ final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable
 
     private func stemMenuItem() -> MenuItemRead {
         guard case .found(let export) = exportMenuItem() else { return .unavailable }
+        if selectedTrack != nil {
+            return directSubmenuItem(of: export) { $0 == "1 Track as Audio File…" }
+        }
         return directSubmenuItem(of: export, matching: ProjectStemExportPanelDriver.stemLeafTitleMatches)
     }
 
