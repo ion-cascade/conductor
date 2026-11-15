@@ -17,6 +17,12 @@ enum AXMixerStripBinding {
         }
 
         private func currentMixerLookup(runtime: AXLogicProElements.Runtime) -> AXLogicProElements.MixerAreaLookup {
+            if ProcessInfo.processInfo.environment["LOGIC_MCP_BOUNDED_MIXER_POLL"] == "1",
+               let observed = try? AXLogicProElements.shallowOwnedMixerPopulationAreaBinding(in: window, runtime: runtime) {
+                // Renew the same native owner used when the bounded poll issued this handle.
+                // The caller still compares the retained Mixer and re-reads strip membership.
+                return .found(observed.mixer)
+            }
             guard runtime.ax.attributeValuesResult != nil else {
                 return AXLogicProElements.mixerAreaLookup(in: window, runtime: runtime)
             }
