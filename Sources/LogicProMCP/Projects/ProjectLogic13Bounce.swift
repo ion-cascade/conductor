@@ -39,6 +39,14 @@ struct ProjectLogic13Bounce {
     private func render(
         to destination: URL, settings: ProjectPCMBounceSettings
     ) async -> ProjectExportBounceHelperResult {
+        let parent = destination.deletingLastPathComponent().path
+        func destinationAvailable() -> Bool {
+            guard FileManager.default.isWritableFile(atPath: parent),
+                  case .absent = ProjectExportArtifactPathPolicy.preferredExistingVariant(
+                    for: destination.path, fileManager: .default
+                  ) else { return false }
+            return true
+        }
         var owned: AXUIElement?
         var saveStage = "settings"
         var fired = false
@@ -48,7 +56,7 @@ struct ProjectLogic13Bounce {
                   AXLogicProElements.dialogPresenceReason(runtime: runtime) == .noBlockingWindow,
                   let transport = try? AXLogicProElements.observedTransportActivity(in: window, runtime: runtime, checking: {}),
                   !transport.isPlaying, !transport.isRecording,
-                  !FileManager.default.fileExists(atPath: destination.path),
+                  destinationAvailable(),
                   let original = windows(), original.filter({ CFEqual($0, window) }).count == 1
             else { throw Failure.unavailable("project_focus_permissions_or_destination") }
             guard let item = AXLogicProElements.menuItem(path: ["File", "Bounce", "Project or Section…"], runtime: runtime),
@@ -75,7 +83,7 @@ struct ProjectLogic13Bounce {
                 holdsProject()
             })
             try await writer.saveOpenedPanel(panel, to: destination, stage: &saveStage) {
-                guard self.holdsProject(), self.focused(panel), self.text(panel, kAXTitleAttribute) == self.title,
+                guard self.holdsProject(), self.focused(panel), self.text(panel, kAXTitleAttribute) == self.title, destinationAvailable(),
                       OperationTraceContext.claimDeadlineEffect("pcm_bounce_save") else {
                     throw Failure.unavailable("bounce_commit_scope")
                 }

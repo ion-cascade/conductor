@@ -15,6 +15,13 @@ enum ProjectExportPlanner {
         let artifacts = try artifactKinds(from: params)
         let bounceSettings = try ProjectPCMBounceSettings.parse(params["bounce_settings"], artifacts: artifacts)
         let stemSettings = try ProjectAlignedStemSettings.parse(params["stem_settings"], artifacts: artifacts)
+        if bounceSettings != nil {
+            var isDirectory: ObjCBool = false
+            guard fileManager.fileExists(atPath: outputRoot, isDirectory: &isDirectory), isDirectory.boolValue,
+                  fileManager.isWritableFile(atPath: outputRoot) else {
+                throw ExportPlanError.invalid("bounce_settings requires an existing writable output_root")
+            }
+        }
         let collisionPolicy = stringParam(params, "collision_policy", default: "fail_if_exists")
         guard ["fail_if_exists", "skip_existing"].contains(collisionPolicy) else {
             throw ExportPlanError.invalid("collision_policy must be fail_if_exists or skip_existing")
