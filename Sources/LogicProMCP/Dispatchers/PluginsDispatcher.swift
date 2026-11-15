@@ -82,7 +82,7 @@ struct PluginsDispatcher: OperationTraceDispatching {
 
     static let tool = commandTool(
         name: "logic_plugins",
-        description: "plan_parameter_changes takes an occupied target_ref and changes:[{param,value,unit}] and returns a read-only requested-supported-subset before-state/diff. Every request is validated before acquisition; unknown/unsupported/missing/extra fields remain visible. Raw B0 readers run under one UI lease with repeated value bookends and separate cleanup receipts. No audio mutation, atomic snapshot, retained plan or application authority. " + "get_param_verified reads one current occupied insert parameter without audio mutation. Inputs: target_ref (ins_...) and param; optional unit, project_ref, track, insert and plugin aliases only corroborate the observed binding. No value, mode, confirmation or caller-supplied project path. Raw units: threshold normalized 0..100 percentage, Channel EQ raw_ax_value, limiter_on/auto_release boolean. Compressor ratio, knee, attack, release, and makeup are read-only: raw_ax_value plus verbatim observed_display; none grants a write method. Compressor circuit_type, auto_gain, and distortion are read-only current strings; they neither open the popups nor grant write methods or complete choice lists. observed_display is verbatim, not an inferred conversion. Reads can acquire an editor and temporarily change views; data and UI cleanup outcomes are reported separately. " +
+        description: "On Logic 13, get_preset_verified reads the selected Compressor insert’s Setting using target_ref. set_preset_verified also requires expected_current and path 02 Keyboards/Piano. " + "plan_parameter_changes takes an occupied target_ref and changes:[{param,value,unit}] and returns a read-only requested-supported-subset before-state/diff. Every request is validated before acquisition; unknown/unsupported/missing/extra fields remain visible. Raw B0 readers run under one UI lease with repeated value bookends and separate cleanup receipts. No audio mutation, atomic snapshot, retained plan or application authority. " + "get_param_verified reads one current occupied insert parameter without audio mutation. Inputs: target_ref (ins_...) and param; optional unit, project_ref, track, insert and plugin aliases only corroborate the observed binding. No value, mode, confirmation or caller-supplied project path. Raw units: threshold normalized 0..100 percentage, Channel EQ raw_ax_value, limiter_on/auto_release boolean. Compressor ratio, knee, attack, release, and makeup are read-only: raw_ax_value plus verbatim observed_display; none grants a write method. Compressor circuit_type, auto_gain, and distortion are read-only current strings; they neither open the popups nor grant write methods or complete choice lists. observed_display is verbatim, not an inferred conversion. Reads can acquire an editor and temporarily change views; data and UI cleanup outcomes are reported separately. " +
             "get_host_parameter_manifest reads every observed Controls-view row for one occupied target_ref. expected_build_fingerprint is required but explicitly reported as caller_expected_unverified because Logic's measured AX tree exposes no trusted build identifier. The manifest is read-only and unapproved; unreadable, unsupported and refused rows stay visible and never become write qualification. " +
             "get_channel_eq_state_verified reads the current referenced Channel EQ insert's eight bands in one owned Controls-view acquisition. Required target_ref; optional project_ref, track, insert, plugin aliases and project_expected_path only corroborate that binding. No param, unit, value, mode or confirmation. Returns frequency/gain/Q raw_ax_value with actual host displays, Cut slope host_choice_text, separate Boolean band enable and plugin bypass observations. Missing/unstable required data is partial, never an invented zero or complete state. Stable bookends are not an atomic snapshot; editor/view acquisition and cleanup are reported separately. " +
             "Verified plugin apply-back for Logic Pro (logic_plugins.*). Commands: get_inventory, get_host_parameter_manifest, get_param_verified, get_channel_eq_state_verified, plan_parameter_changes, set_param_verified, set_eq_band_verified, insert_verified. Unlike legacy logic_mixer.set_plugin_param (Scripter, unverified State B), this surface identifies the target track/insert/plugin/param via AX, writes, and reads back — State A only when the observed value matches within tolerance. get_inventory -> { track: Int (required, >= 0), reveal_mixer?: Bool (default false) } reads without UI actuation by default. Explicit reveal requires a positively observable non-modal Logic window; unknown windows never authorize a menu click or fallback key. Binding refusals include binding_refusal_reason and binding_refusal_header_index. It returns a drift-safe insert chain (physical slot index, read_status ok|empty|unreadable, complete). set_param_verified -> { track: Int, insert: Int, plugin: canonical logic.stock.* id or alias, param: key (e.g. gain_db), value: Float, unit: String, mode: \"duplicate_applyback\", project_expected_path: String (required) }. set_eq_band_verified -> { track: Int, insert: Int, band: String (e.g. Peak 1), parameter: String (e.g. Frequency), value: Float, unit: raw_ax_value|Hz|dB|Q, mode: \"duplicate_applyback\", project_expected_path: String (required) }. Engineering-unit Channel EQ requests are checked against Logic's AXValueDescription; no Hz-to-raw mapping is used. insert_verified -> { track: Int, insert: Int, plugin: Gain|Channel EQ|Compressor, mode: \"duplicate_applyback\", project_expected_path: String (required), expected_name: String }. PRD-007 index binding: insert_verified is `corroborated` — a bare `track` index is REFUSED with index_binding_corroboration_required; supply expected_name (the track name you expect at that index, corroborated against the live header and required to be unique across the surface) or a target_ref instead; expected_name + target_ref together is invalid_params; every binding failure is pre-write with write_attempted:false and takes no verified-op gate. mode confirmed_live is not supported in Release 1 (State C unsupported_mode). ADR-002 (on by default; disable with LOGIC_MCP_ADR002_TARGET_REF=0): set_param_verified, set_eq_band_verified, and insert_verified ALSO accept a session-stable { target_ref: String } from logic://tracks (trk_…) or logic_plugins.get_inventory (ins_…); plugin-insert refs resolve track and physical insert, and explicit track/insert values must agree when supplied or the op fails closed (stale_target_reference); when the kill-switch is set, any supplied target_ref fails closed with target_ref_unavailable; omit target_ref to use explicit selectors.",
@@ -220,15 +220,19 @@ struct PluginsDispatcher: OperationTraceDispatching {
                 }
             }
 
-        case "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes":
+        case "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes",
+             "get_preset_verified", "set_preset_verified":
             // Reads need the same editor/view custody as writes, but never arm a write boundary.
             let wholeEQState = command == "get_channel_eq_state_verified"
             let parameterPlan = command == "plan_parameter_changes"
+            let presetWrite = command == "set_preset_verified"
+            let presetRead = command == "get_preset_verified"
             let operation = "logic_plugins.\(command)"
             let allowed = OperationRegistry.spec(tool: "logic_plugins", command: command)?.allowedParams ?? []
             guard params.keys.allSatisfy({ allowed.contains($0) || $0 == "command" }),
                   nonEmptyString(params, "target_ref") != nil,
-                  wholeEQState || parameterPlan || nonEmptyString(params, "param") != nil,
+                  wholeEQState || parameterPlan || presetRead || presetWrite || nonEmptyString(params, "param") != nil,
+                  !presetWrite || (nonEmptyString(params, "path") != nil && nonEmptyString(params, "expected_current") != nil),
                   !parameterPlan || !(params["changes"]?.arrayValue?.isEmpty ?? true),
                   ["track", "insert"].allSatisfy({
                       switch params[$0] {
@@ -274,6 +278,10 @@ struct PluginsDispatcher: OperationTraceDispatching {
                     ]
                     if let param = nonEmptyString(params, "param") { readParams["param"] = param }
                     if let unit = nonEmptyString(params, "unit") { readParams["unit"] = unit }
+                    if presetWrite {
+                        readParams["path"] = nonEmptyString(params, "path")
+                        readParams["expected_current"] = nonEmptyString(params, "expected_current")
+                    }
                     for key in ["plugin", "plugin_id", "plugin_name"] {
                         if let requested = nonEmptyString(params, key),
                            (VerifiedPluginCatalog.canonicalPluginID(from: requested) ?? requested) != plugin {
@@ -294,6 +302,10 @@ struct PluginsDispatcher: OperationTraceDispatching {
                     } else { result = await router.route(operation: "plugin.\(command)", params: readParams) }
                     guard !Task.isCancelled, await targetRegistry.resolve(binding.reference) != nil,
                           await targetRegistry.currentProjectIdentity == project else {
+                        if presetWrite {
+                            return toolTextResult(.success(HonestContract.encodeStateB(reason: .readbackUnavailable,
+                                extras: ["operation": operation, "safe_to_retry": false, "effect_unknown": true])))
+                        }
                         if parameterPlan { return toolTextResult(Self.parameterPlanContextFailure(result)) }
                         return toolTextResult(AccessibilityChannel.parameterReadContextFailure(
                             result, error: .staleTargetReference, operation: operation

@@ -64,6 +64,143 @@ extension AccessibilityChannel {
         ]))
     }
 
+    static func createTrackVolumeAutomationAtRegionBorders(
+        params: [String: String], logic: AXLogicProElements.Runtime
+    ) async -> ChannelResult {
+        let operation = "track.create_volume_automation_at_region_borders"
+        let ax = logic.ax
+        func refuse(_ stage: String) -> ChannelResult {
+            .error(HonestContract.encodeStateC(error: .readbackUnavailable,
+                hint: "In Arrange, show and enable the Volume lane in Read mode and select exactly one region on the referenced track. The lane must be empty.",
+                extras: ["operation": operation, "readback_stage": stage, "write_attempted": false]))
+        }
+        func uncertain(_ stage: String, cleanup: Bool) -> ChannelResult {
+            .success(HonestContract.encodeStateB(reason: .readbackMismatch, extras: [
+                "operation": operation, "readback_stage": stage, "write_attempted": true,
+                "editor_close_observed": cleanup, "safe_to_retry": false, "effect_unknown": true,
+            ]))
+        }
+        guard ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+              let start = params["start"], let end = params["end"], start != end,
+              let binding = AXTrackBinding.current, let index = binding.currentIndex(),
+              let pid = logic.logicProPID(), let app = AXLogicProElements.appRoot(runtime: logic),
+              let windowTitle = AXHelpers.getTitle(binding.window, runtime: ax), windowTitle.hasSuffix(" - Tracks"),
+              case .success(.some(let name)) = AXValueExtractors.extractTrackNameResult(from: binding.header, runtime: ax)
+        else { return refuse("track_scope") }
+
+        func nativeWindows() -> [AXUIElement]? {
+            let observed: [AXUIElement]? = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax)
+            return observed?.filter { AXHelpers.getRole($0, runtime: ax) != kAXHelpTagRole as String }
+        }
+        func ownsArrange() -> Bool {
+            guard !Task.isCancelled, logic.focusedApplicationPID() == pid,
+                  binding.currentIndex() == index,
+                  let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute as String, runtime: ax),
+                  CFEqual(focused, binding.window), let windows = nativeWindows(),
+                  windows.count == 1, CFEqual(windows[0], binding.window),
+                  let transport = try? AXLogicProElements.observedTransportActivity(in: binding.window, runtime: logic, checking: {}),
+                  !transport.isPlaying, !transport.isRecording else { return false }
+            return true
+        }
+        func selectedVolumeRegion() -> AXUIElement? {
+            guard case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: binding.window, runtime: logic),
+                  headers.indices.contains(index), CFEqual(headers[index], binding.header),
+                  case .success(let controls) = AXHelpers.childrenResult(binding.header, runtime: ax)
+            else { return nil }
+            var matches = 0
+            for (offset, header) in headers.enumerated() {
+                guard case .success(.some(let candidate)) = AXValueExtractors.extractTrackNameResult(from: header, runtime: ax),
+                      AXValueExtractors.extractSelectedState(header, runtime: ax) == (offset == index) else { return nil }
+                if candidate == name { matches += 1 }
+            }
+            func controlValue<T>(_ label: String, role: String) -> T? {
+                let found = controls.filter {
+                    AXHelpers.getRole($0, runtime: ax) == role && AXHelpers.getDescription($0, runtime: ax) == label
+                }
+                guard found.count == 1 else { return nil }
+                return AXHelpers.getAttribute(found[0], kAXValueAttribute as String, runtime: ax)
+            }
+            guard matches == 1,
+                  (controlValue("Automation Parameter", role: kAXPopUpButtonRole as String) as String?) == "Volume",
+                  (controlValue("Automation Mode", role: kAXPopUpButtonRole as String) as String?) == "Read",
+                  (controlValue("Enable Automation", role: kAXCheckBoxRole as String) as Int?) == 1,
+                  let content = AXLogicProElements.logic13TrackContent(in: binding.window, runtime: logic),
+                  let items = AXLogicProElements.logic13RegionItems(in: content, runtime: ax) else { return nil }
+            var selected: [AXUIElement] = []
+            for item in items {
+                guard let isSelected: Bool = AXHelpers.getAttribute(item, kAXSelectedAttribute as String, runtime: ax) else { return nil }
+                if isSelected { selected.append(item) }
+            }
+            guard selected.count == 1, let region = selected.first,
+                  AXLogicProElements.logic13RegionTrackIndex(region, in: content, headers: headers, runtime: ax) == index,
+                  let help = AXHelpers.getHelp(region, runtime: ax),
+                  let bounds = ArrangeRegionBounds.read(from: help), bounds.start == start, bounds.end == end else { return nil }
+            return region
+        }
+        func openEditor() async -> Logic13VolumeEventList? {
+            guard ownsArrange(), CGPreflightPostEventAccess(),
+                  let down = CGEvent(keyboardEventSource: nil, virtualKey: 14, keyDown: true),
+                  let up = CGEvent(keyboardEventSource: nil, virtualKey: 14, keyDown: false),
+                  OperationTraceContext.claimDeadlineEffect("track_volume_automation_editor") else { return nil }
+            down.flags = [.maskControl, .maskCommand]
+            up.flags = down.flags
+            down.postToPid(pid)
+            up.postToPid(pid)
+            for _ in 0..<12 {
+                try? await Task.sleep(for: .milliseconds(65))
+                guard !Task.isCancelled, binding.currentIndex() == index,
+                      logic.focusedApplicationPID() == pid, let windows = nativeWindows(), windows.count <= 2 else { return nil }
+                if let editor = windows.first(where: { !CFEqual($0, binding.window) }) {
+                    let list = Logic13VolumeEventList(app: app, editor: editor, arrange: binding.window,
+                        title: String(windowTitle.dropLast(" - Tracks".count)), trackName: name, runtime: ax)
+                    if list.ownsEditor() { return list }
+                }
+            }
+            return nil
+        }
+        func closeEditor(_ list: Logic13VolumeEventList) async -> Bool {
+            guard list.ownsEditor(), logic.focusedApplicationPID() == pid,
+                  binding.currentIndex() == index,
+                  let button: AXUIElement = AXHelpers.getAttribute(list.editor, kAXCloseButtonAttribute as String, runtime: ax)
+            else { return false }
+            _ = AXHelpers.performAction(button, kAXPressAction, runtime: ax)
+            for _ in 0..<8 {
+                try? await Task.sleep(for: .milliseconds(50))
+                if ownsArrange() { return true }
+            }
+            return false
+        }
+
+        guard ownsArrange(), let region = selectedVolumeRegion(), let beforeEditor = await openEditor() else {
+            return refuse("native_lane_or_editor")
+        }
+        let before = beforeEditor.points()
+        let beforeClosed = await closeEditor(beforeEditor)
+        guard beforeClosed, before?.isEmpty == true else { return refuse("empty_lane_required") }
+
+        let command = ["Mix", "Create Track Automation", "Create 2 Automation Points at Region Borders"]
+        guard let item = AXLogicProElements.menuItem(path: command, runtime: logic),
+              (AXHelpers.getAttribute(item, kAXEnabledAttribute as String, runtime: ax) as Bool?) == true,
+              let currentRegion = selectedVolumeRegion(), CFEqual(currentRegion, region), ownsArrange(),
+              OperationTraceContext.claimDeadlineEffect("track_volume_automation_create") else { return refuse("region_or_command_changed") }
+        _ = AXHelpers.performAction(item, kAXPressAction, runtime: ax)
+        try? await Task.sleep(for: .milliseconds(250))
+        guard let afterEditor = await openEditor() else { return uncertain("editor_after_create", cleanup: false) }
+        let after = afterEditor.points()
+        let closed = await closeEditor(afterEditor)
+        guard let after, after.count == 4,
+              after[1].position == start, after[3].position == end,
+              after.allSatisfy({ $0.value == after[0].value }), closed else {
+            return uncertain("points_after_create", cleanup: closed)
+        }
+        return .success(HonestContract.encodeStateA(extras: [
+            "operation": operation, "lane": "volume", "unit": "logic_fader_value",
+            "position_format": "bar.beat.division.tick", "write_attempted": true,
+            "points": after.map { ["position": $0.position, "value": $0.value] as [String: Any] },
+            "verify_source": "ax_automation_event_list", "editor_close_observed": true,
+        ]))
+    }
+
     private static func changeTrackVolumePoint(
         params: [String: String], points: [Logic13VolumeEventList.Point],
         editor: Logic13VolumeEventList, current: () -> Bool,

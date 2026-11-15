@@ -60,6 +60,8 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case systemSetupControlSurface = "system.setup_control_surface"
     case pluginsGetInventory = "plugins.get_inventory"
     case pluginsGetHostParameterManifest = "plugins.get_host_parameter_manifest"
+    case pluginsGetPresetVerified = "plugins.get_preset_verified"
+    case pluginsSetPresetVerified = "plugins.set_preset_verified"
     case pluginsGetParamVerified = "plugins.get_param_verified"
     case pluginsPlanParameterChanges = "plugins.plan_parameter_changes"
     case pluginsGetChannelEQStateVerified = "plugins.get_channel_eq_state_verified"
@@ -134,6 +136,7 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case tracksRecordSequence = "tracks.record_sequence"
     case tracksSortVerified = "tracks.sort_verified"
     case tracksSetAutomation = "tracks.set_automation"
+    case tracksCreateVolumeAutomation = "tracks.create_volume_automation_at_region_borders"
     case tracksGetVolumeAutomation = "tracks.get_volume_automation"
     case tracksSetVolumeAutomationPoint = "tracks.set_volume_automation_point"
     case tracksSetInstrument = "tracks.set_instrument"
@@ -351,7 +354,7 @@ enum OperationRegistry {
             "system.setup_arm_key", "system.setup_midi_key_commands", "system.setup_control_surface",
         ],
         ToolID.logicPlugins.rawValue: [
-            "plugins.get_inventory", "plugins.get_host_parameter_manifest", "plugins.get_param_verified", "plugins.get_channel_eq_state_verified", "plugins.plan_parameter_changes", "plugins.set_param_verified", "plugins.set_eq_band_verified", "plugins.insert_verified",
+            "plugins.get_inventory", "plugins.get_host_parameter_manifest", "plugins.get_param_verified", "plugins.get_preset_verified", "plugins.set_preset_verified", "plugins.get_channel_eq_state_verified", "plugins.plan_parameter_changes", "plugins.set_param_verified", "plugins.set_eq_band_verified", "plugins.insert_verified",
         ],
         ToolID.logicEdit.rawValue: [
             "edit.undo", "edit.redo", "edit.cut", "edit.copy", "edit.paste", "edit.delete",
@@ -379,7 +382,7 @@ enum OperationRegistry {
             "tracks.create_drummer", "tracks.create_external_midi", "tracks.delete",
             "tracks.duplicate", "tracks.rename", "tracks.mute", "tracks.solo", "tracks.arm",
             "tracks.arm_only", "tracks.record_sequence", "tracks.sort_verified", "tracks.set_automation",
-            "tracks.get_volume_automation", "tracks.set_volume_automation_point",
+            "tracks.get_volume_automation", "tracks.set_volume_automation_point", "tracks.create_volume_automation_at_region_borders",
             "tracks.set_instrument", "tracks.list_library", "tracks.scan_library",
             "tracks.resolve_path", "tracks.scan_plugin_presets",
         ],
@@ -413,7 +416,7 @@ enum OperationRegistry {
             "setup_arm_key", "setup_midi_key_commands", "setup_control_surface",
         ],
         ToolID.logicPlugins.rawValue: [
-            "get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
+            "get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_preset_verified", "set_preset_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
         ],
         ToolID.logicEdit.rawValue: [
             "undo", "redo", "cut", "copy", "paste", "delete", "select_all", "split", "join",
@@ -436,7 +439,7 @@ enum OperationRegistry {
             "select", "create_audio", "create_instrument", "create_drummer",
             "create_external_midi", "delete", "duplicate", "rename", "mute", "solo", "arm",
             "arm_only", "record_sequence", "sort_verified", "set_automation", "set_instrument", "list_library",
-            "scan_library", "resolve_path", "scan_plugin_presets", "get_volume_automation", "set_volume_automation_point",
+            "scan_library", "resolve_path", "scan_plugin_presets", "get_volume_automation", "set_volume_automation_point", "create_volume_automation_at_region_borders",
         ],
     ]
 
@@ -776,6 +779,14 @@ enum OperationRegistry {
             ["expected_build_fingerprint", "insert", "plugin", "plugin_id", "plugin_name", "track"]
         ),
         (
+            .pluginsGetPresetVerified, "get_preset_verified", Mutability.readOnly, DeadlineClass.medium,
+            VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, []
+        ),
+        (
+            .pluginsSetPresetVerified, "set_preset_verified", Mutability.`mutating`, DeadlineClass.medium,
+            VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["path", "expected_current"]
+        ),
+        (
             .pluginsGetParamVerified,
             "get_param_verified",
             Mutability.readOnly,
@@ -1043,8 +1054,9 @@ enum OperationRegistry {
         // confirmation but accepts no track target reference.
         (.tracksSortVerified, "sort_verified", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.none, ["confirmed", "criterion", "expected_order"]),
         (.tracksSetAutomation, "set_automation", Mutability.`mutating`, DeadlineClass.short, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["index", "mode", "track"]),
+        (.tracksCreateVolumeAutomation, "create_volume_automation_at_region_borders", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["start", "end"]),
         (.tracksGetVolumeAutomation, "get_volume_automation", Mutability.readOnly, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, []),
-        (.tracksSetVolumeAutomationPoint, "set_volume_automation_point", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["position", "expected_current", "value"]),
+        (.tracksSetVolumeAutomationPoint, "set_volume_automation_point", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["position", "expected_current", "value", "linked_position"]),
         (.tracksSetInstrument, "set_instrument", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["category", "index", "path", "preset"]),
         (.tracksListLibrary, "list_library", Mutability.readOnly, DeadlineClass.long, VerificationPolicy.none, TargetPolicy.none, []),
         (.tracksScanLibrary, "scan_library", Mutability.readOnly, DeadlineClass.long, VerificationPolicy.none, TargetPolicy.none, ["mode"]),

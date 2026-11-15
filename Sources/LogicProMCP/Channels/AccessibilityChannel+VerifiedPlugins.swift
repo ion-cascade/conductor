@@ -2858,6 +2858,189 @@ extension AccessibilityChannel {
         return result
     }
 
+    static func defaultCompressorPreset(
+        params: [String: String], writing: Bool, runtime: AXLogicProElements.Runtime
+    ) async -> ChannelResult {
+        let operation = "logic_plugins.\(writing ? "set" : "get")_preset_verified"
+        let ax = runtime.ax
+        let supportedPath = "02 Keyboards/Piano"
+        let compressor = "logic.stock.effect.compressor"
+        func refuse(_ error: HonestContract.FailureError, _ stage: String) -> ChannelResult {
+            .error(HonestContract.encodeStateC(error: error, hint: "Select the target track and show its Mixer. This adapter supports the stock Compressor Piano preset.",
+                extras: ["operation": operation, "readback_stage": stage, "write_attempted": false]))
+        }
+        func uncertain(_ stage: String) -> ChannelResult {
+            .success(HonestContract.encodeStateB(reason: .readbackMismatch,
+                extras: ["operation": operation, "readback_stage": stage, "write_attempted": true,
+                         "safe_to_retry": false, "effect_unknown": true]))
+        }
+        guard params["plugin"] == compressor,
+              !writing || params["path"] == supportedPath,
+              let track = params["track"].flatMap(Int.init), track >= 0,
+              let insert = params["insert"].flatMap(Int.init), insert >= 0,
+              let expectedPath = params["project_expected_path"], let expectedName = params["expected_track_name"],
+              let app = AXLogicProElements.appRoot(runtime: runtime), let pid = runtime.logicProPID(),
+              runtime.observeHost(pid)?.logicVersion?.hasPrefix("13.") == true
+        else { return refuse(.invalidParams, "preset_scope") }
+        guard case .found(let arrange) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: runtime),
+              case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(arrange, runtime: runtime),
+              let url = URL(string: document), url.isFileURL,
+              AppleScriptChannel.projectPathsMatch(expectedPath, url.path),
+              let mixer = mixerWithoutRevealForInventory(runtime: runtime, revealRequested: false)?.mixer,
+              let target = AXPluginTrackBinding.resolve(track: track, mixer: mixer, runtime: runtime),
+              CFEqual(target.window, arrange), target.trackName == expectedName,
+              let slots = AXLogicProElements.audioPluginInsertSlots(in: target.strip, runtime: ax),
+              slots.indices.contains(insert), !slots.contains(where: { $0.readStatus == .occupiedUnreadable }),
+              slots.filter({ $0.name == "Compressor" }).count == 1, slots[insert].name == "Compressor"
+        else { return refuse(.readbackUnavailable, "compressor_slot") }
+        let slot = slots[insert]
+        if let failed = pluginInsertReferenceGuard(params: params, slot: slot, operation: operation) { return failed }
+
+        func context() -> Bool {
+            guard !Task.isCancelled, runtime.focusedApplicationPID() == pid,
+                  case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(arrange, runtime: runtime),
+                  current == document, AXPluginTrackBinding.isStable(target, runtime: runtime),
+                  let latest = AXLogicProElements.audioPluginInsertSlots(in: target.strip, runtime: ax),
+                  latest.indices.contains(insert), CFEqual(slot.element, latest[insert].element),
+                  latest[insert].name == "Compressor",
+                  let list = runtime.onScreenWindowList() else { return false }
+            if writing {
+                guard let transport = try? AXLogicProElements.observedTransportActivity(in: arrange, runtime: runtime, checking: {}),
+                      !transport.isPlaying, !transport.isRecording else { return false }
+            }
+            return LogicOnScreenWindows.popupMenuCount(list, logicPID: pid) <= 1
+        }
+        func windows() -> [AXUIElement]? {
+            let candidates: [AXUIElement]? = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax)
+            return candidates?.filter { AXHelpers.getRole($0, runtime: ax) == kAXWindowRole as String }
+        }
+        func focused(_ element: AXUIElement) -> Bool {
+            guard let front: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute as String, runtime: ax)
+            else { return false }
+            return CFEqual(front, element)
+        }
+        guard context(), let beforeWindows = windows(), beforeWindows.contains(arrange) else {
+            return refuse(.readbackUnavailable, "project_focus")
+        }
+        let editor: AXUIElement
+        let opened: Bool
+        if beforeWindows.count == 1 && focused(arrange),
+           case .success(let slotControls) = AXHelpers.childrenResult(slot.element, runtime: ax) {
+            let open = slotControls.filter {
+                AXHelpers.getDescription($0, runtime: ax) == "open"
+                    && AXHelpers.getRole($0, runtime: ax) == kAXButtonRole as String
+            }
+            guard open.count == 1,
+                  OperationTraceContext.claimDeadlineEffect("compressor_preset_open_editor") else {
+                return refuse(.readbackUnavailable, "compressor_open_control")
+            }
+            _ = AXHelpers.performAction(open[0], kAXPressAction, runtime: ax)
+            try? await Task.sleep(for: .milliseconds(400))
+            guard let active = windows(), active.count == 2, active.contains(arrange),
+                  let added = active.first(where: { !CFEqual($0, arrange) }) else {
+                return refuse(.readbackUnavailable, "compressor_editor")
+            }
+            editor = added
+            opened = true
+        } else if beforeWindows.count == 2, let existing = beforeWindows.first(where: { !CFEqual($0, arrange) }) {
+            editor = existing
+            opened = false
+        } else { return refuse(.readbackUnavailable, "compressor_editor_population") }
+
+        func editorIdentified() -> Bool {
+            guard AXHelpers.getTitle(editor, runtime: ax) == expectedName,
+                  case .success(let controls) = AXHelpers.childrenResult(editor, runtime: ax) else { return false }
+            return controls.filter {
+                AXHelpers.getRole($0, runtime: ax) == kAXStaticTextRole as String
+                    && (AXHelpers.getAttribute($0, kAXValueAttribute as String, runtime: ax) as String?) == "Compressor"
+            }.count == 1
+        }
+        defer {
+            if opened, editorIdentified(), runtime.focusedApplicationPID() == pid,
+               let active = windows(), active.count == 2, active.contains(arrange), active.contains(editor),
+               let closer: AXUIElement = AXHelpers.getAttribute(editor, kAXCloseButtonAttribute as String, runtime: ax) {
+                _ = AXHelpers.performAction(closer, kAXPressAction, runtime: ax)
+            }
+        }
+        func setting() -> (AXUIElement, String)? {
+            guard editorIdentified(), case .success(let controls) = AXHelpers.childrenResult(editor, runtime: ax) else { return nil }
+            let possible = controls.filter {
+                guard AXHelpers.getRole($0, runtime: ax) == kAXPopUpButtonRole as String,
+                      case .success(let actions) = AXHelpers.getActionNamesResult($0, runtime: ax)
+                else { return false }
+                return actions == [kAXPressAction as String]
+            }
+            guard possible.count == 1, let value: String = AXHelpers.getAttribute(possible[0], kAXValueAttribute as String, runtime: ax),
+                  !value.isEmpty else { return nil }
+            return (possible[0], value)
+        }
+        guard context(), focused(editor), let (popup, before) = setting() else {
+            return refuse(.readbackUnavailable, "preset_control")
+        }
+        func evidence(_ observed: String, attempted: Bool) -> ChannelResult {
+            .success(HonestContract.encodeStateA(extras: [
+                "operation": operation, "plugin": compressor, "observed_preset": observed,
+                "before": before, "changed": before != observed, "write_attempted": attempted,
+                "verify_source": "ax_compressor_setting",
+            ]))
+        }
+        guard writing else {
+            guard setting()?.1 == before, context() else { return refuse(.readbackUnavailable, "preset_readback") }
+            return evidence(before, attempted: false)
+        }
+        guard params["expected_current"] == before else { return refuse(.staleSnapshot, "preset_expected_current") }
+        if before == "Piano" { return evidence(before, attempted: false) }
+
+        func nativeMenus() -> [AXUIElement] {
+            AXHelpers.findAllDescendants(of: app, role: kAXMenuRole as String, maxDepth: 5, runtime: ax)
+                .filter { menu in
+                    guard isVisibleMenu(menu, runtime: ax),
+                          case .success(let leaves) = AXHelpers.childrenResult(menu, runtime: ax) else { return false }
+                    let titles = leaves.compactMap { AXHelpers.getTitle($0, runtime: ax) }
+                    return titles.contains("Setting") && titles.contains("02 Keyboards")
+                }
+        }
+        guard let visible = runtime.onScreenWindowList(), LogicOnScreenWindows.popupMenuCount(visible, logicPID: pid) == 0,
+              nativeMenus().isEmpty else { return refuse(.readbackUnavailable, "preexisting_menu") }
+        _ = AXHelpers.performAction(popup, kAXPressAction, runtime: ax)
+        try? await Task.sleep(for: .milliseconds(350))
+        let menus = nativeMenus()
+        guard menus.count == 1, let menu = menus.first, slotPopupMenuIsAnchored(menu, toSlot: popup, runtime: ax) else {
+            return refuse(.readbackUnavailable, "preset_menu_ownership")
+        }
+        func cancelOwned() {
+            let now = nativeMenus()
+            if runtime.focusedApplicationPID() == pid, editorIdentified(), now.count == 1, CFEqual(now[0], menu) {
+                _ = AXHelpers.performAction(menu, kAXCancelAction, runtime: ax)
+            }
+        }
+        guard case .success(let rootItems) = AXHelpers.childrenResult(menu, runtime: ax) else {
+            cancelOwned(); return refuse(.readbackUnavailable, "preset_menu_items")
+        }
+        let category = rootItems.filter { AXHelpers.getTitle($0, runtime: ax) == "02 Keyboards" }
+        guard category.count == 1,
+              case .success(let submenu) = AXHelpers.childrenResult(category[0], runtime: ax),
+              submenu.count == 1, AXHelpers.getRole(submenu[0], runtime: ax) == kAXMenuRole as String,
+              case .success(let items) = AXHelpers.childrenResult(submenu[0], runtime: ax) else {
+            cancelOwned(); return refuse(.readbackUnavailable, "preset_category")
+        }
+        let piano = items.filter { AXHelpers.getTitle($0, runtime: ax) == "Piano" }
+        guard piano.count == 1, (AXHelpers.getAttribute(piano[0], kAXEnabledAttribute as String, runtime: ax) as Bool?) == true,
+              nativeMenus().count == 1, context(), let (current, value) = setting(),
+              CFEqual(current, popup), value == before,
+              OperationTraceContext.claimDeadlineEffect("compressor_preset_pick") else {
+            cancelOwned(); return refuse(.readbackUnavailable, "preset_before_pick")
+        }
+        _ = AXHelpers.performAction(piano[0], "AXPick", runtime: ax)
+        try? await Task.sleep(for: .milliseconds(350))
+        for _ in 0..<2 {
+            guard nativeMenus().isEmpty, context(), focused(editor), setting()?.1 == "Piano" else {
+                cancelOwned(); return uncertain("preset_after_pick")
+            }
+        }
+        return evidence("Piano", attempted: true)
+    }
+
     static func defaultGetParamVerified(
         params: [String: String],
         runtime: AXLogicProElements.Runtime = .production,

@@ -2115,6 +2115,8 @@ actor AccessibilityChannel: Channel {
                 edit: operation == "track.set_volume_automation_point", runtime: runtime.logicRuntime)
 
         // MARK: - Track mutations
+        case "track.create_volume_automation_at_region_borders":
+            return await Self.createTrackVolumeAutomationAtRegionBorders(params: params, logic: runtime.logicRuntime)
         case "track.select":
             return await runtime.selectTrack(params)
         case "track.set_mute":
@@ -2456,6 +2458,9 @@ actor AccessibilityChannel: Channel {
             return await AccessibilityChannel.defaultGetPluginInventory(params: params, runtime: runtime.logicRuntime)
         case "plugin.get_host_parameter_manifest":
             return await AccessibilityChannel.defaultGetHostParameterManifest(params: params, runtime: runtime.logicRuntime)
+        case "plugin.get_preset_verified", "plugin.set_preset_verified":
+            return await Self.defaultCompressorPreset(params: params,
+                writing: operation == "plugin.set_preset_verified", runtime: runtime.logicRuntime)
         case "plugin.get_param_verified":
             return await AccessibilityChannel.defaultGetParamVerified(params: params, runtime: runtime.logicRuntime)
         case "plugin.get_channel_eq_state_verified":
