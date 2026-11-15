@@ -73,6 +73,7 @@ struct IndexBindingCensusTests {
         let expected: Set<OperationID> = [
             .mixerSetInputBusVerified, .mixerSetSendOutputVerified, .mixerSetSendBypassVerified, .mixerSetSendLevelVerified, .mixerSetSendModeVerified,
             .midiExportTrackMIDI, .midiReadTrackNotes,
+            .pluginsSetBypassVerified, .tracksCreatePanAutomation, .tracksSetPanAutomationPoint,
         ]
         #expect(OperationRegistry.refRequiredOperationIDs == expected)
         #expect(Self.ids { $0.indexBinding == .refRequired } == expected)

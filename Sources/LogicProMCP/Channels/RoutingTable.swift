@@ -67,6 +67,9 @@ extension ChannelRouter {
         "track.get_tracks":           [.accessibility],
         "track.get_selected":         [.accessibility],
         "track.split_selected_audio": [.accessibility],
+        "track.get_pan_automation": [.accessibility],
+        "track.set_pan_automation_point": [.accessibility],
+        "track.create_pan_automation_point": [.accessibility],
         "track.get_volume_automation": [.accessibility],
         "track.set_volume_automation_point": [.accessibility],
         "track.create_volume_automation_at_region_borders": [.accessibility],
@@ -155,6 +158,7 @@ extension ChannelRouter {
         // past them.
         "plugin.get_inventory":       [.accessibility],
         "plugin.get_host_parameter_manifest": [.accessibility],
+        "plugin.set_bypass_verified": [.accessibility],
         "plugin.get_preset_verified": [.accessibility],
         "plugin.set_preset_verified": [.accessibility],
         "plugin.get_param_verified":  [.accessibility],

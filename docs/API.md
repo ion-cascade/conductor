@@ -160,6 +160,12 @@ successful refresh clears the old key. Clients must accept historical payloads w
 
 Use explicit indices or names. Track mutation fails closed when the target cannot be identified or read back.
 
+On Logic Pro 13, the absolute track Pan commands take a current `trk_…` reference and optional `project_ref`. Leave the intended track singly selected with the absolute Pan lane visible in Read mode.
+
+- `create_pan_automation_point` seeds an empty lane at the current playhead. In the foreground Arrange window, choose the control bar’s Beats display. Pass the playhead `position` and Logic’s expected `initial_position`, usually the project start, in `bar.beat.division.tick` format. The receipt verifies the requested point, the initial anchor and the existing Volume events.
+- `get_pan_automation` takes the reference while the track’s Automation Event List is open. Each point has `position`, its native integer `value` (0–127, centre 64), and Logic’s `displayed_value`.
+- `set_pan_automation_point` takes one of those positions, `expected_current` and the desired `value` in 10-unit steps. Include `linked_position` if Logic selected two matching points together. Keep transport stopped. Read fresh references after reopening.
+
 Common commands: `select`, `create_audio`, `create_instrument`, `create_drummer`, `create_external_midi`, `delete`, `duplicate`, `rename`, `mute`, `solo`, `arm`, `arm_only`, `record_sequence`, `set_automation`, `set_instrument`, `list_library`, `scan_library`, `resolve_path`, `scan_plugin_presets`.
 
 **`delete`, `duplicate`, and `set_instrument` no longer accept a bare index.** They are `corroborated` (see [Index binding](#index-binding)): pass `expected_name` (the track name you expect at that index) or `target_ref`. Without one, they fail closed with `index_binding_corroboration_required` and write nothing.
@@ -217,6 +223,8 @@ An issued `mixer_strip_ref` (`mix_`) identifies an observed physical Mixer strip
 For `set_volume`, `set_pan` and `set_output_verified`, a physical `mix_` reference uses controls in that same strip and rechecks its observed document/window/Mixer membership before actuation. The same physical strip may move within a completely readable Mixer enumeration; replacement, removal or changed project/topology is not identity continuity. Do not combine a physical reference with a track/index selector. `trk_` and explicit legacy selectors retain their existing separate behavior; old track-shaped `mix_` bindings without a physical observation are not write authority. Native AX has no atomic compare-and-act guarantee, and an uncertain after-read must not be treated as verified success.
 
 ### `logic_plugins`
+
+`set_bypass_verified` takes `{target_ref: ins_…, project_ref?: prj_…, expected_current: Bool, bypassed: Bool}`. Use the project and occupied insert references from the same fresh `get_inventory` response. Keep the Mixer open, transport stopped and plug-in editors closed. A matching requested state returns `write_attempted: false`. A change verifies the exact physical slot and other inserts on that strip. If Logic cannot settle the after-read, read the inventory before deciding what to do next.
 
 This is the stock-plugin inventory, parameter-read and verified apply-back surface.
 

@@ -31,8 +31,8 @@ Our focus is practical music work with trustworthy feedback: a command being acc
 | Area | Available interfaces |
 | --- | --- |
 | **Transport** | Playback, stop, tempo, position and control-bar state |
-| **Tracks** | Inspect and select tracks, adjust track controls, and create and edit Volume automation |
-| **Mixer** | Channel strips, faders, stock inserts, Compressor presets, sends and guarded routing operations |
+| **Tracks** | Inspect and select tracks, adjust track controls, and create and edit Volume and absolute Pan automation |
+| **Mixer** | Channel strips, faders, stock insert bypass, Compressor presets, sends and guarded routing operations |
 | **MIDI** | Sequence creation and import, MIDI messages, region-event inspection and guarded MIDI export |
 | **Projects** | Open, save, find offscreen regions, edit exact boundaries and bounce an explicit musical range |
 | **Audio analysis** | File format, duration, levels and spectrum measurements |
@@ -83,9 +83,7 @@ Keep recordings and projects on your own machines. Conductor's bridge uses your 
 
 ## Tested status
 
-Conductor 1.1 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
-
-The release passed 494 focused Swift tests and 19 Python tests covering the installer and shared bridge.
+Conductor 1.3 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
 
 ### Render and export from Logic 13
 
@@ -128,6 +126,12 @@ For the Compressor threshold, `get_param_verified` and `set_param_verified` use 
 2. Take the track reference from `logic://tracks` and read the selected region’s exact start and end with `logic_project.get_regions`. Call `logic_tracks.create_volume_automation_at_region_borders` with the reference, `start`, and `end`. Creation requires an empty track automation event list.
 3. Open Logic’s Track Automation Event List for the track. Call `get_volume_automation` with the same track reference and verify its `points` and `selected_positions`.
 4. Call `set_volume_automation_point` with a reported `position`, `expected_current` and the target `value`. If Logic selected two points together, send the other position as `linked_position`. The adapter changes values in 10-unit steps in Logic’s 0–127 fader scale.
+
+### Automate track pan and bypass inserts
+
+Show the track’s absolute Pan lane in Read mode. Choose the control bar’s Beats display and place the playhead at the desired position. Use `logic_tracks.create_pan_automation_point` with that position and the expected initial anchor. Open the track’s Automation Event List to read the points with `get_pan_automation` or update one with `set_pan_automation_point`. The read reports both the native 0–127 value and Logic’s display text.
+
+In the Mixer, take the occupied insert’s `plugin_insert_ref` from `logic_plugins.get_inventory`. Call `logic_plugins.set_bypass_verified` with that reference, the current Boolean `expected_current` and the desired Boolean `bypassed`. Use a fresh insert reference after reopening.
 
 ### Current limits
 

@@ -5276,7 +5276,7 @@ extension AccessibilityChannel {
 
     /// An insert reference carries the observed physical slot state, not just its number.
     /// Reusing a reference after replacement must not authorize a different plug-in.
-    private static func pluginInsertReferenceGuard(
+    static func pluginInsertReferenceGuard(
         params: [String: String],
         slot: AXLogicProElements.PluginInsertSlot,
         operation: String

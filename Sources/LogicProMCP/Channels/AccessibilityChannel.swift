@@ -2111,15 +2111,18 @@ actor AccessibilityChannel: Channel {
             return runtime.tracks()
         case "track.get_selected":
             return runtime.selectedTrack()
-        case "track.get_volume_automation", "track.set_volume_automation_point":
-            return await Self.defaultTrackVolumeAutomation(params: params,
-                edit: operation == "track.set_volume_automation_point", runtime: runtime.logicRuntime)
+        case "track.get_volume_automation", "track.set_volume_automation_point",
+             "track.get_pan_automation", "track.set_pan_automation_point":
+            return await Self.defaultTrackAutomation(params: params,
+                lane: operation.contains("_pan_") ? .pan : .volume,
+                edit: operation.hasPrefix("track.set_"), runtime: runtime.logicRuntime)
 
         // MARK: - Track mutations
         case "track.split_selected_audio":
             return await ProjectLogic13StemSplitter.run(params: params, runtime: runtime.logicRuntime)
-        case "track.create_volume_automation_at_region_borders":
-            return await Self.createTrackVolumeAutomationAtRegionBorders(params: params, logic: runtime.logicRuntime)
+        case "track.create_volume_automation_at_region_borders", "track.create_pan_automation_point":
+            return await Self.createTrackAutomation(params: params,
+                lane: operation.contains("_pan_") ? .pan : .volume, logic: runtime.logicRuntime)
         case "track.select":
             return await runtime.selectTrack(params)
         case "track.set_mute":
@@ -2465,6 +2468,8 @@ actor AccessibilityChannel: Channel {
             return await AccessibilityChannel.defaultGetPluginInventory(params: params, runtime: runtime.logicRuntime)
         case "plugin.get_host_parameter_manifest":
             return await AccessibilityChannel.defaultGetHostParameterManifest(params: params, runtime: runtime.logicRuntime)
+        case "plugin.set_bypass_verified":
+            return await Self.setPluginBypassVerified(params: params, runtime: runtime.logicRuntime)
         case "plugin.get_preset_verified", "plugin.set_preset_verified":
             return await Self.defaultCompressorPreset(params: params,
                 writing: operation == "plugin.set_preset_verified", runtime: runtime.logicRuntime)

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.3.0] — 2026-11-15
+
+### Added
+
+- Seed the absolute track Pan lane and edit its points at exact positions. Read Logic’s native value and display text while checking the existing Volume lane. ([#26](https://github.com/ion-cascade/conductor/issues/26))
+- Set or clear bypass on a referenced occupied stock insert. Matching current and requested states require no write. The native Mixer check distinguishes duplicate plug-ins by slot. ([#27](https://github.com/ion-cascade/conductor/issues/27))
+
+### Qualification scope
+
+- The Compressor showed `Input 1` again after reopening the test project, although immediate readback still returned `Internal`. A Bus 1 send and Aux were present on the tested layout, but Bus 1 did not appear in the target Compressor’s menu. Release 1.3 has no sidechain setter. ([#28](https://github.com/ion-cascade/conductor/issues/28))
+
 ## [1.2.0] — 2026-11-15
 
 ### Added

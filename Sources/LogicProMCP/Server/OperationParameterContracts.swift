@@ -396,6 +396,18 @@ extension OperationRegistry {
             "tracks.resolve_path": .init(params: ["path": .enforced(.scalar, .string("Bass/Electric Bass"))], required: [["path"]]),
             "tracks.scan_library": .init(params: ["mode": .unconstrained("read as text; an empty mode leaves the channel's default")],
                                         required: []),
+            "tracks.get_pan_automation": .init(params: ["target_ref": targetRef, "project_ref": projectRef],
+                required: [["target_ref"]]),
+            "tracks.set_pan_automation_point": .init(params: [
+                "target_ref": targetRef, "project_ref": projectRef,
+                "position": .enforced(.string, "1.1.1.1"),
+                "expected_current": .enforced(.integer, .int(64)), "value": .enforced(.integer, .int(74)),
+                "linked_position": .enforced(.string, "1.4.4.240"),
+            ], required: [["target_ref"], ["position"], ["expected_current"], ["value"]]),
+            "tracks.create_pan_automation_point": .init(params: [
+                "target_ref": targetRef, "project_ref": projectRef,
+                "position": .enforced(.string, "2.1.1.1"), "initial_position": .enforced(.string, "1.1.1.1"),
+            ], required: [["target_ref"], ["position"], ["initial_position"]]),
             "tracks.scan_plugin_presets": .init(params: ["submenuOpenDelayMs": index(250)], required: []),
             "tracks.record_sequence": .init(params: [
                 "bar": index(9), "notes": .enforced(.string, .string("60:0:480")), "tempo": .enforced(.number, .int(120)),
@@ -473,6 +485,10 @@ extension OperationRegistry {
 
             // logic_plugins: the dispatcher omits a value that does not read, and the channel's own
             // schema step refuses the request, so those refusals come after a channel ran.
+            "plugins.set_bypass_verified": .init(params: [
+                "target_ref": targetRef, "project_ref": projectRef,
+                "bypassed": .enforced(.boolean, .bool(true)), "expected_current": .enforced(.boolean, .bool(false)),
+            ], required: [["target_ref"], ["bypassed"], ["expected_current"]]),
             "plugins.get_inventory": .init(params: Dictionary(uniqueKeysWithValues: ["index", "track", "track_index"].map {
                 ($0, ParamRule.unconstrained("omitted when it does not read as an integer; the channel then refuses the request",
                                              sample: .int(0)))

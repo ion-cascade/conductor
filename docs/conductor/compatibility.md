@@ -1,6 +1,6 @@
-# Conductor 1.2 compatibility
+# Conductor 1.3 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.2. It also records the results from Conductor 1.1 and 1.0.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.3 and the checks from earlier releases.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -13,6 +13,18 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 | Permissions | Accessibility and keyboard event access in the Terminal context. macOS Automation approval for project commands when requested. |
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
+
+
+## 1.3 Pan automation and insert bypass
+
+| Workflow | Mac mini qualification |
+| --- | --- |
+| Absolute track Pan | With Logic’s Beats display at `2.1.1.1`, seeded Pan at the initial anchor `1.1.1.1` and at the playhead. Logic’s Event List read back `74` at `1.1.1.1` after editing and `64` at `2.1.1.1`. The existing Volume events and the adjacent track’s empty automation list were preserved. Reopened the project through a fresh connection and checked both the positions and displayed values. |
+| Stock insert bypass | Bypassed and re-enabled each of two Compressors on the same strip by its occupied slot reference. Channel EQ and ChromaVerb stayed active. The already-correct request returned without pressing a control. Reopened through a fresh connection, saw the saved bypass state and verified that the retired reference was rejected before writing. |
+| Compressor sidechain | The control continued to read `Internal` immediately after the Input 1 press, then showed `Input 1` after reopening. The tested Bus 1 send and return were visible in the Mixer, while the exact Compressor menu offered the physical inputs. A keyed/control render is pending. Sidechain writes are outside the 1.3 surface. |
+| Managed connection | Installed the source build and reconnected through the configured SSH stdio launcher. |
+
+The Pan adapter requires Logic’s visible absolute track Pan lane in Read mode. Creation uses a single selected track, an empty Pan lane and the full Beats playhead display. The bypass adapter requires a readable Mixer insert chain and stopped transport. [API reference](../API.md)
 
 
 ## 1.2 arrangement and bounce

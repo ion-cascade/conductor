@@ -1,17 +1,27 @@
 import ApplicationServices
 import Foundation
 
+enum Logic13AutomationLane: String {
+    case volume
+    case pan
+
+    var label: String { self == .volume ? "Volume" : "Pan" }
+    var unit: String { self == .volume ? "logic_fader_value" : "logic_pan_value" }
+
+    func allows(_ value: Int) -> Bool { (0...127).contains(value) }
+}
+
 extension AccessibilityChannel {
-    static func defaultTrackVolumeAutomation(
+    static func defaultTrackAutomation(
         params: [String: String],
-        edit: Bool,
+        lane: Logic13AutomationLane, edit: Bool,
         runtime logic: AXLogicProElements.Runtime
     ) async -> ChannelResult {
-        let operation = edit ? "track.set_volume_automation_point" : "track.get_volume_automation"
+        let operation = edit ? "track.set_\(lane.rawValue)_automation_point" : "track.get_\(lane.rawValue)_automation"
         func unavailable(_ stage: String) -> ChannelResult {
             .error(HonestContract.encodeStateC(
                 error: .readbackUnavailable,
-                hint: "Open the Track Automation Event List for the referenced track and expose its Volume events.",
+                hint: "Open the Track Automation Event List for the referenced track and expose its \(lane.label) events.",
                 extras: ["operation": operation, "readback_stage": stage, "write_attempted": false]))
         }
         guard let binding = AXTrackBinding.current,
@@ -24,7 +34,7 @@ extension AccessibilityChannel {
               arrangeTitle.hasSuffix(" - Tracks"),
               let editor: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute as String, runtime: logic.ax),
               !CFEqual(editor, binding.window) else { return unavailable("track_editor_scope") }
-        let read = Logic13VolumeEventList(app: app, editor: editor, arrange: binding.window,
+        let read = Logic13AutomationEventList(app: app, editor: editor, arrange: binding.window,
             title: String(arrangeTitle.dropLast(" - Tracks".count)),
             trackName: trackName, runtime: logic.ax)
         func current() -> Bool {
@@ -41,37 +51,41 @@ extension AccessibilityChannel {
             }
             return nameMatches == 1 && logic.focusedApplicationPID() == pid && read.ownsEditor()
         }
-        guard current() else { return unavailable("editor_ownership") }
+        func ready() -> Bool {
+            current() && (lane != .pan || automationLaneIsReady(.pan, header: binding.header, runtime: logic.ax))
+        }
+        guard ready() else { return unavailable("editor_ownership") }
         var stage = "event_table"
         guard let points = read.points(onRefusal: { stage = $0 }) else { return unavailable(stage) }
-        guard current() else { return unavailable("editor_ownership_after_read") }
+        guard ready() else { return unavailable("editor_ownership_after_read") }
         if edit {
-            return await changeTrackVolumePoint(params: params, points: points,
-                editor: read, current: current, logic: logic, operation: operation)
+            return await changeTrackAutomationPoint(params: params, points: points, lane: lane,
+                editor: read, current: ready, logic: logic, operation: operation)
         }
+        let lanePoints = points.filter { $0.lane == lane }
         return .success(HonestContract.encodeStateA(extras: [
             "operation": operation,
-            "lane": "volume",
-            "unit": "logic_fader_value",
+            "lane": lane.rawValue,
+            "unit": lane.unit,
             "position_format": "bar.beat.division.tick",
             "track": index,
-            "points": points.map { point -> [String: Any] in
-                ["position": point.position, "value": point.value]
-            },
-            "selected_positions": points.filter(\.selected).map(\.position),
+            "points": lanePoints.map(\.evidence),
+            "selected_positions": lanePoints.filter(\.selected).map(\.position),
             "verify_source": "ax_automation_event_list",
             "write_attempted": false,
         ]))
     }
 
-    static func createTrackVolumeAutomationAtRegionBorders(
-        params: [String: String], logic: AXLogicProElements.Runtime
+    static func createTrackAutomation(
+        params: [String: String], lane: Logic13AutomationLane, logic: AXLogicProElements.Runtime
     ) async -> ChannelResult {
-        let operation = "track.create_volume_automation_at_region_borders"
+        let operation = lane == .pan ? "track.create_pan_automation_point" : "track.create_volume_automation_at_region_borders"
         let ax = logic.ax
         func refuse(_ stage: String) -> ChannelResult {
             .error(HonestContract.encodeStateC(error: .readbackUnavailable,
-                hint: "In Arrange, show and enable the Volume lane in Read mode and select exactly one region on the referenced track. The lane must be empty.",
+                hint: lane == .pan
+                    ? "Select the track in Arrange, show its empty absolute Pan lane in Read mode and set the playhead to the requested position with the full Beats display visible."
+                    : "In Arrange, show and enable the Volume lane in Read mode and select exactly one region on the referenced track. The lane must be empty.",
                 extras: ["operation": operation, "readback_stage": stage, "write_attempted": false]))
         }
         func uncertain(_ stage: String, cleanup: Bool) -> ChannelResult {
@@ -80,8 +94,16 @@ extension AccessibilityChannel {
                 "editor_close_observed": cleanup, "safe_to_retry": false, "effect_unknown": true,
             ]))
         }
+        let startKey = lane == .pan ? "initial_position" : "start"
+        let endKey = lane == .pan ? "position" : "end"
+        guard let start = params[startKey], let end = params[endKey],
+              let startFields = ProjectBounceRange.position(start), let endFields = ProjectBounceRange.position(end),
+              startFields.lexicographicallyPrecedes(endFields) || (lane == .pan && start == end) else {
+            return .error(HonestContract.encodeStateC(error: .invalidParams,
+                hint: "Supply ordered musical positions in bar.beat.division.tick format.",
+                extras: ["operation": operation, "write_attempted": false]))
+        }
         guard ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
-              let start = params["start"], let end = params["end"], start != end,
               let binding = AXTrackBinding.current, let index = binding.currentIndex(),
               let pid = logic.logicProPID(), let app = AXLogicProElements.appRoot(runtime: logic),
               let windowTitle = AXHelpers.getTitle(binding.window, runtime: ax), windowTitle.hasSuffix(" - Tracks"),
@@ -102,29 +124,24 @@ extension AccessibilityChannel {
                   !transport.isPlaying, !transport.isRecording else { return false }
             return true
         }
-        func selectedVolumeRegion() -> AXUIElement? {
+        func automationTarget() -> AXUIElement? {
             guard case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: binding.window, runtime: logic),
-                  headers.indices.contains(index), CFEqual(headers[index], binding.header),
-                  case .success(let controls) = AXHelpers.childrenResult(binding.header, runtime: ax)
-            else { return nil }
+                  headers.indices.contains(index), CFEqual(headers[index], binding.header) else { return nil }
             var matches = 0
             for (offset, header) in headers.enumerated() {
                 guard case .success(.some(let candidate)) = AXValueExtractors.extractTrackNameResult(from: header, runtime: ax),
                       AXValueExtractors.extractSelectedState(header, runtime: ax) == (offset == index) else { return nil }
                 if candidate == name { matches += 1 }
             }
-            func controlValue<T>(_ label: String, role: String) -> T? {
-                let found = controls.filter {
-                    AXHelpers.getRole($0, runtime: ax) == role && AXHelpers.getDescription($0, runtime: ax) == label
-                }
-                guard found.count == 1 else { return nil }
-                return AXHelpers.getAttribute(found[0], kAXValueAttribute as String, runtime: ax)
+            guard matches == 1, automationLaneIsReady(lane, header: binding.header, runtime: ax) else { return nil }
+            if lane == .pan {
+                guard let controlBar = AXLogicProElements.logic13ControlBarContainer(in: binding.window, runtime: ax),
+                      TransportDispatcher.completeObservedMusicalPosition(
+                        AXValueExtractors.extractTransportState(from: controlBar, runtime: ax)
+                      )?.value == end else { return nil }
+                return binding.header
             }
-            guard matches == 1,
-                  (controlValue("Automation Parameter", role: kAXPopUpButtonRole as String) as String?) == "Volume",
-                  (controlValue("Automation Mode", role: kAXPopUpButtonRole as String) as String?) == "Read",
-                  (controlValue("Enable Automation", role: kAXCheckBoxRole as String) as Int?) == 1,
-                  let content = AXLogicProElements.logic13TrackContent(in: binding.window, runtime: logic),
+            guard let content = AXLogicProElements.logic13TrackContent(in: binding.window, runtime: logic),
                   let items = AXLogicProElements.logic13RegionItems(in: content, runtime: ax) else { return nil }
             var selected: [AXUIElement] = []
             for item in items {
@@ -137,7 +154,7 @@ extension AccessibilityChannel {
                   let bounds = ArrangeRegionBounds.read(from: help), bounds.start == start, bounds.end == end else { return nil }
             return region
         }
-        func openEditor() async -> Logic13VolumeEventList? {
+        func openEditor() async -> Logic13AutomationEventList? {
             guard ownsArrange(), CGPreflightPostEventAccess(),
                   let down = CGEvent(keyboardEventSource: nil, virtualKey: 14, keyDown: true),
                   let up = CGEvent(keyboardEventSource: nil, virtualKey: 14, keyDown: false),
@@ -151,14 +168,14 @@ extension AccessibilityChannel {
                 guard !Task.isCancelled, binding.currentIndex() == index,
                       logic.focusedApplicationPID() == pid, let windows = nativeWindows(), windows.count <= 2 else { return nil }
                 if let editor = windows.first(where: { !CFEqual($0, binding.window) }) {
-                    let list = Logic13VolumeEventList(app: app, editor: editor, arrange: binding.window,
+                    let list = Logic13AutomationEventList(app: app, editor: editor, arrange: binding.window,
                         title: String(windowTitle.dropLast(" - Tracks".count)), trackName: name, runtime: ax)
                     if list.ownsEditor() { return list }
                 }
             }
             return nil
         }
-        func closeEditor(_ list: Logic13VolumeEventList) async -> Bool {
+        func closeEditor(_ list: Logic13AutomationEventList) async -> Bool {
             guard list.ownsEditor(), logic.focusedApplicationPID() == pid,
                   binding.currentIndex() == index,
                   let button: AXUIElement = AXHelpers.getAttribute(list.editor, kAXCloseButtonAttribute as String, runtime: ax)
@@ -171,39 +188,86 @@ extension AccessibilityChannel {
             return false
         }
 
-        guard ownsArrange(), let region = selectedVolumeRegion(), let beforeEditor = await openEditor() else {
-            return refuse("native_lane_or_editor")
-        }
+        guard ownsArrange() else { return refuse("arrange_scope") }
+        guard let target = automationTarget() else { return refuse("native_lane_or_position") }
+        guard let beforeEditor = await openEditor() else { return refuse("event_editor") }
         let before = beforeEditor.points()
         let beforeClosed = await closeEditor(beforeEditor)
-        guard beforeClosed, before?.isEmpty == true else { return refuse("empty_lane_required") }
+        guard beforeClosed, let before, !before.contains(where: { $0.lane == lane }) else {
+            return refuse("empty_lane_required")
+        }
 
-        let command = ["Mix", "Create Track Automation", "Create 2 Automation Points at Region Borders"]
+        // The visible-parameter command seeds the first Pan point and Logic's initial anchor.
+        let command = ["Mix", "Create Track Automation", lane == .volume
+            ? "Create 2 Automation Points at Region Borders" : "Create 1 Automation Point for Visible Parameter"]
         guard let item = AXLogicProElements.menuItem(path: command, runtime: logic),
               (AXHelpers.getAttribute(item, kAXEnabledAttribute as String, runtime: ax) as Bool?) == true,
-              let currentRegion = selectedVolumeRegion(), CFEqual(currentRegion, region), ownsArrange(),
+              let current = automationTarget(), CFEqual(current, target), ownsArrange(),
               OperationTraceContext.claimDeadlineEffect("track_volume_automation_create") else { return refuse("region_or_command_changed") }
         _ = AXHelpers.performAction(item, kAXPressAction, runtime: ax)
         try? await Task.sleep(for: .milliseconds(250))
         guard let afterEditor = await openEditor() else { return uncertain("editor_after_create", cleanup: false) }
         let after = afterEditor.points()
         let closed = await closeEditor(afterEditor)
-        guard let after, after.count == 4,
-              after[1].position == start, after[3].position == end,
-              after.allSatisfy({ $0.value == after[0].value }), closed else {
+        let peers = after?.filter { $0.lane != lane }
+        guard let after = after?.filter({ $0.lane == lane }), let peers, sameAutomationValues(before, peers),
+              let first = after.first, after.allSatisfy({ $0.value == first.value }), closed else {
             return uncertain("points_after_create", cleanup: closed)
         }
+        let matchesBorders = lane == .pan
+            ? after.map(\.position) == (start == end ? [end] : [start, end])
+            : after.count == 4 && after[1].position == start && after[3].position == end
+        guard matchesBorders else { return uncertain("positions_after_create", cleanup: closed) }
         return .success(HonestContract.encodeStateA(extras: [
-            "operation": operation, "lane": "volume", "unit": "logic_fader_value",
+            "operation": operation, "lane": lane.rawValue, "unit": lane.unit,
             "position_format": "bar.beat.division.tick", "write_attempted": true,
-            "points": after.map { ["position": $0.position, "value": $0.value] as [String: Any] },
+            "points": after.map(\.evidence),
             "verify_source": "ax_automation_event_list", "editor_close_observed": true,
         ]))
     }
 
-    private static func changeTrackVolumePoint(
-        params: [String: String], points: [Logic13VolumeEventList.Point],
-        editor: Logic13VolumeEventList, current: () -> Bool,
+    private static func sameAutomationValues(
+        _ left: [Logic13AutomationEventList.Point], _ right: [Logic13AutomationEventList.Point]
+    ) -> Bool {
+        left.count == right.count && zip(left, right).allSatisfy {
+            $0.lane == $1.lane && $0.position == $1.position && $0.value == $1.value
+        }
+    }
+
+    private static func automationLaneIsReady(
+        _ lane: Logic13AutomationLane, header: AXUIElement, runtime: AXHelpers.Runtime
+    ) -> Bool {
+        guard case .success(let controls) = AXHelpers.childrenResult(header, runtime: runtime) else { return false }
+        func value<T>(_ label: String, role: String) -> T? {
+            let matches = controls.filter {
+                AXHelpers.getRole($0, runtime: runtime) == role
+                    && AXHelpers.getDescription($0, runtime: runtime) == label
+            }
+            guard matches.count == 1 else { return nil }
+            return AXHelpers.getAttribute(matches[0], kAXValueAttribute as String, runtime: runtime)
+        }
+        guard (value("Automation Parameter", role: kAXPopUpButtonRole) as String?) == lane.label,
+              (value("Automation Mode", role: kAXPopUpButtonRole) as String?) == "Read" else { return false }
+        let enableControls = controls.filter {
+            AXHelpers.getRole($0, runtime: runtime) == kAXCheckBoxRole
+                && AXHelpers.getDescription($0, runtime: runtime) == "Enable Automation"
+        }
+        if lane == .pan {
+            // The native header has a Track/Region button. An empty absolute Pan
+            // lane can lack a separate Enable Automation checkbox.
+            guard controls.filter({
+                AXHelpers.getRole($0, runtime: runtime) == kAXButtonRole
+                    && AXHelpers.getDescription($0, runtime: runtime) == "Track"
+            }).count == 1 else { return false }
+            if enableControls.isEmpty { return true }
+        }
+        guard enableControls.count == 1 else { return false }
+        return (AXHelpers.getAttribute(enableControls[0], kAXValueAttribute, runtime: runtime) as Int?) == 1
+    }
+
+    private static func changeTrackAutomationPoint(
+        params: [String: String], points: [Logic13AutomationEventList.Point], lane: Logic13AutomationLane,
+        editor: Logic13AutomationEventList, current: () -> Bool,
         logic: AXLogicProElements.Runtime, operation: String
     ) async -> ChannelResult {
         func refusal(_ error: HonestContract.FailureError, _ hint: String) -> ChannelResult {
@@ -213,14 +277,17 @@ extension AccessibilityChannel {
         guard let position = params["position"],
               let expected = params["expected_current"].flatMap(Int.init),
               let requested = params["value"].flatMap(Int.init),
-              (0...127).contains(expected), (0...127).contains(requested) else {
-            return refusal(.invalidParams, "Supply an observed musical position, expected value and requested Logic fader value.")
+              lane.allows(expected), lane.allows(requested) else {
+            return refusal(.invalidParams, "Supply an observed musical position, expected value and requested \(lane.label) value.")
         }
-        let matchingIndices = points.indices.filter { points[$0].position == position }
+        let matchingIndices = points.indices.filter { points[$0].lane == lane && points[$0].position == position }
         guard matchingIndices.count == 1, let index = matchingIndices.first, points[index].value == expected else {
-            return refusal(.staleSnapshot, "The position and expected value do not identify one current Volume event.")
+            return refusal(.staleSnapshot, "The position and expected value do not identify one current \(lane.label) event.")
         }
-        let affected = points[index].selected ? points.indices.filter { points[$0].selected } : [index]
+        func affectedIndices(_ rows: [Logic13AutomationEventList.Point]) -> [Int] {
+            rows[index].selected ? rows.indices.filter { rows[$0].selected } : [index]
+        }
+        let affected = affectedIndices(points)
         var authorizedPositions = Set([position])
         if let linkedPosition = params["linked_position"] {
             guard authorizedPositions.insert(linkedPosition).inserted else {
@@ -229,11 +296,11 @@ extension AccessibilityChannel {
         }
         guard affected.count == authorizedPositions.count,
               Set(affected.map { points[$0].position }) == authorizedPositions,
-              affected.allSatisfy({ points[$0].value == expected }) else {
-            return refusal(.staleSnapshot, "The selected Volume points and their values do not match the requested edit. Read the lane again.")
+              affected.allSatisfy({ points[$0].lane == lane && points[$0].value == expected }) else {
+            return refusal(.staleSnapshot, "The selected \(lane.label) points and their values do not match the requested edit. Read the lane again.")
         }
         guard (requested - expected).isMultiple(of: 10) else {
-            return refusal(.invalidParams, "This editor supports changes in steps of 10 Logic fader units.")
+            return refusal(.invalidParams, "This editor supports changes in steps of 10 native \(lane.label) units.")
         }
         func stopped() -> Bool {
             guard let transport = try? AXLogicProElements.observedTransportActivity(
@@ -241,7 +308,7 @@ extension AccessibilityChannel {
             return !transport.isPlaying && !transport.isRecording
         }
         func result(_ value: Int, attempted: Bool) -> [String: Any] {
-            ["operation": operation, "lane": "volume", "position": position, "unit": "logic_fader_value",
+            ["operation": operation, "lane": lane.rawValue, "position": position, "unit": lane.unit,
              "before": expected, "observed": value, "requested": requested,
              "affected_positions": affected.map { points[$0].position },
              "changed": value != expected, "write_attempted": attempted]
@@ -263,22 +330,23 @@ extension AccessibilityChannel {
         let step = requested > expected ? 10 : -10
         let action = step > 0 ? kAXIncrementAction : kAXDecrementAction
         var observed = expected
+        var displayed = points[index].displayed
         var attempted = false
-        func matches(_ fresh: [Logic13VolumeEventList.Point], value: Int) -> Bool {
+        func matches(_ fresh: [Logic13AutomationEventList.Point], value: Int) -> Bool {
             guard points.count == fresh.count else { return false }
             return zip(points, fresh).enumerated().allSatisfy { pair in
                 let (original, live) = pair.element
-                return original.position == live.position
-                    && original.selected == live.selected
+                return original.lane == live.lane && original.position == live.position
+                    && (lane == .pan || original.selected == live.selected)
                     && (affected.contains(pair.offset) ? value : original.value) == live.value
             }
         }
         while observed != requested {
             guard stopped(), current(), let fresh = editor.points(), matches(fresh, value: observed),
-                  editor.ownsEditor(),
+                  affectedIndices(fresh) == affected, editor.ownsEditor(),
                   OperationTraceContext.claimDeadlineEffect("track_volume_automation_edit") else {
                 return attempted ? uncertain(observed, stage: "before_next_step")
-                    : refusal(.staleSnapshot, "The native Volume event changed before the edit.")
+                    : refusal(.staleSnapshot, "The native \(lane.label) event changed before the edit.")
             }
             attempted = true
             let applied = AXHelpers.performAction(fresh[index].slider, action, runtime: logic.ax)
@@ -297,6 +365,7 @@ extension AccessibilityChannel {
                 }
                 if matches(after, value: wanted), editor.ownsEditor() {
                     observed = wanted
+                    displayed = after[index].displayed
                     break
                 }
                 if !matches(after, value: observed) { break }
@@ -306,17 +375,26 @@ extension AccessibilityChannel {
             }
         }
         var evidence = result(observed, attempted: attempted)
+        evidence["displayed_value"] = displayed
         evidence["verify_source"] = "ax_automation_event_list"
         return .success(HonestContract.encodeStateA(extras: evidence))
     }
 }
 
-private struct Logic13VolumeEventList {
+private struct Logic13AutomationEventList {
     struct Point {
+        let lane: Logic13AutomationLane
         let position: String
         let value: Int
+        let displayed: String?
         let selected: Bool
         let slider: AXUIElement
+
+        var evidence: [String: Any] {
+            var fields: [String: Any] = ["position": position, "value": value]
+            fields["displayed_value"] = displayed
+            return fields
+        }
     }
 
     let app: AXUIElement
@@ -379,17 +457,29 @@ private struct Logic13VolumeEventList {
             guard !Task.isCancelled,
                   case .success(let cells) = AXHelpers.childrenResult(row, runtime: runtime),
                   cells.count == columns.count,
-                  unique("Fader", role: kAXCellRole as String, in: AXHelpers.getChildren(cells[3], runtime: runtime)) != nil,
-                  unique("Volume", role: kAXCellRole as String, in: AXHelpers.getChildren(cells[7], runtime: runtime)) != nil
-            else { onRefusal("volume_event_identity"); return nil }
+                  unique("Fader", role: kAXCellRole as String, in: AXHelpers.getChildren(cells[3], runtime: runtime)) != nil
+            else { onRefusal("event_identity"); return nil }
+            let eventLabels = AXHelpers.getChildren(cells[7], runtime: runtime)
+            let lanes: [Logic13AutomationLane] = [.volume, .pan]
+            let matches = lanes.filter { unique($0.label, role: kAXCellRole as String, in: eventLabels) != nil }
+            guard matches.count == 1, let lane = matches.first else { onRefusal("event_lane"); return nil }
             guard let positionGroup = hitInCell(cells[2], column: 2, role: kAXGroupRole as String),
                   let position = AXHelpers.getDescription(positionGroup, runtime: runtime).flatMap(Self.position)
             else { onRefusal("event_position"); return nil }
             guard let slider = hitInCell(cells[6], column: 6, role: kAXSliderRole as String),
                   let value: Int = AXHelpers.getAttribute(slider, kAXValueAttribute as String, runtime: runtime),
                   let selected: Bool = AXHelpers.getAttribute(row, kAXSelectedAttribute as String, runtime: runtime),
-                  (0...127).contains(value) else { onRefusal("event_value"); return nil }
-            points.append(Point(position: position, value: value, selected: selected, slider: slider))
+                  lane.allows(value) else { onRefusal("event_value"); return nil }
+            var displayed: String?
+            if lane == .pan {
+                guard let controller = hitInCell(cells[5], column: 5, role: kAXSliderRole),
+                      (AXHelpers.getAttribute(controller, kAXValueAttribute, runtime: runtime) as Int?) == 10,
+                      let text = AXValueExtractors.extractValueDescription(slider, runtime: runtime),
+                      !text.isEmpty else { onRefusal("pan_event_value"); return nil }
+                displayed = text
+            }
+            points.append(Point(lane: lane, position: position, value: value, displayed: displayed,
+                                selected: selected, slider: slider))
         }
         return points
     }
@@ -433,7 +523,9 @@ private struct Logic13VolumeEventList {
     }
 
     private static func position(_ description: String) -> String? {
-        let fields = description.split(whereSeparator: \.isWhitespace)
+        var label = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        if label.hasSuffix(".") { label.removeLast() }
+        let fields = label.split(whereSeparator: \.isWhitespace)
         let components = fields.compactMap { Int($0) }
         guard fields.count == 4, components.count == 4,
               components.dropFirst().allSatisfy({ $0 > 0 }) else { return nil }
