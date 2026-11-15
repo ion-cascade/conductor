@@ -1,6 +1,6 @@
-# Conductor 1.0 compatibility
+# Conductor 1.1 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the exact combination and workflows tested for this release.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the host used to qualify Conductor 1.1. The 1.0 installation and workflow results are included below as the previous release baseline.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -15,7 +15,17 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
 
-## Installation and recovery
+## 1.1 Logic workflows
+
+| Workflow | Qualification on a 21-track project |
+| --- | --- |
+| Hidden tracks and collapsed stacks | With the Arrange header rail focused, inspection observed 14 → 21 → 14 rows across Hide View and a six-child summing stack. It preserved the original selection and restored both controls. The scrollable rail remained partial despite matching the project’s track count. With Arrange workspace focus, inspection exposed the hidden row, restored Hide View and left the stack collapsed. |
+| Exact track targeting | Two tracks shared a name and one had its Hide flag set. A fresh reference changed and restored only that track’s volume. The visible duplicate stayed at its original value. Name-only selection and retired references refused before editing. |
+| Mixer routing and scalars | Verified Stereo Out → No Output after replacement of the selected native strip. The neighboring strip stayed on Stereo Out and the retired reference refused. Volume, pan, mute and solo each changed and restored on the fresh strip. Other layouts and redraws without native continuity evidence can return an unverified result. |
+| Explicit PCM bounce | Verified two 48 kHz, 16-bit stereo WAVE exports of the 256-second range shown in Logic, with 12,288,000 frames each. Covered a Mixer-to-Arrange transition, reconnect through the configured SSH launcher, a real Open dialog refusal and no overwrite on collisions. The wrong-document refusal was also exercised in the Swift executor tests. |
+| Managed install | Built the source distribution in the Mac mini’s Swift toolchain, selected 1.1.0 with the managed launcher and reconnected through the existing SSH client command. |
+
+## 1.0 installation and recovery
 
 | Workflow | Mac mini result |
 | --- | --- |
@@ -24,7 +34,7 @@ Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, 
 | Bridge recovery | Two simultaneous clients shared the bridge. A duplicate start preserved the running process. During an outage the relay returned before sending a request. Restart and reconnect restored access. |
 | Distribution | Versioned source archive and SHA-256 checksums. The tested Swift build used its local ad-hoc signature. |
 
-## Logic workflows
+## 1.0 Logic workflows
 
 | Workflow | Verified case and scope |
 | --- | --- |

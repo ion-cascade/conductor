@@ -24,7 +24,7 @@ It is the **complete server maintained by Ion Cascade**: native control channels
 
 Our focus is practical music work with trustworthy feedback: a command being accepted is different from the intended track changing, a cached reading is different from a fresh observation, and a MIDI region is different from a rendered audio file.
 
-> Conductor 1.0 supports the Logic workflows listed in the [compatibility matrix](docs/conductor/compatibility.md). Start with a disposable project.
+> Conductor 1.1 supports the Logic workflows listed in the [compatibility matrix](docs/conductor/compatibility.md). Start with a disposable project.
 
 ## What Conductor does
 
@@ -83,9 +83,9 @@ Keep recordings and projects on your own machines. Conductor's bridge uses your 
 
 ## Tested status
 
-Conductor 1.0 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
+Conductor 1.1 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
 
-The release passed 404 focused Swift tests and 19 Python tests covering the installer and shared bridge.
+The release passed 494 focused Swift tests and 19 Python tests covering the installer and shared bridge.
 
 ### Render and export from Logic 13
 
@@ -128,7 +128,7 @@ For the Compressor threshold, `get_param_verified` and `set_param_verified` use 
 ### Current limits
 
 - The track-selection adapter uses English UI labels and an exposed, contiguous track rail in one Arrange window. Logic's track search can omit tracks marked hidden even while their headers are shown.
-- Track inventories can be partial when tracks are concealed, stacks are collapsed or the viewport cannot prove the end of the rail. Routing completeness has separate requirements.
+- Track inventories can be partial when tracks are hidden, stacks are collapsed or Logic exposes a scrollable rail without an independent end marker. Check each row’s `target_availability` and reacquire its reference after changing the view.
 - Mixer readback depends on the visible layout. For example, Master has no observed pan control and Stereo Out has no observed solo switch in the tested Mixer.
 - Short per-track exports can finish between progress observations. The 0.2 candidate verifies a stable, decodable WAV or AIFF in its own run directory with one independently bound subject. General multi-track file attribution remains unverified.
 - MIDI note readback uses the native Standard MIDI File export and reports ticks from the SMF origin. The bar-three fixture keeps its leading space. Its region spans bars one through four, and the first note falls at tick 3840 at 480 PPQ.
