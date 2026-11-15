@@ -769,6 +769,12 @@ enum SessionPopulationObservation {
         }
     }
 
+    enum TrackTargetAvailability: String, Encodable, Sendable {
+        case current
+        case requiresExposure = "requires_exposure"
+        case unavailable
+    }
+
     struct TrackRow: Encodable, Sendable {
         let row: Int
         let trackIndex: Int
@@ -786,6 +792,7 @@ enum SessionPopulationObservation {
         let isSelected: Bool?
         let placeholder: Bool?
         let trackRef: String?
+        let targetAvailability: TrackTargetAvailability
 
         enum CodingKeys: String, CodingKey {
             case row
@@ -803,6 +810,7 @@ enum SessionPopulationObservation {
             case isSelected = "is_selected"
             case placeholder
             case trackRef = "track_ref"
+            case targetAvailability = "target_availability"
         }
 
         // Unread selection/stack/placeholder fields are explicit nulls: unavailable metadata
@@ -827,6 +835,7 @@ enum SessionPopulationObservation {
             try container.encode(isSelected, forKey: .isSelected)
             try container.encode(placeholder, forKey: .placeholder)
             try container.encodeIfPresent(trackRef, forKey: .trackRef)
+            try container.encode(targetAvailability, forKey: .targetAvailability)
         }
     }
 
@@ -1241,6 +1250,14 @@ enum SessionPopulationObservation {
             if let issued, index < issued.byRow.count {
                 reference = issued.byRow[index]?.rawValue
             }
+            let availability: TrackTargetAvailability
+            if track.physicalBinding?.exposure != nil {
+                availability = .requiresExposure
+            } else if reference != nil, !moved {
+                availability = .current
+            } else {
+                availability = .unavailable
+            }
             return TrackRow(
                 row: index,
                 trackIndex: track.id,
@@ -1251,7 +1268,8 @@ enum SessionPopulationObservation {
                 hidden: !moved && capture.freshPopulation?.stable == true ? track.hideButtonReadback : nil,
                 isSelected: track.selectionReadback,
                 placeholder: track.placeholder,
-                trackRef: reference
+                trackRef: reference,
+                targetAvailability: availability
             )
         }
         let collapsedStackRows = live.enumerated().compactMap { index, track in

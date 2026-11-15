@@ -356,13 +356,15 @@ extension AccessibilityChannel {
         // during header renewal would adopt that changed position as original.
         // This geometry grants no replacement-source or assignment authority.
         var outputRestorationGeometry: HeldSelectionAssociation.MixerViewportGeometry?
-        if let physical, outputAssociation != nil,
+        var outputFocusBaseline: HeldSelectionAssociation.OriginalHeaderFocusBaseline?
+        if let physical, let outputAssociation,
            let observation = HeldSelectionAssociation(window: physical.window, logic: runtime,
                expectedProject: nil, requiresProjectReference: false, allowsSelectedChildRailEntry: true,
                retainedMixerSource: physical),
            CFEqual(observation.mixer, physical.mixer),
            observation.document.utf8.elementsEqual(physical.document.utf8) {
             outputRestorationGeometry = observation.observedMixerViewportGeometry()
+            outputFocusBaseline = observation.originalHeaderFocusBaseline(observedPairs: [outputAssociation])
         }
         // Open the popup of THIS strip and find the menu it opened: a new AXMenu among the Mixer
         // layout area's children, which is where Logic parents it (measured in ko and de).
@@ -556,7 +558,8 @@ extension AccessibilityChannel {
                     attemptedAssociation = true
                     let observed = await readOutputThroughOriginalHeader(outputAssociation, original: physical, runtime: runtime,
                         sourceDisposition: retired ? .retiredOriginal : .survivingOriginal,
-                        restoringMixerGeometry: outputRestorationGeometry)
+                        restoringMixerGeometry: outputRestorationGeometry,
+                        recoveringRetiredFocusFrom: retired ? outputFocusBaseline : nil)
                     extras["ui_effects"] = ["navigation_performed": observed.effects.navigationPerformed,
                         "attempted": observed.effects.attempted, "changed": observed.effects.changed,
                         "restoration": observed.effects.restoration, "reason": observed.effects.reason as Any? ?? NSNull()]
@@ -620,11 +623,13 @@ extension AccessibilityChannel {
         _ originalPair: HeldSelectionAssociation.Pair, original: AXMixerStripBinding.Binding,
         runtime: AXLogicProElements.Runtime,
         sourceDisposition: OriginalHeaderSourceDisposition = .retiredOriginal,
-        restoringMixerGeometry: HeldSelectionAssociation.MixerViewportGeometry? = nil
+        restoringMixerGeometry: HeldSelectionAssociation.MixerViewportGeometry? = nil,
+        recoveringRetiredFocusFrom focusBaseline: HeldSelectionAssociation.OriginalHeaderFocusBaseline? = nil
     ) async -> (label: String?, index: Int?, source: String?, renewal: OriginalHeaderSourceRenewal?,
         effects: SessionPopulationObservation.UIEffects) {
         let observed = await renewSourceThroughOriginalHeader(originalPair, original: original, runtime: runtime,
-            sourceDisposition: sourceDisposition, restoringMixerGeometry: restoringMixerGeometry)
+            sourceDisposition: sourceDisposition, restoringMixerGeometry: restoringMixerGeometry,
+            recoveringRetiredFocusFrom: focusBaseline)
         guard let source = observed.source,
               let label = AXLogicProElements.outputSlotDestination(in: source.pair.strip.strip, runtime: runtime.ax),
               source.permits(runtime: runtime) else { return (nil, nil, nil, nil, observed.effects) }
