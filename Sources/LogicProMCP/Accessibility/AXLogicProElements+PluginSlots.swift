@@ -190,6 +190,16 @@ extension AXLogicProElements {
         children: [AXUIElement],
         runtime: AXHelpers.Runtime
     ) -> MIDIEffectSlotReading {
+        // The Logic 13 Mixer exposes the empty MIDI effect slot as a directly
+        // named button. A readable description and frame identify it without
+        // asking unrelated strip controls for Quick Help.
+        let named = children.filter { isNamedMIDIPluginButton($0, runtime: runtime) }
+        if !named.isEmpty {
+            guard named.count == 1, let frame = elementFrame(named[0], runtime: runtime) else {
+                return .unreadable
+            }
+            return .frame(frame)
+        }
         var slots: [AXUIElement] = []
         for child in children {
             let reading: Result<AnyObject?, AXHelpers.AXStatusError> = AXHelpers.getAttributeResult(
@@ -214,6 +224,14 @@ extension AXLogicProElements {
         guard !slots.isEmpty else { return .absent }
         guard slots.count == 1, let frame = elementFrame(slots[0], runtime: runtime) else { return .unreadable }
         return .frame(frame)
+    }
+
+    private static func isNamedMIDIPluginButton(
+        _ element: AXUIElement,
+        runtime: AXHelpers.Runtime
+    ) -> Bool {
+        AXHelpers.getRole(element, runtime: runtime) == kAXButtonRole as String
+            && AXHelpers.getDescription(element, runtime: runtime) == "MIDI plug-in"
     }
 
     /// The frame of a 1 px button of the kind Logic draws directly above each insert, or nil.
@@ -332,7 +350,8 @@ extension AXLogicProElements {
         offset: Int,
         runtime: AXHelpers.Runtime
     ) -> Bool {
-        guard (AXHelpers.getRole(element, runtime: runtime) ?? "") == (kAXButtonRole as String) else {
+        guard (AXHelpers.getRole(element, runtime: runtime) ?? "") == (kAXButtonRole as String),
+              !isNamedMIDIPluginButton(element, runtime: runtime) else {
             return false
         }
         // Logic Pro 12.2 exposes a short (~9 px) "Audio Plug-in" button at the

@@ -214,6 +214,15 @@ extension AXLogicProElements {
 
     static func mixerAreaLookup(runtime: Runtime = .production) -> MixerAreaLookup {
         guard let window = mainWindow(runtime: runtime) else { return .notFound }
+        // Logic 13 can expose the embedded Mixer in its direct owner envelope
+        // while the older full-window search misses it. Use the same positive
+        // acquisition as the bounded inventory reader before the general scan.
+        if let pid = runtime.logicProPID(),
+           let version = runtime.observeHost(pid)?.logicVersion,
+           Int(version.prefix(while: { $0.isNumber })) == 13,
+           let direct = try? shallowOwnedMixerPopulationAreaBinding(in: window, runtime: runtime) {
+            return .found(direct.mixer)
+        }
         return mixerAreaLookup(in: window, runtime: runtime)
     }
 

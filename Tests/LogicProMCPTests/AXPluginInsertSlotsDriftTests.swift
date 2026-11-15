@@ -72,6 +72,30 @@ private func addFramedButton(
 
 // MARK: - AC12: physical index preserved across an unreadable occupied slot
 
+@Test func testLogic13NamedMIDIEffectButtonIsNotAnAudioInsert() throws {
+    let builder = FakeAXRuntimeBuilder()
+    let midi = addFramedButton(builder, 860, y: 973, width: 66, height: 22,
+                               description: "MIDI plug-in", help: "audio plug-in")
+    let instrument = addOccupiedSlot(builder, 861, name: "Piano")
+    let effect = addOccupiedSlot(builder, 862, name: "Compressor")
+    builder.setAttribute(instrument, kAXPositionAttribute as String, axPoint(100, 1001))
+    builder.setAttribute(instrument, kAXSizeAttribute as String, axSize(66, 22))
+    builder.setAttribute(effect, kAXPositionAttribute as String, axPoint(100, 1030))
+    builder.setAttribute(effect, kAXSizeAttribute as String, axSize(66, 20))
+    let separator = addFramedButton(builder, 863, y: 1029, width: 66, height: 1,
+                                     description: "insert bar")
+    let append = addFramedButton(builder, 864, y: 1050, width: 66, height: 11,
+                                  description: "audio plug-in")
+    let slots = AXLogicProElements.audioPluginInsertSlots(
+        children: [append, effect, separator, instrument, midi], runtime: builder.makeAXRuntime())
+
+    let slot = try #require(slots.first)
+    #expect(slots.count == 1)
+    #expect(slot.index == 0)
+    #expect(slot.name == "Compressor")
+    #expect(slot.readStatus == .occupiedReadable)
+}
+
 @Test func testInsertSlotsPreservePhysicalIndexAcrossUnreadableOccupied() throws {
     let builder = FakeAXRuntimeBuilder()
     let strip = builder.element(500)
