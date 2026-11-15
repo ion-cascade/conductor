@@ -1,3 +1,4 @@
+@preconcurrency import AppKit
 @preconcurrency import ApplicationServices
 import Foundation
 
@@ -142,15 +143,22 @@ extension AccessibilityChannel {
         // Logic temporarily replaces its normal Arrange hit state with the
         // resize tool. Finish the gesture before clearing that hover.
         mouse.sleepMicros(350_000)
-        if change.edge != .middle,
-           let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
-           let current: AXUIElement = AXHelpers.getAttribute(scope.app, kAXFocusedWindowAttribute, runtime: ax),
-           CFEqual(current, scope.window),
-           AXLogicProElements.projectPickerDocumentRead(current, runtime: runtime) == .success(scope.document),
-           let frame = scope.frame(current) {
-            let title = CGPoint(x: frame.minX + min(180, frame.width / 2), y: frame.minY + 10)
-            _ = mouse.postMouseEvent(.mouseMoved, title, 0)
-            mouse.sleepMicros(400_000)
+        if change.edge != .middle {
+            // AX focused-app readback can be unavailable while Logic is still
+            // reporting its resize cursor. Use the foreground owner's held
+            // main window to clear only that cursor, then do normal AX proof.
+            if let pid = runtime.logicProPID(), NSRunningApplication(processIdentifier: pid)?.isActive == true,
+               let main: AXUIElement = AXHelpers.getAttribute(scope.app, kAXMainWindowAttribute, runtime: ax),
+               CFEqual(main, scope.window),
+               AXLogicProElements.projectPickerDocumentRead(main, runtime: runtime) == .success(scope.document),
+               let frame = scope.frame(main), OperationTraceContext.current?.ownsGate() == true {
+                let title = CGPoint(x: frame.minX + min(180, frame.width / 2), y: frame.minY + 10)
+                CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: title,
+                        mouseButton: .left)?.post(tap: .cghidEventTap)
+                mouse.sleepMicros(400_000)
+            } else {
+                Log.debug("The held Arrange title was unavailable for resize hover cleanup", subsystem: "ax")
+            }
         }
 
         var observed: RegionInfo?

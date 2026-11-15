@@ -119,6 +119,7 @@ extension AccessibilityChannel {
         }
 
         func holdsArrange() -> Bool {
+            _ = runtime.onScreenWindowList()
             guard OperationTraceContext.current?.ownsGate() == true,
                   case .found(let current) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: runtime),
                   CFEqual(current, window),
