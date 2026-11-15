@@ -77,7 +77,7 @@ extension AccessibilityChannel {
         }
         guard await scope.show(held.page, replacing: scope.originalPage) else {
             return refuse(.readbackUnavailable, "The saved region viewport could not be reacquired.",
-                          restored: scope.page() == scope.originalPage)
+                          restored: scope.page()?.matches(scope.originalPage) == true)
         }
 
         let ax = runtime.ax
@@ -91,7 +91,7 @@ extension AccessibilityChannel {
               let hitTest = ax.elementAtPosition,
               case .success(.some(let hit)) = hitTest(scope.app, drag.start),
               Self.ownsRegionGesture(hit, held: held, edge: change.edge, runtime: ax),
-              scope.holdsArrange(), scope.page() == held.page,
+              scope.holdsArrange(), scope.page()?.matches(held.page) == true,
               OperationTraceContext.claimDeadlineEffect("region_drag")
         else {
             let restored = await scope.show(scope.originalPage, replacing: held.page)
@@ -105,7 +105,7 @@ extension AccessibilityChannel {
         let priorPointer = CGEvent(source: nil)?.location
         _ = mouse.postMouseEvent(.mouseMoved, drag.start, 0)
         mouse.sleepMicros(70_000)
-        guard scope.holdsArrange(), scope.page() == held.page, scope.selectionIsOriginal(),
+        guard scope.holdsArrange(), scope.page()?.matches(held.page) == true, scope.selectionIsOriginal(),
               case .success(.some(let ready)) = hitTest(scope.app, drag.start),
               Self.ownsRegionGesture(ready, held: held, edge: change.edge, runtime: ax),
               mouse.postMouseEvent(.leftMouseDown, drag.start, 1) else {

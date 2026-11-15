@@ -34,7 +34,7 @@ Our focus is practical music work with trustworthy feedback: a command being acc
 | **Tracks** | Inspect and select tracks, adjust track controls, and create and edit Volume automation |
 | **Mixer** | Channel strips, faders, stock inserts, Compressor presets, sends and guarded routing operations |
 | **MIDI** | Sequence creation and import, MIDI messages, region-event inspection and guarded MIDI export |
-| **Projects** | Open, save, inspect exact region boundaries, plan exports and verify produced artifacts |
+| **Projects** | Open, save, find offscreen regions, edit exact boundaries and bounce an explicit musical range |
 | **Audio analysis** | File format, duration, levels and spectrum measurements |
 | **Remote access** | Owner-only Mac socket with an SSH relay for MCP clients on another machine |
 
@@ -98,6 +98,10 @@ Logic’s Stem Splitter is a separate workflow. Select an audio region in a save
 In Logic 13, select the Studio Grand track and keep its Inspector visible. Pass its current zero-based index as `target_track` and its unique current name as `target_expected_name` to `logic_tracks.record_sequence`. The note string contains pitch, offset in milliseconds, duration in milliseconds, velocity and a one-based MIDI channel.
 
 Logic creates a staging track when it imports the Standard MIDI File. Conductor verifies Arrange keyboard focus before copying and pasting the new region onto the selected instrument track. It then checks the result against the previous arrangement. When Conductor closes the Library to transfer the region, the receipt reports whether it verified that the Library reopened. The receipt identifies the retained staging track. Reacquire track references before reading the notes or deleting the staging track, especially when both tracks have the same name. After an interrupted or unverified write, inspect the arrangement before another import.
+
+### Edit an offscreen region and bounce a range
+
+Run `logic_project.scan_regions` to sample the Arrange view and obtain a reference for each verified edit target. Pass the reference and both current bounds to `edit_region` to move or trim one ordinary audio or MIDI region. Save, then pass the desired start and end in `bounce_settings.range` to `export_run`. [Arrangement and bounce parameters](docs/API.md#sample-arrange-viewports-and-edit-one-region)
 
 ### Place and move a MIDI region
 

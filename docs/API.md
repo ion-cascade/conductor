@@ -345,13 +345,34 @@ Common commands: `goto_bar`, `goto_marker`, `create_marker`, `delete_marker`, `r
 
 ### `logic_project`
 
-Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `export_plan`, `export_run`, `export_resume`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
+Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `scan_regions`, `edit_region`, `export_plan`, `export_run`, `export_resume`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
 
 File-writing paths require confirmation. `save_as` verifies the resulting `.logicx` package. `audit` marks GM Device and External MIDI tracks with MIDI regions as export blockers. Use the read-only `export_plan` and confirmed `export_run` to produce audio. The standalone `bounce` command is unsupported.
 
+#### Sample Arrange viewports and edit one region
+
+Call `logic_project.scan_regions` with empty parameters in a saved, stopped Logic 13 Arrange window. The response lists the actual sampled scrollbar positions and wraps each region in a `region` object. Eligible rows include a `target_ref` tied to that project window, native track and region. `complete:false` and `reasons` describe the coverage limits. Collapsed stacks stay collapsed. If viewport and selection restoration cannot be verified, the scan issues no edit references.
+
+Use `logic_project.edit_region` with the reference and the region's exact current boundaries. For example:
+
+```json
+{
+  "command": "edit_region",
+  "params": {
+    "target_ref": "reg_…",
+    "expected_start": "34.1.1.1",
+    "expected_end": "35.1.1.1",
+    "mode": "move",
+    "start": "35.1.1.1"
+  }
+}
+```
+
+A move keeps the region length. For `mode:"trim"`, give exactly one new `start` or `end` inside the original bounds. This route is for ordinary audio and MIDI regions on the 4/4, 1/16 Arrange grid. Use a zoom and snap setting that can represent the requested movement. The region and destination must fit in a sampled viewport. Deselect other regions before editing. A successful native edit can select its target and restores the original viewport. References expire after three minutes and a new scan replaces them. After an edit attempt or a project reopen, scan again before using a reference. If a receipt reports a write attempt with unverified readback, inspect the observed region before retrying.
+
 #### Explicit stereo PCM bounce
 
-Pass `artifacts: ["bounce"]` and `bounce_settings: {"format":"wav","sample_rate":48000,"bit_depth":24}` to `logic_project`. Accepted rates are 44100, 48000 and 96000, and accepted depths are 16 and 24. Use `"aiff"` for AIFF or add `"include_audio_tail":true` to enable Logic’s native tail option. Conductor selects interleaved stereo PCM with normalization off, then verifies the container and decoded output. The bounce uses the range reported by Logic’s Bounce dialog.
+Pass `artifacts: ["bounce"]` and `bounce_settings: {"format":"wav","sample_rate":48000,"bit_depth":24}` to `logic_project`. Accepted rates are 44100, 48000 and 96000, and accepted depths are 16 and 24. Use `"aiff"` for AIFF or add `"include_audio_tail":true` to enable Logic’s native tail option. Conductor selects interleaved stereo PCM with normalization off, then verifies the container and decoded output. To request your own range, add `"range":{"start":"35.1.1.1","end":"36.1.1.1"}` inside `bounce_settings`. Supply canonical `bar.beat.division.tick` positions in ascending order. Conductor verifies both positions in Logic’s Bounce dialog before saving and includes `observed_bounce_range` with the verified artifact. The explicit route requires Logic’s supported 4/4, 1/16 position grid. With audio tails enabled, the file can run past the requested end. If you omit `range`, Logic supplies the bounce positions.
 
 The project and output directory must be readable on the Mac. The output directory must already exist, be writable by the GUI user, and be accessible to Logic through the native save panel. The Mac must be logged in with Accessibility permission for the configured launcher. Use `collision_policy: "fail_if_exists"` to refuse an occupied destination. `skip_existing` leaves an existing file in place and reports that its provenance is unverified.
 

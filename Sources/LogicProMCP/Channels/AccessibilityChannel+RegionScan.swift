@@ -5,6 +5,11 @@ extension AccessibilityChannel {
     struct RegionPage: Codable, Equatable, Sendable {
         let horizontal: Double
         let vertical: Double
+
+        // Native layout rounds normalized scroll values as the other axis redraws.
+        func matches(_ other: Self) -> Bool {
+            abs(horizontal - other.horizontal) <= 0.0012 && abs(vertical - other.vertical) <= 0.0012
+        }
     }
 
     struct HeldRegion: @unchecked Sendable {
@@ -142,29 +147,29 @@ extension AccessibilityChannel {
             let ownedPage: RegionPage?
         }
 
-        func transition(to requested: RegionPage, replacing owned: RegionPage,
-                        tolerance: Double = 0) async -> ViewportTransition {
+        func transition(to requested: RegionPage, replacing owned: RegionPage) async -> ViewportTransition {
             var before = owned
             for (index, bar) in [horizontal, vertical].enumerated() {
-                guard holdsArrange(), page() == before else { return .init(reached: false, ownedPage: nil) }
-                let value = index == 0 ? requested.horizontal : requested.vertical
-                let current = index == 0 ? before.horizontal : before.vertical
-                if abs(current - value) <= tolerance { continue }
-                guard AXHelpers.setAttribute(bar, kAXValueAttribute, NSNumber(value: value), runtime: runtime.ax)
-                else { return .init(reached: false, ownedPage: page() == before ? before : nil) }
-                try? await Task.sleep(for: .milliseconds(100))
-                guard holdsArrange(), let after = page(),
-                      index == 0 ? after.vertical == before.vertical : after.horizontal == before.horizontal else {
+                guard holdsArrange(), let current = page(), current.matches(before) else {
                     return .init(reached: false, ownedPage: nil)
                 }
-                let observed = index == 0 ? after.horizontal : after.vertical
-                guard abs(observed - value) <= tolerance else {
-                    Log.debug("Arrange viewport axis \(index) was set to \(value) and read \(observed)", subsystem: "ax")
-                    return .init(reached: false, ownedPage: after == before ? before : nil)
+                before = current
+                let value = index == 0 ? requested.horizontal : requested.vertical
+                let expected = index == 0
+                    ? RegionPage(horizontal: value, vertical: before.vertical)
+                    : RegionPage(horizontal: before.horizontal, vertical: value)
+                if before.matches(expected) { continue }
+                guard AXHelpers.setAttribute(bar, kAXValueAttribute, NSNumber(value: value), runtime: runtime.ax)
+                else { return .init(reached: false, ownedPage: page()?.matches(before) == true ? before : nil) }
+                try? await Task.sleep(for: .milliseconds(125))
+                guard holdsArrange(), let after = page() else { return .init(reached: false, ownedPage: nil) }
+                guard after.matches(expected) else {
+                    Log.debug("Arrange viewport after setting axis \(index): expected \(expected), observed \(after)", subsystem: "ax")
+                    return .init(reached: false, ownedPage: after.matches(before) ? after : nil)
                 }
                 before = after
             }
-            return .init(reached: true, ownedPage: before)
+            return .init(reached: before.matches(requested), ownedPage: before)
         }
 
         func show(_ page: RegionPage, replacing owned: RegionPage) async -> Bool {
@@ -214,7 +219,7 @@ extension AccessibilityChannel {
                 reasons.append("viewport_navigation_unverified")
                 break
             }
-            let navigation = await scope.transition(to: requested, replacing: page, tolerance: 0.012)
+            let navigation = await scope.transition(to: requested, replacing: page)
             if let owned = navigation.ownedPage { page = owned }
             else { custodyLost = true }
             guard navigation.reached else {
@@ -222,10 +227,10 @@ extension AccessibilityChannel {
                 if custodyLost { break }
                 continue
             }
-            if sampled.contains(page) { continue }
+            if sampled.contains(where: { $0.matches(page) }) { continue }
             guard scope.holdsHeaders(), scope.selectionIsOriginal(),
                   case .success(let inventory) = Self.enumerateRegionItems(runtime: runtime),
-                  scope.holdsArrange(), scope.page() == page else {
+                  scope.holdsArrange(), scope.page()?.matches(page) == true else {
                 reasons.append("viewport_readback_unverified")
                 break
             }
