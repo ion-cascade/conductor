@@ -406,8 +406,8 @@ struct MixerDispatcher: OperationTraceDispatching {
             let resolved: TargetRefResolver.Resolved
             switch await TargetRefResolver.resolveMutationIndex(
                 params, targetRegistry: targetRegistry, cache: cache, operation: operation,
-                invalidIndexResult: toolInvalidParamsResult("\(command) requires an issued Mixer strip target_ref"),
-                requiredKind: .mixerStrip
+                requiredKind: .mixerStrip,
+                invalidIndexResult: toolInvalidParamsResult("\(command) requires an issued Mixer strip target_ref")
             ) {
             case .success(let target): resolved = target
             case .failure(let result): return result
