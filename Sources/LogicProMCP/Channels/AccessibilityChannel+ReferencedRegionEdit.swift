@@ -139,9 +139,19 @@ extension AccessibilityChannel {
             mouse.sleepMicros(25_000)
         }
         posted = mouse.postMouseEvent(.leftMouseUp, drag.end, 1) && posted
-        // Let Logic finish the gesture before reading its new position.
-        // The held region can report its bounds with trim-tool help text.
+        // Logic temporarily replaces its normal Arrange hit state with the
+        // resize tool. Finish the gesture before clearing that hover.
         mouse.sleepMicros(350_000)
+        if change.edge != .middle,
+           let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
+           let current: AXUIElement = AXHelpers.getAttribute(scope.app, kAXFocusedWindowAttribute, runtime: ax),
+           CFEqual(current, scope.window),
+           AXLogicProElements.projectPickerDocumentRead(current, runtime: runtime) == .success(scope.document),
+           let frame = scope.frame(current) {
+            let title = CGPoint(x: frame.minX + min(180, frame.width / 2), y: frame.minY + 10)
+            _ = mouse.postMouseEvent(.mouseMoved, title, 0)
+            mouse.sleepMicros(400_000)
+        }
 
         var observed: RegionInfo?
         var peersVerified = false

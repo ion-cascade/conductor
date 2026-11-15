@@ -368,7 +368,7 @@ Use `logic_project.edit_region` with the reference and the region's exact curren
 }
 ```
 
-A move keeps the region length. For `mode:"trim"`, give exactly one new `start` or `end` inside the original bounds. This route is for ordinary audio and MIDI regions on the 4/4, 1/16 Arrange grid. Use a zoom and snap setting that can represent the requested movement. The region and destination must fit in a sampled viewport. Deselect other regions before editing. A successful native edit can select its target and restores the original viewport. References expire after three minutes and a new scan replaces them. After an edit attempt or a project reopen, scan again before using a reference. If a receipt reports a write attempt with unverified readback, inspect the observed region before retrying.
+A move keeps the region length. For `mode:"trim"`, give exactly one new `start` or `end` inside the original bounds. This route is for ordinary audio and MIDI regions on the 4/4, 1/16 Arrange grid. Use a zoom and snap setting that can represent the requested movement. The region and destination must fit in a sampled viewport. Deselect other regions before editing. A native edit can select its target track and region. The receipt reports whether Conductor restored the original viewport. References expire after three minutes and a new scan replaces them. After an edit attempt or a project reopen, scan again before using a reference. If a receipt reports a write attempt with unverified readback, inspect the observed region before retrying.
 
 #### Explicit stereo PCM bounce
 
