@@ -7,7 +7,10 @@ struct ProjectIsolatedStemExportResult: Sendable {
 }
 
 enum ProjectIsolatedStemExport {
-    static func live(root: String, expectedCount: Int) async -> ProjectIsolatedStemExportResult {
+    static func live(
+        root: String, expectedCount: Int,
+        aligned: (ProjectAlignedStemSettings, [ProjectExportStemSubject], String)? = nil
+    ) async -> ProjectIsolatedStemExportResult {
         let witness: ProjectStemExportFileWitness
         do {
             witness = try ProjectStemExportFileWitness(root: root, expectedCount: expectedCount)
@@ -20,7 +23,8 @@ enum ProjectIsolatedStemExport {
             progressPollAttempts: 80,
             sleep: { try? await Task.sleep(nanoseconds: $0) },
             pollIntervalNanos: 250_000_000,
-            artifactCompletion: { witness.observe() }
+            artifactCompletion: { witness.observe() },
+            aligned: aligned
         )
         guard outcome == .completed else {
             return .init(outcome: outcome, directory: witness.directory, files: [])

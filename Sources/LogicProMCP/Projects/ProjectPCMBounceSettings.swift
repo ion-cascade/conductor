@@ -48,18 +48,29 @@ struct ProjectPCMBounceSettings: Codable, Sendable, Equatable {
     }
 
     func matchesFile(_ path: String) -> Bool {
+        guard let (type, stream) = Self.readPCM(path) else { return false }
+        return type == format.fileType && stream.mSampleRate == Double(sampleRate)
+            && stream.mBitsPerChannel == UInt32(bitDepth) && stream.mChannelsPerFrame == 2
+    }
+
+    static func isStemWAVE24(_ path: String, sampleRate: Int) -> Bool {
+        guard let (type, stream) = readPCM(path) else { return false }
+        return type == kAudioFileWAVEType && stream.mSampleRate == Double(sampleRate)
+            && stream.mBitsPerChannel == 24 && (1...2).contains(stream.mChannelsPerFrame)
+    }
+
+    private static func readPCM(_ path: String) -> (AudioFileTypeID, AudioStreamBasicDescription)? {
         var file: AudioFileID?
         let url = URL(fileURLWithPath: path)
-        guard AudioFileOpenURL(url as CFURL, .readPermission, 0, &file) == noErr, let file else { return false }
+        guard AudioFileOpenURL(url as CFURL, .readPermission, 0, &file) == noErr, let file else { return nil }
         defer { AudioFileClose(file) }
         var type: AudioFileTypeID = 0
         var typeSize = UInt32(MemoryLayout.size(ofValue: type))
         var stream = AudioStreamBasicDescription()
         var streamSize = UInt32(MemoryLayout.size(ofValue: stream))
-        return AudioFileGetProperty(file, kAudioFilePropertyFileFormat, &typeSize, &type) == noErr
-            && AudioFileGetProperty(file, kAudioFilePropertyDataFormat, &streamSize, &stream) == noErr
-            && type == format.fileType && stream.mFormatID == kAudioFormatLinearPCM
-            && stream.mSampleRate == Double(sampleRate) && stream.mBitsPerChannel == UInt32(bitDepth)
-            && stream.mChannelsPerFrame == 2
+        guard AudioFileGetProperty(file, kAudioFilePropertyFileFormat, &typeSize, &type) == noErr,
+              AudioFileGetProperty(file, kAudioFilePropertyDataFormat, &streamSize, &stream) == noErr,
+              stream.mFormatID == kAudioFormatLinearPCM else { return nil }
+        return (type, stream)
     }
 }

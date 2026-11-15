@@ -14,6 +14,7 @@ enum ProjectExportPlanner {
         let outputRoot = try outputRoot(from: params, fileManager: fileManager)
         let artifacts = try artifactKinds(from: params)
         let bounceSettings = try ProjectPCMBounceSettings.parse(params["bounce_settings"], artifacts: artifacts)
+        let stemSettings = try ProjectAlignedStemSettings.parse(params["stem_settings"], artifacts: artifacts)
         let collisionPolicy = stringParam(params, "collision_policy", default: "fail_if_exists")
         guard ["fail_if_exists", "skip_existing"].contains(collisionPolicy) else {
             throw ExportPlanError.invalid("collision_policy must be fail_if_exists or skip_existing")
@@ -38,7 +39,8 @@ enum ProjectExportPlanner {
                 collisionPolicy: collisionPolicy,
                 fileManager: fileManager,
                 stemSubjects: stemSubjects,
-                bounceSettings: bounceSettings
+                bounceSettings: bounceSettings,
+                stemSettings: stemSettings
             )
         }
 
@@ -63,6 +65,8 @@ enum ProjectExportPlanner {
             schema: schema,
             runID: deterministicRunID(projects: projects, outputRoot: outputRoot, artifacts: artifacts + (bounceSettings.map {
                 ["\($0.format.rawValue):\($0.sampleRate):\($0.bitDepth):\($0.includeAudioTail)"]
+            } ?? []) + (stemSettings.map {
+                ["stems:\($0.includeAudioTail):\($0.includeVolumePanAutomation)"]
             } ?? [])),
             // C3: real run-window anchor so the advertised mtime_within_run_window
             // gate is evaluable — an executor bounds post-export mtime to >= this.
@@ -99,7 +103,8 @@ enum ProjectExportPlanner {
         collisionPolicy: String,
         fileManager: FileManager,
         stemSubjects: ProjectExportStemSubjectInventory?,
-        bounceSettings: ProjectPCMBounceSettings?
+        bounceSettings: ProjectPCMBounceSettings?,
+        stemSettings: ProjectAlignedStemSettings?
     ) -> ProjectExportPlanProject {
         var issues: [String] = []
         if !AppleScriptSafety.isValidProjectPath(path, requireExisting: false) {
@@ -120,7 +125,8 @@ enum ProjectExportPlanner {
                 fileManager: fileManager,
                 projectPath: path,
                 stemSubjects: stemSubjects,
-                bounceSettings: kind == "bounce" ? bounceSettings : nil
+                bounceSettings: kind == "bounce" ? bounceSettings : nil,
+                stemSettings: kind == "stem" ? stemSettings : nil
             )
         }
 
@@ -144,16 +150,19 @@ enum ProjectExportPlanner {
         fileManager: FileManager,
         projectPath: String,
         stemSubjects: ProjectExportStemSubjectInventory?,
-        bounceSettings: ProjectPCMBounceSettings?
+        bounceSettings: ProjectPCMBounceSettings?,
+        stemSettings: ProjectAlignedStemSettings?
     ) -> ProjectExportPlanArtifact {
         if kind == "stem" {
-            return stemArtifact(
+            var stem = stemArtifact(
                 outputRoot: outputRoot,
                 collisionPolicy: collisionPolicy,
                 projectPath: projectPath,
                 stemSubjects: stemSubjects,
                 fileManager: fileManager
             )
+            stem.stemSettings = stemSettings
+            return stem
         }
         // PR99-C2: validate containment against the PRE-sanitization candidate so
         // the check is non-vacuous. A raw displayName containing ".." or a path

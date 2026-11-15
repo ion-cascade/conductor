@@ -98,6 +98,7 @@ enum ProjectExportExecutor {
         /// Production route: private output namespace plus complete-file
         /// evidence, including exports too short to expose a progress window.
         var driveIsolatedStemExport: (@Sendable (String, Int) async -> ProjectIsolatedStemExportResult)? = nil
+        var driveAlignedStemExport: (@Sendable (String, ProjectAlignedStemSettings, [ProjectExportStemSubject], String) async -> ProjectIsolatedStemExportResult)? = nil
         /// Acquire after project-open and before Export. A Boolean captured
         /// before opening a project would outlive the track population it proved.
         var verifyIsolatedSubjectBinding: (@Sendable (String, [ProjectExportStemSubject]) async -> Bool)? = nil
@@ -121,6 +122,10 @@ enum ProjectExportExecutor {
                 dialogPresent: { AXLogicProElements.dialogPresent() },
                 driveIsolatedStemExport: { destination, count in
                     await ProjectIsolatedStemExport.live(root: destination, expectedCount: count)
+                },
+                driveAlignedStemExport: { destination, settings, subjects, project in
+                    await ProjectIsolatedStemExport.live(root: destination, expectedCount: subjects.count,
+                        aligned: (settings, subjects, project))
                 }
             )
         }

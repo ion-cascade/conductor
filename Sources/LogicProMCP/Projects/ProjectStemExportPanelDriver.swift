@@ -96,6 +96,9 @@ enum ProjectStemExportPanelDriver {
         /// Reads the current per-track popup value; it does not infer enablement
         /// from the control merely existing.
         func oneFilePerTrackIsActive() -> Bool
+        func prepareAlignedExport(
+            _ settings: ProjectAlignedStemSettings, subjects: [ProjectExportStemSubject], projectPath: String
+        ) async -> Bool
         /// Attempts Export. Its AX status is intentionally not returned: the
         /// driver judges the press only by the post-press observations below.
         func pressExport()
@@ -112,6 +115,7 @@ enum ProjectStemExportPanelDriver {
         sleep: @escaping @Sendable (UInt64) async -> Void,
         pollIntervalNanos: UInt64,
         artifactCompletion: @escaping @Sendable () -> Bool = { false },
+        aligned: (ProjectAlignedStemSettings, [ProjectExportStemSubject], String)? = nil,
         monotonicNowNanos: @escaping @Sendable () -> UInt64 = {
             DispatchTime.now().uptimeNanoseconds
         }
@@ -227,6 +231,10 @@ enum ProjectStemExportPanelDriver {
         guard let afterDestination = surface.destinationPopupValue(),
               destinationDisplay(afterDestination, confirms: destination) else {
             return finish(.refused("stem_destination_not_confirmed_after_browser_selection"))
+        }
+        if let (settings, subjects, projectPath) = aligned,
+           !(await surface.prepareAlignedExport(settings, subjects: subjects, projectPath: projectPath)) {
+            return finish(.refused("stem_alignment_settings_or_track_name_pattern_not_verified"))
         }
         guard surface.oneFilePerTrackIsActive() else {
             return finish(.refused("stem_one_file_per_track_not_active"))
@@ -533,6 +541,34 @@ final class AXSurface: ProjectStemExportPanelDriver.Surface, @unchecked Sendable
         guard let panel = exportPanel() else { return false }
         return popupButtons(in: panel).contains { popup in
             AXLocalePolicy.oneFilePerTrackPopupValue.matches(elementText(popup))
+        }
+    }
+
+    func prepareAlignedExport(
+        _ settings: ProjectAlignedStemSettings, subjects: [ProjectExportStemSubject], projectPath: String
+    ) async -> Bool {
+        guard let pid = runtime.logicProPID(),
+              runtime.observeHost(pid)?.logicVersion?.hasPrefix("13.") == true,
+              let panel = exportPanel(),
+              let app = AXLogicProElements.appRoot(runtime: runtime),
+              let originals: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: runtime.ax)
+        else { return false }
+        let matches = originals.filter { candidate in
+            guard case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(candidate, runtime: runtime),
+                  let url = URL(string: document), url.isFileURL else { return false }
+            return AppleScriptChannel.projectPathsMatch(projectPath, url.path)
+        }
+        guard matches.count == 1, let owner = matches.first else { return false }
+        return await ProjectStemPanelSettings.apply(settings, subjects: subjects, panel: panel, runtime: runtime) {
+            guard !Task.isCancelled, self.runtime.focusedApplicationPID() == pid,
+                  let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: self.runtime.ax),
+                  CFEqual(focused, panel),
+                  let current: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: self.runtime.ax),
+                  current.contains(panel), current.contains(owner),
+                  case .success(.some(let observed)) = AXLogicProElements.projectPickerDocumentRead(owner, runtime: self.runtime),
+                  let path = URL(string: observed), path.isFileURL
+            else { return false }
+            return AppleScriptChannel.projectPathsMatch(projectPath, path.path)
         }
     }
 
@@ -1335,4 +1371,10 @@ extension ProjectStemExportPanelDriver {
     static func stemLeafTitleMatches(_ title: String) -> Bool {
         AXLocalePolicy.allTracksAsAudioFilesMenuItem.matches(title)
     }
+}
+
+extension ProjectStemExportPanelDriver.Surface {
+    func prepareAlignedExport(
+        _ settings: ProjectAlignedStemSettings, subjects: [ProjectExportStemSubject], projectPath: String
+    ) async -> Bool { false }
 }

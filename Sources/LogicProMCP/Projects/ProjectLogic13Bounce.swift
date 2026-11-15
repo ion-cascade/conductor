@@ -219,6 +219,7 @@ struct ProjectLogic13Bounce {
             }
             guard observed.count < 2 else { return nil }
             if let file = observed.first, let previous, file == previous,
+               ProjectExportContainerCompletion.isComplete(at: file.0.path, size: Int64(file.1)),
                settings.matchesFile(file.0.path) { return file.0.path }
             previous = observed.first
             do { try await Task.sleep(for: .milliseconds(250)) } catch { return nil }

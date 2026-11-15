@@ -584,7 +584,7 @@ extension OperationRegistry {
         ]
         for op in ["export_plan", "export_run", "export_resume"] {
             var params = Dictionary(uniqueKeysWithValues: [
-                "artifact", "artifacts", "bounce_settings", "collision_policy", "kind", "naming_policy", "outputRoot", "output_root",
+                "artifact", "artifacts", "bounce_settings", "stem_settings", "collision_policy", "kind", "naming_policy", "outputRoot", "output_root",
                 "path", "project", "projects",
             ].map { ($0, ParamRule.unconstrained("checked by ProjectExportPlanner.plan, whose refusals are not yet recorded by kind",
                                                  sample: exportSamples[$0])) })

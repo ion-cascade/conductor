@@ -79,6 +79,7 @@ struct ProjectExportPlanArtifact: Codable, Sendable, Equatable {
     /// Human-readable explanation for a late-bound planning refusal.
     let planningReason: String?
     var bounceSettings: ProjectPCMBounceSettings? = nil
+    var stemSettings: ProjectAlignedStemSettings? = nil
 
     enum CodingKeys: String, CodingKey {
         case kind
@@ -91,6 +92,7 @@ struct ProjectExportPlanArtifact: Codable, Sendable, Equatable {
         case filenamesLateBound = "filenames_late_bound"
         case planningReason = "planning_reason"
         case bounceSettings = "bounce_settings"
+        case stemSettings = "stem_settings"
     }
 }
 

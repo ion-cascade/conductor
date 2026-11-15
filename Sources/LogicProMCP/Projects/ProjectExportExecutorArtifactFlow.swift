@@ -325,6 +325,13 @@ extension ProjectExportExecutor {
         if let projectPath = plan.projects.first?.projectPath, let verify = options.verifyIsolatedSubjectBinding {
             subjectBindingVerified = await verify(projectPath, subjects)
         } else { subjectBindingVerified = false }
+        if artifact.stemSettings != nil,
+           !(subjectBindingVerified && ProjectAlignedStemSettings.namesQualify(subjects)
+                && options.driveAlignedStemExport != nil) {
+            return stemSubjectArtifacts(artifact: artifact, destination: destination, subjects: subjects,
+                state: "C", bounceFired: false, writeAttempted: false,
+                error: "aligned_stem_subjects_or_host_unavailable", reason: nil, observations: nil)
+        }
         guard OperationTraceContext.claimDeadlineEffect("project_export_stem") else {
             return stemSubjectArtifacts(
                 artifact: artifact,
@@ -340,7 +347,13 @@ extension ProjectExportExecutor {
         }
         let outcome: ProjectStemExportPanelDriver.Outcome
         var isolatedFiles: [String] = []
-        if let drive = options.driveIsolatedStemExport {
+        if let settings = artifact.stemSettings, let drive = options.driveAlignedStemExport,
+           let projectPath = plan.projects.first?.projectPath {
+            let receipt = await drive(destination, settings, subjects, projectPath)
+            outcome = receipt.outcome
+            if let actualDirectory = receipt.directory { destination = actualDirectory }
+            isolatedFiles = receipt.files
+        } else if let drive = options.driveIsolatedStemExport {
             let receipt = await drive(destination, subjects.count)
             outcome = receipt.outcome
             if let actualDirectory = receipt.directory { destination = actualDirectory }
@@ -383,6 +396,36 @@ extension ProjectExportExecutor {
             )
         case .completed:
             break
+        }
+
+        if artifact.stemSettings != nil {
+            let observations = isolatedFiles.map { stemOutputObservation(path: $0, plan: plan, options: options) }
+            var byTrack: [String: ProjectExportObservedStemOutput] = [:]
+            for output in observations {
+                let key = URL(fileURLWithPath: output.path).lastPathComponent
+                guard output.verified, byTrack.updateValue(output, forKey: key) == nil else {
+                    return stemSubjectArtifacts(artifact: artifact, destination: destination, subjects: subjects,
+                        state: "B", bounceFired: true, writeAttempted: true, error: nil,
+                        reason: "aligned_stem_output_not_verified", observations: observations)
+                }
+            }
+            let paired = subjects.compactMap { byTrack[$0.name + ".wav"] }
+            let rate = observations.first?.evidence.sampleRate
+            let duration = observations.first?.evidence.durationSeconds
+            guard paired.count == subjects.count, paired.count == observations.count, let rate, let duration,
+                  paired.allSatisfy({
+                      $0.evidence.sampleRate == rate && $0.evidence.durationSeconds == duration
+                          && ProjectPCMBounceSettings.isStemWAVE24($0.path, sampleRate: rate)
+                  }) else {
+                return stemSubjectArtifacts(artifact: artifact, destination: destination, subjects: subjects,
+                    state: "B", bounceFired: true, writeAttempted: true, error: nil,
+                    reason: "aligned_stem_name_binding_or_common_length_unverified", observations: observations)
+            }
+            return zip(subjects, paired).map { subject, output in
+                RunArtifact(kind: artifact.kind, path: output.path, state: "A", verified: true,
+                            bounceFired: true, writeAttempted: true, error: nil, reason: nil,
+                            evidence: output.evidence, subject: subject, observedStemOutputs: [output])
+            }
         }
 
         // A sole planned populated subject and a sole complete file in a

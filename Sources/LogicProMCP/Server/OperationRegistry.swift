@@ -924,7 +924,7 @@ enum OperationRegistry {
             VerificationPolicy.none,
             DeadlineClass.short,
             [
-                "artifact", "artifacts", "bounce_settings", "collision_policy", "kind", "naming_policy",
+                "artifact", "artifacts", "bounce_settings", "stem_settings", "collision_policy", "kind", "naming_policy",
                 "outputRoot", "output_root", "path", "project", "projects",
             ]
         ),
@@ -936,7 +936,7 @@ enum OperationRegistry {
             VerificationPolicy.readbackRequired,
             DeadlineClass.long,
             [
-                "artifact", "artifacts", "bounce_settings", "collision_policy", "confirmed", "kind", "naming_policy",
+                "artifact", "artifacts", "bounce_settings", "stem_settings", "collision_policy", "confirmed", "kind", "naming_policy",
                 "outputRoot", "output_root", "path", "project", "projects",
             ]
         ),
@@ -948,7 +948,7 @@ enum OperationRegistry {
             VerificationPolicy.readbackRequired,
             DeadlineClass.long,
             [
-                "artifact", "artifacts", "bounce_settings", "collision_policy", "confirmed", "kind", "naming_policy",
+                "artifact", "artifacts", "bounce_settings", "stem_settings", "collision_policy", "confirmed", "kind", "naming_policy",
                 "outputRoot", "output_root", "path", "project", "projects",
             ]
         ),

@@ -112,7 +112,8 @@ extension ProjectExportPlanner {
                     subjects: art.subjects,
                     filenamesLateBound: art.filenamesLateBound,
                     planningReason: art.planningReason,
-                    bounceSettings: art.bounceSettings
+                    bounceSettings: art.bounceSettings,
+                    stemSettings: art.stemSettings
                 )
             }
             return ProjectExportPlanProject(
