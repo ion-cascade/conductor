@@ -326,7 +326,7 @@ private func insertParams(
     #expect(obj["state"] as? String == "C")
     #expect(obj["error"] as? String == "operation_timeout")
     #expect(obj["commit_strategy"] as? String == "slot_popup_axpick_menu_select")
-    #expect((obj["safe_to_retry"] as? Bool)!)
+    #expect(obj["safe_to_retry"] as? Bool == false)
     #expect((obj["write_attempted"] as? Bool)!)
 }
 

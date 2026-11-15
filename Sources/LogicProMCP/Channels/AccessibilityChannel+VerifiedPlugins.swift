@@ -6423,8 +6423,8 @@ extension AccessibilityChannel {
                     "commit_strategy": strategy,
                     "select_trace": trace,
                     "what_was_attempted": "wait for post-insert inventory to confirm the exact slot popup commit",
-                    "what_was_observed": "the insert UI changed/closed before the requested plugin appeared in readback",
-                    "safe_to_retry": true,
+                    "what_was_observed": "the committed menu action did not yield verified insert readback before the deadline",
+                    "safe_to_retry": false,
                     "write_attempted": true,
                 ]
             ))
@@ -6748,7 +6748,7 @@ extension AccessibilityChannel {
         #endif
 
         let poll = await pollStripInventoryUntil(
-            track: track, runtime: runtime, timeoutMs: 2_000
+            track: track, runtime: runtime, timeoutMs: 4_000
         ) { inv in
             newlyMountedSlot(pluginID: pluginID, pre: preInventory, post: inv) != nil
                 || newlyMountedAnyPlugin(pre: preInventory, post: inv) != nil
@@ -6788,6 +6788,7 @@ extension AccessibilityChannel {
         }
 
         if poll.satisfied == nil {
+            trace["post_commit_observed_inserts"] = postInventory.keys.sorted()
             return (
                 .postCommitTimeout(strategy: "slot_popup_axpick_menu_select"),
                 trace
