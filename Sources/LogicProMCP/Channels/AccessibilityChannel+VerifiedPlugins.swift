@@ -2869,9 +2869,10 @@ extension AccessibilityChannel {
             .error(HonestContract.encodeStateC(error: error, hint: "Select the target track and show its Mixer. This adapter supports the stock Compressor Piano preset.",
                 extras: ["operation": operation, "readback_stage": stage, "write_attempted": false]))
         }
-        func uncertain(_ stage: String) -> ChannelResult {
+        func uncertain(_ stage: String, observed: String?) -> ChannelResult {
             .success(HonestContract.encodeStateB(reason: .readbackMismatch,
                 extras: ["operation": operation, "readback_stage": stage, "write_attempted": true,
+                         "observed_setting": observed as Any? ?? NSNull(),
                          "safe_to_retry": false, "effect_unknown": true]))
         }
         guard params["plugin"] == compressor,
@@ -2896,13 +2897,15 @@ extension AccessibilityChannel {
         let slot = slots[insert]
         if let failed = pluginInsertReferenceGuard(params: params, slot: slot, operation: operation) { return failed }
 
-        func context() -> Bool {
+        func context(sameSlotElement: Bool = true) -> Bool {
             guard !Task.isCancelled, runtime.focusedApplicationPID() == pid,
                   case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(arrange, runtime: runtime),
                   current == document, AXPluginTrackBinding.isStable(target, runtime: runtime),
                   let latest = AXLogicProElements.audioPluginInsertSlots(in: target.strip, runtime: ax),
-                  latest.indices.contains(insert), CFEqual(slot.element, latest[insert].element),
-                  latest[insert].name == "Compressor",
+                  latest.indices.contains(insert),
+                  !latest.contains(where: { $0.readStatus == .occupiedUnreadable }),
+                  latest.filter({ $0.name == "Compressor" }).count == 1, latest[insert].name == "Compressor",
+                  !sameSlotElement || CFEqual(slot.element, latest[insert].element),
                   let list = runtime.onScreenWindowList() else { return false }
             if writing {
                 guard let transport = try? AXLogicProElements.observedTransportActivity(in: arrange, runtime: runtime, checking: {}),
@@ -3034,9 +3037,17 @@ extension AccessibilityChannel {
         _ = AXHelpers.performAction(piano[0], "AXPick", runtime: ax)
         try? await Task.sleep(for: .milliseconds(350))
         for _ in 0..<2 {
-            guard nativeMenus().isEmpty, context(), focused(editor), setting()?.1 == "Piano" else {
-                cancelOwned(); return uncertain("preset_after_pick")
+            guard nativeMenus().isEmpty else {
+                cancelOwned()
+                return uncertain("preset_menu_still_open", observed: setting()?.1)
             }
+            let observed = setting()?.1
+            guard context(sameSlotElement: false),
+                  let active = windows(), active.count == 2, active.contains(arrange), active.contains(editor),
+                  focused(editor) || focused(arrange) else {
+                return uncertain("preset_scope_after_pick", observed: observed)
+            }
+            guard observed == "Piano" else { return uncertain("preset_value_after_pick", observed: observed) }
         }
         return evidence("Piano", attempted: true)
     }
