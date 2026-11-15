@@ -138,7 +138,7 @@ final class MIDITrackExportPanel {
     /// The producer owns the operation that acquired the panel and the file evidence.
     func saveOpenedPanel(
         _ panel: AXUIElement, to destination: URL, stage: inout String,
-        beforeCommit: @MainActor () throws -> Void = {}
+        beforeCommit: @escaping @MainActor () throws -> Void = {}
     ) async throws {
         let app = try currentApp()
         stage = "save_panel_ready"
