@@ -1,6 +1,6 @@
-# Conductor 1.5 compatibility
+# Conductor 1.6 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.5 and the checks from earlier releases.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.6 and the checks from earlier releases.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -14,6 +14,17 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
+
+## 1.6 Verified mix delivery
+
+| Workflow | Mac mini qualification |
+| --- | --- |
+| Mix and selected stems | On a 12-track Logic project with four populated tracks, exported the stereo mix, two distinct tracks named `Twin`, and the piano. Independent PCM analysis matched the stem signals to their selected tracks. A separate stem export verified that the omitted track was audible, and its tone was present in the stereo mix. |
+| Musical range and alignment | The native cycle ran from `1.1.1.1` to `3.1.1.1`, with 120 BPM at bar 1 and 60 BPM at bar 2. The four 24-bit WAVs each had 264,600 frames at 44.1 kHz. A signal beginning at one second matched in the corresponding stem and mix on a 20 ms measurement grid. |
+| Read-only status | Verified a 1.4 receipt and the partial 1.6 receipt with the project closed. Detected changed and missing WAVs, a changed bundled source, changed expected settings, and an invalid receipt. Status preserved the valid receipt bytes. |
+| Resume after interruption | Stopped the test bridge after the first stem committed. Reopened the same project, obtained fresh references, and confirmed that resume retained the first file’s checksum and rendered the two remaining stems and stereo mix. The configured bridge repeated the complete workflow. |
+
+The combined delivery qualifies 24-bit WAVE at the native project sample rate, with a shared exact range and both tail options off. The Mac mini qualification used 44.1 kHz. The stereo mix follows the main output, including its routing and processing. [Mix delivery and recovery](../API.md#deliver-a-stereo-mix-with-selected-stems)
 
 ## 1.5 Production editors
 

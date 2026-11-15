@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.6.0] — 2026-11-15
+
+- Inspect a selective delivery and verify its saved project and files without opening Logic. ([#34](https://github.com/ion-cascade/conductor/issues/34))
+- Deliver a stereo mix and selected stems over one exact range, with common sample rate and frame counts and one resumable receipt. ([#35](https://github.com/ion-cascade/conductor/issues/35))
+- Record the Mac mini interruption and recovery qualification. ([#36](https://github.com/ion-cascade/conductor/issues/36))
+
 ## [1.5.0] — 2026-11-15
 
 - Inspect one selected Step Sequencer step, read its native on/off state and velocity, and set its on/off state using the returned address and expected current value. The response reports the grid addresses Logic exposes. ([#32](https://github.com/ion-cascade/conductor/issues/32))

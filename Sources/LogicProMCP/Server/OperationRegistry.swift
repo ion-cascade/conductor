@@ -100,6 +100,7 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case projectEditRegion = "project.edit_region"
     case projectExportPlan = "project.export_plan"
     case projectExportRun = "project.export_run"
+    case projectExportStatus = "project.export_status"
     case projectExportResume = "project.export_resume"
     case projectAudit = "project.audit"
     case projectCleanupPlan = "project.cleanup_plan"
@@ -375,7 +376,7 @@ enum OperationRegistry {
             "project.new", "project.open", "project.save", "project.save_as", "project.close",
             "project.bounce", "project.is_running", "project.launch", "project.quit",
             "project.get_regions", "project.get_pattern_step", "project.set_pattern_step_enabled", "project.scan_regions", "project.edit_region", "project.export_plan", "project.export_run",
-            "project.export_resume", "project.audit", "project.cleanup_plan",
+            "project.export_resume", "project.export_status", "project.audit", "project.cleanup_plan",
             "project.inspect_session", "project.plan_session_repair", "project.apply_session_repair", "project.cleanup_apply",
         ],
         ToolID.logicMidi.rawValue: [
@@ -435,7 +436,7 @@ enum OperationRegistry {
         ],
         ToolID.logicProject.rawValue: [
             "new", "open", "save", "save_as", "close", "bounce", "is_running", "launch",
-            "quit", "get_regions", "get_pattern_step", "set_pattern_step_enabled", "scan_regions", "edit_region", "export_plan", "export_run", "export_resume", "audit",
+            "quit", "get_regions", "get_pattern_step", "set_pattern_step_enabled", "scan_regions", "edit_region", "export_plan", "export_run", "export_resume", "export_status", "audit",
             "cleanup_plan", "inspect_session", "plan_session_repair", "apply_session_repair", "cleanup_apply",
         ],
         ToolID.logicMidi.rawValue: [
@@ -929,6 +930,7 @@ enum OperationRegistry {
         (.projectIsRunning, "is_running", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.short, []),
         (.projectLaunch, "launch", Mutability.`mutating`, ConfirmationPolicy.l1, VerificationPolicy.readbackRequired, DeadlineClass.short, []),
         (.projectQuit, "quit", Mutability.`mutating`, ConfirmationPolicy.l3, VerificationPolicy.readbackRequired, DeadlineClass.medium, ["confirmed"]),
+        (.projectExportStatus, "export_status", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.long, ["delivery_id", "output_root", "expected_settings"]),
         (.projectGetRegions, "get_regions", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.short, []),
         (.projectGetPatternStep, "get_pattern_step", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.medium, []),
         (.projectSetPatternStepEnabled, "set_pattern_step_enabled", Mutability.mutating, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.medium, ["address", "expected_enabled", "enabled"]),

@@ -558,6 +558,13 @@ extension OperationRegistry {
             ], required: [["project_ref"], ["target_ref"], ["region_name"], ["start"], ["end"], ["confirmed"]]),
 
             // logic_project
+            "project.export_status": .init(params: [
+                "delivery_id": .enforced(.string, .string("50ea956b-a26e-4ca7-bddb-900d9d11bf5c")),
+                "output_root": .enforced(.string, .string("/tmp/Exports")),
+                "expected_settings": .enforced(.object, .object([
+                    "stems": .object(["include_audio_tail": .bool(false), "include_volume_pan_automation": .bool(true)]),
+                ])),
+            ], required: [["delivery_id"], ["output_root"]]),
             "project.quit": .init(params: ["confirmed": .enforced(.boolean, .bool(false))], required: []),
             "project.close": .init(params: [
                 "confirmed": .enforced(.boolean, .bool(false)),

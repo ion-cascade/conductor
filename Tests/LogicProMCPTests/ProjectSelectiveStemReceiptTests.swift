@@ -51,12 +51,55 @@ struct ProjectSelectiveStemReceiptTests {
         #expect(try Data(contentsOf: file) == edited)
     }
 
-    private func writeStem(_ url: URL) throws {
-        let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1))
+    @Test func inspectMixDeliveryChecksFilesWithoutChangingTheJournal() throws {
+        let root = try makeExecTempDir().resolvingSymlinksInPath()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let id = UUID()
+        let delivery = ProjectSelectiveStemRequest.directory(root: root.path, id: id)
+        let range = ProjectBounceRange(start: "1.1.1.1", end: "3.1.1.1")
+        let identity = ProjectSelectiveStemReceipt.Identity(projectPath: "/project.logicx",
+            projectSHA256: "saved-project", subjects: [.init(index: 0, name: "Twin")],
+            settings: .init(includeAudioTail: false, includeVolumePanAutomation: true, range: range),
+            mix: .init(format: .wav, sampleRate: 48_000, bitDepth: 24, includeAudioTail: false, range: range))
+        let mix: URL
+        do {
+            let receipt = try ProjectSelectiveStemReceipt(directory: delivery, deliveryID: id, identity: identity, resume: false)
+            mix = try receipt.newMixDestination()
+            try writeStem(mix, channels: 2)
+            try receipt.record(mix, track: nil, sampleRate: 48_000, frames: 4800)
+            #expect(throws: ProjectSelectiveStemReceipt.Failure.self) {
+                try ProjectSelectiveStemReceipt.inspect(directory: delivery, deliveryID: id) { _ in true }
+            }
+        }
+        let path = delivery.appendingPathComponent("receipt.json")
+        let original = try Data(contentsOf: path)
+        let modified = try path.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        func status() throws -> ProjectSelectiveStemReceipt.FileState {
+            try ProjectSelectiveStemReceipt.inspect(directory: delivery, deliveryID: id) { journal in
+                #expect(journal.version == 2)
+                #expect(journal.identity.expectedTracks == [0, nil])
+                let entry = try #require(journal.files.first)
+                #expect(entry.trackIndex == nil)
+                return ProjectSelectiveStemReceipt.fileState(entry, directory: delivery, identity: journal.identity)
+            }
+        }
+        #expect(try status() == .verified)
+        var wav = try Data(contentsOf: mix)
+        wav[wav.index(before: wav.endIndex)] ^= 1
+        try wav.write(to: mix)
+        #expect(try status() == .changed)
+        try FileManager.default.removeItem(at: mix)
+        #expect(try status() == .missing)
+        #expect(try Data(contentsOf: path) == original)
+        #expect(try path.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
+    }
+
+    private func writeStem(_ url: URL, channels: AVAudioChannelCount = 1) throws {
+        let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: channels))
         let file = try AVAudioFile(forWriting: url, settings: [
             AVFormatIDKey: kAudioFormatLinearPCM,
             AVSampleRateKey: 48_000,
-            AVNumberOfChannelsKey: 1,
+            AVNumberOfChannelsKey: channels,
             AVLinearPCMBitDepthKey: 24,
             AVLinearPCMIsFloatKey: false,
         ])

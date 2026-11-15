@@ -374,9 +374,21 @@ Run and resume take `confirmed: true`. The output root must exist. For a range, 
 
 If a delivery is interrupted, reopen the same saved project and inspect its tracks again. Resume with the same delivery ID, output root, track order, range and export settings, using the fresh references. Conductor checks the saved edit data, bundled media and completed-file checksums before exporting more tracks. Bundle source audio in the Logic project for a verifiable resume. Existing valid files are marked `reused`.
 
+### Deliver a stereo mix with selected stems
+
+Use the selective stem request above and pass `artifacts: ["bounce", "stem"]` and `bounce_settings: {"format":"wav","sample_rate":44100,"bit_depth":24}`. Use the project’s native sample rate, supply an exact `stem_settings.range` and keep both tail options off. If `bounce_settings.range` is supplied, use the same bounds. The stereo mix follows Logic’s main output. The selected stems follow the specified track references and the track export automation option.
+
+The result identifies each output as `kind: "mix"` or `kind: "stem"`. The single `receipt.json` in the delivery directory binds the files to the saved project, selected tracks and range. A completed package requires the same sample rate and frame count for every file. Keep the delivery UUID and output root for recovery.
+
+### Inspect and resume a delivery
+
+Call `logic_project.export_status` with `delivery_id` and `output_root`. It reads the receipt and checks the project and audio files without opening Logic. It reports `pending` for an output awaiting a verified export, `missing` for a recorded file absent from disk, `changed` for bytes that differ from their recorded checksum, and `unverifiable` when it cannot verify a file. Verified outputs include their paths, checksums, sample rates and frame counts. Pass the returned `settings` as `expected_settings` to compare a later read with an earlier one.
+
+If status reports a resumable partial delivery, reopen the same saved project, reacquire the track references and submit the original run parameters to `export_resume` with the fresh references. Conductor verifies the native range again and exports the pending outputs. A changed, missing or unverifiable committed file blocks resume. Use a new delivery UUID when exporting a changed project or changing the range or settings. The same status command supports version 1 selective stem receipts.
+
 ### `logic_project`
 
-Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `get_pattern_step`, `set_pattern_step_enabled`, `scan_regions`, `edit_region`, `export_plan`, `export_run`, `export_resume`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
+Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `get_pattern_step`, `set_pattern_step_enabled`, `scan_regions`, `edit_region`, `export_plan`, `export_run`, `export_resume`, `export_status`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
 
 File-writing paths require confirmation. `save_as` verifies the resulting `.logicx` package. `audit` marks GM Device and External MIDI tracks with MIDI regions as export blockers. Use the read-only `export_plan` and confirmed `export_run` to produce audio. The standalone `bounce` command is unsupported.
 

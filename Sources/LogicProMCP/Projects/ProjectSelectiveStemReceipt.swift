@@ -1,3 +1,4 @@
+import AVFoundation
 import CryptoKit
 import Darwin
 import Foundation
@@ -9,10 +10,15 @@ final class ProjectSelectiveStemReceipt {
         let projectSHA256: String
         let subjects: [ProjectExportStemSubject]
         let settings: ProjectAlignedStemSettings
+        var mix: ProjectPCMBounceSettings? = nil
+
+        var expectedTracks: [Int?] {
+            subjects.map { Optional($0.index) } + (mix == nil ? [] : [nil])
+        }
     }
 
     struct File: Codable, Equatable {
-        let trackIndex: Int
+        let trackIndex: Int?
         let relativePath: String
         let sha256: String
         let sampleRate: Int
@@ -34,8 +40,12 @@ final class ProjectSelectiveStemReceipt {
         case savedProjectUnreadable
     }
 
+    enum FileState: String {
+        case verified, pending, missing, changed, unverifiable
+    }
+
     let directory: URL
-    let startedWith: Set<Int>
+    let startedWith: Set<Int?>
     private let descriptor: Int32
     private let manifest: URL
     private(set) var journal: Journal
@@ -47,36 +57,22 @@ final class ProjectSelectiveStemReceipt {
         if !resume {
             guard directory.path.withCString({ mkdir($0, 0o700) }) == 0 else { throw Failure.alreadyExists }
         }
-        let fd = directory.path.withCString { open($0, O_RDONLY | O_DIRECTORY | O_NOFOLLOW) }
+        let fd = try Self.lock(directory, mode: LOCK_EX)
         var transferred = false
-        defer { if fd >= 0 && !transferred { close(fd) } }
-        var info = stat()
-        guard fd >= 0, fstat(fd, &info) == 0, info.st_uid == getuid(), info.st_mode & 0o777 == 0o700,
-              directory.resolvingSymlinksInPath().path == directory.path,
-              flock(fd, LOCK_EX | LOCK_NB) == 0 else { throw Failure.missingOrBusy }
+        defer { if !transferred { close(fd) } }
         let journal: Journal
         if resume {
-            let entry = try Self.openFile(manifest)
-            defer { try? entry.close() }
-            let data = try entry.read(upToCount: 128 * 1024) ?? Data()
-            guard data.count < 128 * 1024, let existing = try? JSONDecoder().decode(Journal.self, from: data),
-                  existing.version == 1, existing.deliveryID == deliveryID, existing.identity == identity,
-                  Set(existing.files.map(\.trackIndex)).isSubset(of: Set(identity.subjects.map(\.index))),
-                  Set(existing.files.map(\.trackIndex)).count == existing.files.count,
-                  Set(existing.files.map(\.relativePath)).count == existing.files.count else { throw Failure.changedDelivery }
-            journal = existing
+            journal = try Self.readJournal(manifest, id: deliveryID)
+            guard journal.identity == identity else { throw Failure.changedDelivery }
+            guard journal.files.allSatisfy({
+                Self.fileState($0, directory: directory, identity: identity) == .verified
+            }) else { throw Failure.invalidOrChangedFile }
         } else {
-            journal = .init(version: 1, deliveryID: deliveryID, identity: identity, files: [])
+            journal = .init(version: identity.mix == nil ? 1 : 2, deliveryID: deliveryID, identity: identity, files: [])
+            guard Self.holdsDirectory(directory, fd: fd) else { throw Failure.missingOrBusy }
             try Self.write(journal, to: manifest)
         }
-        for file in journal.files {
-            guard let url = Self.validFileLocation(file.relativePath, in: directory),
-                  file.sampleRate > 0, file.frames > 0,
-                  try Self.digest(url) == file.sha256,
-                  ProjectPCMBounceSettings.isStemWAVE24(url.path, sampleRate: file.sampleRate) else {
-                throw Failure.invalidOrChangedFile
-            }
-        }
+        guard Self.holdsDirectory(directory, fd: fd) else { throw Failure.missingOrBusy }
         self.startedWith = Set(journal.files.map(\.trackIndex))
         self.descriptor = fd
         self.journal = journal
@@ -85,18 +81,74 @@ final class ProjectSelectiveStemReceipt {
 
     deinit { close(descriptor) }
 
-    func holdsDirectory() -> Bool {
+    static func inspect<T>(directory: URL, deliveryID: UUID, _ inspect: (Journal) throws -> T) throws -> T {
+        let fd = try lock(directory, mode: LOCK_SH)
+        defer { close(fd) }
+        let journal = try readJournal(directory.appendingPathComponent("receipt.json"), id: deliveryID)
+        let result = try inspect(journal)
+        guard !Task.isCancelled, holdsDirectory(directory, fd: fd) else { throw Failure.missingOrBusy }
+        return result
+    }
+
+    private static func lock(_ directory: URL, mode: Int32) throws -> Int32 {
+        let fd = directory.path.withCString { open($0, O_RDONLY | O_DIRECTORY | O_NOFOLLOW) }
+        guard fd >= 0 else { throw Failure.missingOrBusy }
+        guard directory.resolvingSymlinksInPath().path == directory.path, holdsDirectory(directory, fd: fd),
+              flock(fd, mode | LOCK_NB) == 0 else {
+            close(fd)
+            throw Failure.missingOrBusy
+        }
+        return fd
+    }
+
+    private static func readJournal(_ manifest: URL, id: UUID) throws -> Journal {
+        let entry = try openFile(manifest)
+        defer { try? entry.close() }
+        let data = try entry.read(upToCount: 128 * 1024) ?? Data()
+        guard data.count < 128 * 1024, let journal = try? JSONDecoder().decode(Journal.self, from: data),
+              journal.version == (journal.identity.mix == nil ? 1 : 2), journal.deliveryID == id,
+              (1...16).contains(journal.identity.subjects.count),
+              journal.identity.subjects.allSatisfy({ $0.index >= 0 }),
+              Set(journal.identity.expectedTracks).count == journal.identity.expectedTracks.count,
+              Set(journal.files.map(\.trackIndex)).isSubset(of: Set(journal.identity.expectedTracks)),
+              Set(journal.files.map(\.trackIndex)).count == journal.files.count,
+              Set(journal.files.map(\.relativePath)).count == journal.files.count
+        else { throw Failure.changedDelivery }
+        if let mix = journal.identity.mix {
+            guard mix.range == journal.identity.settings.range, mix.range != nil,
+                  mix.format == .wav, mix.bitDepth == 24, !mix.includeAudioTail,
+                  !journal.identity.settings.includeAudioTail else { throw Failure.changedDelivery }
+        }
+        if let first = journal.files.first,
+           !journal.files.allSatisfy({
+               $0.sampleRate == first.sampleRate &&
+                   (journal.identity.settings.includeAudioTail || $0.frames == first.frames)
+           }) { throw Failure.changedDelivery }
+        return journal
+    }
+
+    private static func holdsDirectory(_ directory: URL, fd: Int32) -> Bool {
         var held = stat()
         var visible = stat()
-        return fstat(descriptor, &held) == 0 && lstat(directory.path, &visible) == 0
+        return fstat(fd, &held) == 0 && lstat(directory.path, &visible) == 0
             && held.st_dev == visible.st_dev && held.st_ino == visible.st_ino
             && visible.st_uid == getuid() && visible.st_mode & S_IFMT == S_IFDIR
             && visible.st_mode & 0o777 == 0o700
     }
 
-    func record(_ url: URL, track: Int, sampleRate: Int, frames: Int64) throws {
+    func holdsDirectory() -> Bool { Self.holdsDirectory(directory, fd: descriptor) }
+
+    func newMixDestination() throws -> URL {
+        guard holdsDirectory() else { throw Failure.missingOrBusy }
+        let attempt = directory.appendingPathComponent("Conductor Export \(UUID().uuidString)", isDirectory: true)
+        guard attempt.path.withCString({ mkdir($0, 0o700) }) == 0 else { throw Failure.alreadyExists }
+        return attempt.appendingPathComponent("Stereo Mix.wav")
+    }
+
+    func record(_ url: URL, track: Int?, sampleRate: Int, frames: Int64) throws {
         let prefix = directory.path + "/"
-        guard holdsDirectory(), url.path.hasPrefix(prefix), journal.files.allSatisfy({ $0.trackIndex != track }) else {
+        guard holdsDirectory(), url.path.hasPrefix(prefix), journal.identity.expectedTracks.contains(track),
+              journal.files.allSatisfy({ $0.trackIndex != track }) else {
             throw Failure.invalidOrChangedFile
         }
         let relative = String(url.path.dropFirst(prefix.count))
@@ -108,6 +160,26 @@ final class ProjectSelectiveStemReceipt {
         next.files.append(file)
         try Self.write(next, to: manifest)
         journal = next
+    }
+
+    static func fileState(_ file: File, directory: URL, identity: Identity) -> FileState {
+        guard let url = validFileLocation(file.relativePath, in: directory) else { return .unverifiable }
+        var details = stat()
+        guard lstat(url.path, &details) == 0 else { return errno == ENOENT ? .missing : .unverifiable }
+        guard let hash = try? digest(url) else { return .unverifiable }
+        guard hash == file.sha256 else { return .changed }
+        guard file.sampleRate > 0, file.frames > 0,
+              identity.mix.map({ $0.sampleRate == file.sampleRate }) ?? true else { return .unverifiable }
+        let formatVerified: Bool
+        if file.trackIndex != nil {
+            formatVerified = ProjectPCMBounceSettings.isStemWAVE24(url.path, sampleRate: file.sampleRate)
+        } else {
+            formatVerified = identity.mix?.matchesFile(url.path) == true
+        }
+        guard formatVerified, let wav = try? AVAudioFile(forReading: url), wav.length == file.frames else {
+            return .unverifiable
+        }
+        return .verified
     }
 
     private static func write(_ journal: Journal, to url: URL) throws {

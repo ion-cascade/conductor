@@ -49,7 +49,8 @@ extension ProjectDispatcher {
         func envelope(_ state: String, files: [[String: Any]], status: String, reason: String? = nil,
                       restored: Bool? = nil, attempted: Bool = false) -> CallTool.Result {
             var result: [String: Any] = [
-                "schema": "logic_pro_mcp_selective_stems.v1", "operation": operation,
+                "schema": request.mix == nil ? "logic_pro_mcp_selective_stems.v1" : "logic_pro_mcp_mix_delivery.v1",
+                "operation": operation,
                 "delivery_id": request.deliveryID.uuidString, "output_root": request.outputRoot,
                 "directory": request.directory.path, "project_path": request.projectPath,
                 "state": state, "status": status, "success": state == "A", "verified": state == "A" && status == "complete",
@@ -60,6 +61,7 @@ extension ProjectDispatcher {
                 "include_audio_tail": request.settings.includeAudioTail,
                 "include_volume_pan_automation": request.settings.includeVolumePanAutomation,
             ]
+            result["sample_rate"] = request.mix?.sampleRate
             if let range { result["range"] = ["start": range.start, "end": range.end] }
             result["selection_restored"] = restored
             result["reason"] = reason
@@ -73,7 +75,7 @@ extension ProjectDispatcher {
         do {
             let digest = try ProjectSelectiveStemReceipt.savedProjectDigest(path: request.projectPath)
             identity = .init(projectPath: request.projectPath, projectSHA256: digest,
-                             subjects: subjects, settings: request.settings)
+                             subjects: subjects, settings: request.settings, mix: request.mix)
         } catch {
             return refusal(.readbackUnavailable, "The saved project data or bundled media could not be verified.")
         }
@@ -123,6 +125,7 @@ extension ProjectDispatcher {
             let audio = AudioAnalyzer.analyzeFile(path: path,
                 policy: .init(minimumDurationSeconds: 0.05, allowsSilentOutput: true, outputRoot: receipt.directory.path))
             guard audio.verification.status == .pass, audio.frameCount > 0,
+                  request.mix.map({ $0.sampleRate == audio.sampleRate }) ?? true,
                   ProjectPCMBounceSettings.isStemWAVE24(path, sampleRate: audio.sampleRate),
                   receipt.journal.files.allSatisfy({ file in
                       file.sampleRate == audio.sampleRate &&
@@ -140,15 +143,59 @@ extension ProjectDispatcher {
             }
         }
 
-        let restored = await scope.select(scope.originalIndex, replacing: selectedIndex)
-        let files = receipt.journal.files.map { file -> [String: Any] in
-            ["track_index": file.trackIndex, "path": receipt.directory.appendingPathComponent(file.relativePath).path,
-             "sha256": file.sha256, "sample_rate": file.sampleRate, "frame_count": file.frames,
-             "reused": receipt.startedWith.contains(file.trackIndex)]
+        if reason == nil, let mix = request.mix, !receipt.startedWith.contains(nil) {
+            attempted = true
+            reason = await renderDeliveryMix(mix, scope: scope, selectedIndex: selectedIndex, receipt: receipt)
         }
-        let complete = reason == nil && files.count == subjects.count && restored
+
+        let restored = await scope.select(scope.originalIndex, replacing: selectedIndex)
+        let files = receipt.journal.files.map { file in
+            var row = deliveryFileJSON(file, directory: receipt.directory)
+            row["reused"] = receipt.startedWith.contains(file.trackIndex)
+            return row
+        }
+        let complete = reason == nil && files.count == identity.expectedTracks.count && restored
         return envelope(complete ? "A" : "B", files: files, status: complete ? "complete" : "partial",
                         reason: reason ?? (restored ? nil : "selection_restoration_unverified"),
                         restored: restored, attempted: attempted)
+    }
+
+    private static func renderDeliveryMix(
+        _ mix: ProjectPCMBounceSettings, scope: ProjectSelectiveStemScope, selectedIndex: Int,
+        receipt: ProjectSelectiveStemReceipt
+    ) async -> String? {
+        let identity = receipt.journal.identity
+        guard scope.selected(selectedIndex, range: mix.range), receipt.holdsDirectory(),
+              OperationTraceContext.claimDeadlineEffect("delivery_mix"),
+              let destination = try? receipt.newMixDestination() else { return "mix_scope_or_destination_unavailable" }
+        let rendered = await ProjectLogic13Bounce.run(path: destination.path, projectPath: identity.projectPath,
+                                                       settings: mix, runtime: scope.runtime)
+        guard let path = rendered.artifactPath, path == destination.path, rendered.observedRange == mix.range else {
+            return rendered.error ?? "mix_range_or_output_unverified"
+        }
+        let audio = AudioAnalyzer.analyzeFile(path: path,
+            policy: .init(minimumDurationSeconds: 0.05, allowsSilentOutput: true, outputRoot: receipt.directory.path))
+        guard audio.verification.status == .pass, audio.frameCount > 0,
+              mix.matchesFile(path), audio.sampleRate == mix.sampleRate,
+              receipt.journal.files.allSatisfy({ $0.sampleRate == audio.sampleRate && $0.frames == audio.frameCount }),
+              scope.selected(selectedIndex, range: mix.range),
+              (try? ProjectSelectiveStemReceipt.savedProjectDigest(path: identity.projectPath)) == identity.projectSHA256
+        else { return "mix_alignment_or_project_unverified" }
+        do {
+            try receipt.record(destination, track: nil, sampleRate: audio.sampleRate, frames: audio.frameCount)
+            return nil
+        } catch {
+            return "mix_receipt_commit_failed"
+        }
+    }
+
+    static func deliveryFileJSON(_ file: ProjectSelectiveStemReceipt.File, directory: URL) -> [String: Any] {
+        var row: [String: Any] = [
+            "kind": file.trackIndex == nil ? "mix" : "stem",
+            "path": directory.appendingPathComponent(file.relativePath).path,
+            "sha256": file.sha256, "sample_rate": file.sampleRate, "frame_count": file.frames,
+        ]
+        row["track_index"] = file.trackIndex
+        return row
     }
 }
