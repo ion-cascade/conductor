@@ -5,9 +5,10 @@ struct ProjectExportBounceHelperResult: Sendable, Equatable {
     let artifactPath: String?
     let error: String?
     let bounceFired: Bool
+    var observedRange: ProjectBounceRange? = nil
 
-    static func success(_ path: String, bounceFired: Bool = true) -> ProjectExportBounceHelperResult {
-        ProjectExportBounceHelperResult(artifactPath: path, error: nil, bounceFired: bounceFired)
+    static func success(_ path: String, bounceFired: Bool = true, observedRange: ProjectBounceRange? = nil) -> ProjectExportBounceHelperResult {
+        ProjectExportBounceHelperResult(artifactPath: path, error: nil, bounceFired: bounceFired, observedRange: observedRange)
     }
 
     static func failure(_ error: String, bounceFired: Bool = false) -> ProjectExportBounceHelperResult {

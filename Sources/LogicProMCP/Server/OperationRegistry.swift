@@ -919,7 +919,7 @@ enum OperationRegistry {
         (.projectQuit, "quit", Mutability.`mutating`, ConfirmationPolicy.l3, VerificationPolicy.readbackRequired, DeadlineClass.medium, ["confirmed"]),
         (.projectGetRegions, "get_regions", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.short, []),
         (.projectScanRegions, "scan_regions", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.medium, []),
-        (.projectEditRegion, "edit_region", Mutability.mutating, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.medium, ["target_ref", "expected_start", "expected_end", "start", "end"]),
+        (.projectEditRegion, "edit_region", Mutability.mutating, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.medium, ["target_ref", "mode", "expected_start", "expected_end", "start", "end"]),
         (
             .projectExportPlan,
             "export_plan",

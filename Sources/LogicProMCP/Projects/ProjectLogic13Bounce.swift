@@ -140,7 +140,7 @@ struct ProjectLogic13Bounce {
             guard let output = await completedFile(destination, settings: settings) else {
                 throw Failure.unavailable("bounce_file_missing_incomplete_or_wrong_settings")
             }
-            return .success(output)
+            return .success(output, observedRange: settings.range)
         } catch {
             if let owned { cancelIfOwned(owned) }
             let detail: String
@@ -193,10 +193,8 @@ struct ProjectLogic13Bounce {
     // plus ten bars of native offset. This adapter qualifies the observed
     // 4/4, 1/16 grid by checking the host's independent musical display.
     private func arrangeSliderValue(_ position: String) -> Int64? {
-        guard let parts = ProjectBounceRange.position(position), parts[1] <= 4, parts[2] <= 4, parts[3] <= 240
-        else { return nil }
-        let ticks = (parts[0] + 9) * 3840 + (parts[1] - 1) * 960 + (parts[2] - 1) * 240 + parts[3] - 1
-        return Int64(ticks) << 32
+        guard let ticks = ArrangeMusicalGrid.ticks(position) else { return nil }
+        return Int64(ticks + 38_400) << 32
     }
 
     private func configureRange(_ range: ProjectBounceRange, in dialog: AXUIElement) async throws {

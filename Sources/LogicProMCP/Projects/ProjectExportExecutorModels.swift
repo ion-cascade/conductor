@@ -85,6 +85,7 @@ struct ProjectExportRunArtifact: Codable, Sendable, Equatable {
     let error: String?
     let reason: String?
     let evidence: ProjectExportArtifactEvidence?
+    let observedBounceRange: ProjectBounceRange?
     /// Present for a late-bound stem result. This is the requested populated
     /// track, not an inference from an output filename.
     let subject: ProjectExportStemSubject?
@@ -105,6 +106,7 @@ struct ProjectExportRunArtifact: Codable, Sendable, Equatable {
         case error
         case reason
         case evidence
+        case observedBounceRange = "observed_bounce_range"
         case subject
         case observedStemOutputs = "observed_stem_outputs"
     }
@@ -120,7 +122,8 @@ struct ProjectExportRunArtifact: Codable, Sendable, Equatable {
         reason: String?,
         evidence: ProjectExportArtifactEvidence?,
         subject: ProjectExportStemSubject? = nil,
-        observedStemOutputs: [ProjectExportObservedStemOutput]? = nil
+        observedStemOutputs: [ProjectExportObservedStemOutput]? = nil,
+        observedBounceRange: ProjectBounceRange? = nil
     ) {
         self.kind = kind
         self.path = path
@@ -131,6 +134,7 @@ struct ProjectExportRunArtifact: Codable, Sendable, Equatable {
         self.error = error
         self.reason = reason
         self.evidence = evidence
+        self.observedBounceRange = observedBounceRange
         self.subject = subject
         self.observedStemOutputs = observedStemOutputs
     }

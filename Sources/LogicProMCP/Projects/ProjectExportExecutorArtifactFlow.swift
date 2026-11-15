@@ -125,6 +125,7 @@ extension ProjectExportExecutor {
         }
 
         let producedPath: String
+        var observedRange: ProjectBounceRange?
         if options.bounceToPath != nil || options.driveNativeBounce != nil || artifact.bounceSettings != nil {
             guard OperationTraceContext.claimDeadlineEffect("project_export_bounce") else {
                 return failedArtifact(
@@ -174,6 +175,10 @@ extension ProjectExportExecutor {
                     error: "bounce_helper_unexpected_artifact_path: expected stem \(ProjectExportArtifactPathPolicy.standardizedStemPath(artifact.path)) but helper returned \(produced)",
                     bounceFired: true
                 )
+            }
+            observedRange = bounceResult.observedRange
+            if let requested = artifact.bounceSettings?.range, observedRange != requested {
+                return failedArtifact(artifact, error: "rendered_pcm_range_unverified", bounceFired: true)
             }
             producedPath = produced
         } else {
@@ -230,7 +235,7 @@ extension ProjectExportExecutor {
                 writeAttempted: true,
                 error: nil,
                 reason: nil,
-                evidence: evidence
+                evidence: evidence, observedBounceRange: observedRange
             )
         }
         return RunArtifact(
@@ -242,7 +247,7 @@ extension ProjectExportExecutor {
             writeAttempted: true,
             error: nil,
             reason: "artifact_unverified: \(analysis.verification.reasons.joined(separator: ","))",
-            evidence: evidence
+            evidence: evidence, observedBounceRange: observedRange
         )
     }
 

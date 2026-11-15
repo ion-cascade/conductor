@@ -35,3 +35,19 @@ struct ArrangeRegionBounds: Equatable, Sendable {
                     end: end.map(String.init).joined(separator: "."))
     }
 }
+
+
+/// The measured Logic 13 English quarter-note, sixteenth-division grid used by
+/// numeric and geometric adapters. Native readback remains authoritative.
+enum ArrangeMusicalGrid {
+    static func ticks(_ position: String) -> Int? {
+        guard let parts = ProjectBounceRange.position(position), parts[1] <= 4, parts[2] <= 4, parts[3] <= 240
+        else { return nil }
+        return (parts[0] - 1) * 3840 + (parts[1] - 1) * 960 + (parts[2] - 1) * 240 + parts[3] - 1
+    }
+
+    static func position(_ ticks: Int) -> String? {
+        guard (0..<(9999 * 3840)).contains(ticks) else { return nil }
+        return "\(ticks / 3840 + 1).\(ticks / 960 % 4 + 1).\(ticks / 240 % 4 + 1).\(ticks % 240 + 1)"
+    }
+}

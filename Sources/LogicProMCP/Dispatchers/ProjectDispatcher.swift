@@ -429,7 +429,7 @@ struct ProjectDispatcher: OperationTraceDispatching {
             return toolTextResult(await router.route(operation: "region.scan"))
 
         case "edit_region":
-            let keys: Set<String> = ["target_ref", "expected_start", "expected_end", "start", "end"]
+            let keys: Set<String> = ["target_ref", "mode", "expected_start", "expected_end", "start", "end"]
             guard Set(params.keys).isSubset(of: keys),
                   let reference = params["target_ref"]?.stringValue, reference.hasPrefix("reg_"),
                   let expectedStart = params["expected_start"]?.stringValue,
@@ -437,11 +437,13 @@ struct ProjectDispatcher: OperationTraceDispatching {
                   let first = ProjectBounceRange.position(expectedStart),
                   let last = ProjectBounceRange.position(expectedEnd),
                   first.lexicographicallyPrecedes(last),
-                  (params["start"] != nil || params["end"] != nil),
+                  let mode = params["mode"]?.stringValue,
+                  (mode == "move" && params["start"] != nil && params["end"] == nil)
+                    || (mode == "trim" && ((params["start"] != nil) != (params["end"] != nil))),
                   ["start", "end"].allSatisfy({ key in
                       params[key] == nil || params[key]?.stringValue.flatMap(ProjectBounceRange.position) != nil
                   }) else {
-                return toolInvalidParamsResult("edit_region requires target_ref, expected_start, expected_end and at least one new boundary")
+                return toolInvalidParamsResult("edit_region requires target_ref, expected_start and expected_end. Use move with start, or trim with exactly one new boundary.")
             }
             let traceID = await startTraceIfEnabled(command: command)
             let result = await withWriteBoundaryArmed(traceID) {
