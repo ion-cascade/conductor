@@ -8,11 +8,11 @@ extension AccessibilityChannel {
         runtime logic: AXLogicProElements.Runtime
     ) async -> ChannelResult {
         let operation = edit ? "track.set_volume_automation_point" : "track.get_volume_automation"
-        func unavailable() -> ChannelResult {
+        func unavailable(_ stage: String) -> ChannelResult {
             .error(HonestContract.encodeStateC(
                 error: .readbackUnavailable,
                 hint: "Open the Track Automation Event List for the referenced track and expose its Volume events.",
-                extras: ["operation": operation, "write_attempted": false]))
+                extras: ["operation": operation, "readback_stage": stage, "write_attempted": false]))
         }
         guard let binding = AXTrackBinding.current,
               let index = binding.currentIndex(),
@@ -23,7 +23,7 @@ extension AccessibilityChannel {
               let arrangeTitle = AXHelpers.getTitle(binding.window, runtime: logic.ax),
               arrangeTitle.hasSuffix(" - Tracks"),
               let editor: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute as String, runtime: logic.ax),
-              !CFEqual(editor, binding.window) else { return unavailable() }
+              !CFEqual(editor, binding.window) else { return unavailable("track_editor_scope") }
         let read = Logic13VolumeEventList(app: app, editor: editor, arrange: binding.window,
             title: String(arrangeTitle.dropLast(" - Tracks".count)),
             trackName: trackName, runtime: logic.ax)
@@ -41,7 +41,10 @@ extension AccessibilityChannel {
             }
             return nameMatches == 1 && logic.focusedApplicationPID() == pid && read.ownsEditor()
         }
-        guard let points = read.points(), current() else { return unavailable() }
+        guard current() else { return unavailable("editor_ownership") }
+        var stage = "event_table"
+        guard let points = read.points(onRefusal: { stage = $0 }) else { return unavailable(stage) }
+        guard current() else { return unavailable("editor_ownership_after_read") }
         if edit {
             return await changeTrackVolumePoint(params: params, points: points,
                 editor: read, current: current, logic: logic, operation: operation)
@@ -168,7 +171,7 @@ private struct Logic13VolumeEventList {
             && documents.contains(where: { CFEqual($0, editor) })
     }
 
-    func points() -> [Point]? {
+    func points(onRefusal: (String) -> Void = { _ in }) -> [Point]? {
         guard ownsEditor(),
               case .success(let windowChildren) = AXHelpers.childrenResult(editor, runtime: runtime),
               let event = unique("Event", role: kAXGroupRole as String, in: windowChildren),
@@ -184,25 +187,33 @@ private struct Logic13VolumeEventList {
               let scroll = uniqueRole(kAXScrollAreaRole as String, in: contentChildren),
               case .success(let scrollChildren) = AXHelpers.childrenResult(scroll, runtime: runtime),
               let table = uniqueRole(kAXTableRole as String, in: scrollChildren),
-              case .success(let tableChildren) = AXHelpers.childrenResult(table, runtime: runtime) else { return nil }
+              case .success(let tableChildren) = AXHelpers.childrenResult(table, runtime: runtime) else {
+            onRefusal("event_table")
+            return nil
+        }
 
         let columns = tableChildren.filter { AXHelpers.getRole($0, runtime: runtime) == kAXColumnRole as String }
         guard columns.map({ AXHelpers.getDescription($0, runtime: runtime) ?? "" })
-                == ["Lock", "Muted", "Position", "Status", "Ch", "Num", "Val", "Length"] else { return nil }
+                == ["Lock", "Muted", "Position", "Status", "Ch", "Num", "Val", "Length"] else {
+            onRefusal("event_columns")
+            return nil
+        }
         let rows = tableChildren.filter { AXHelpers.getRole($0, runtime: runtime) == kAXRowRole as String }
-        guard rows.count == count else { return nil }
+        guard rows.count == count else { onRefusal("event_row_count"); return nil }
         var points: [Point] = []
         for row in rows {
             guard !Task.isCancelled,
                   case .success(let cells) = AXHelpers.childrenResult(row, runtime: runtime),
                   cells.count == columns.count,
                   unique("Fader", role: kAXCellRole as String, in: AXHelpers.getChildren(cells[3], runtime: runtime)) != nil,
-                  unique("Volume", role: kAXCellRole as String, in: AXHelpers.getChildren(cells[7], runtime: runtime)) != nil,
-                  let positionGroup = hitInCell(cells[2], column: 2, role: kAXGroupRole as String),
-                  let position = AXHelpers.getDescription(positionGroup, runtime: runtime).flatMap(Self.position),
-                  let slider = hitInCell(cells[6], column: 6, role: kAXSliderRole as String),
+                  unique("Volume", role: kAXCellRole as String, in: AXHelpers.getChildren(cells[7], runtime: runtime)) != nil
+            else { onRefusal("volume_event_identity"); return nil }
+            guard let positionGroup = hitInCell(cells[2], column: 2, role: kAXGroupRole as String),
+                  let position = AXHelpers.getDescription(positionGroup, runtime: runtime).flatMap(Self.position)
+            else { onRefusal("event_position"); return nil }
+            guard let slider = hitInCell(cells[6], column: 6, role: kAXSliderRole as String),
                   let value: Int = AXHelpers.getAttribute(slider, kAXValueAttribute as String, runtime: runtime),
-                  (0...127).contains(value) else { return nil }
+                  (0...127).contains(value) else { onRefusal("event_value"); return nil }
             points.append(Point(position: position, value: value, slider: slider))
         }
         return points
@@ -238,7 +249,7 @@ private struct Logic13VolumeEventList {
         var observed = CFRange(location: 0, length: 0)
         guard AXValueGetValue(rawColumn, .cfRange, &observed),
               observed.location == column, observed.length == 1,
-              case .success(.some(let element)) = hit(app, CGPoint(
+              case .success(.some(let element)) = hit(AXUIElementCreateSystemWide(), CGPoint(
                 x: origin.x + size.width / 2, y: origin.y + size.height / 2)),
               AXHelpers.getRole(element, runtime: runtime) == role,
               let parent: AXUIElement = AXHelpers.getAttribute(element, kAXParentAttribute as String, runtime: runtime),
