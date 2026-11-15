@@ -86,6 +86,7 @@ enum ProjectExportExecutor {
         /// Live path-directed bounce. nil keeps the legacy router-bounce seam so
         /// the deterministic unit tests never shell out to the UI helper.
         var bounceToPath: BounceToPath?
+        var driveNativeBounce: (@Sendable (String, String, ProjectPCMBounceSettings?) async -> BounceHelperResult?)? = nil
         /// Blocking-dialog preflight for the per-project batch open (audit P2 #18).
         /// Defaults to `{ false }` so hermetic unit tests never trip the preflight;
         /// `.live()` wires it to the real AX dialog probe.
@@ -111,6 +112,12 @@ enum ProjectExportExecutor {
                 sleep: { try? await Task.sleep(nanoseconds: $0) },
                 minimumDurationSeconds: 0.05,
                 bounceToPath: { artifactPath in await ProjectExportExecutor.runBounceHelper(artifactPath: artifactPath) },
+                driveNativeBounce: { path, project, requested in
+                    guard await ProjectLogic13Bounce.isSupported() else { return nil }
+                    let settings = requested ?? ProjectPCMBounceSettings(
+                        format: .wav, sampleRate: 44_100, bitDepth: 24, includeAudioTail: false)
+                    return await ProjectLogic13Bounce.run(path: path, projectPath: project, settings: settings)
+                },
                 dialogPresent: { AXLogicProElements.dialogPresent() },
                 driveIsolatedStemExport: { destination, count in
                     await ProjectIsolatedStemExport.live(root: destination, expectedCount: count)
@@ -360,6 +367,7 @@ enum ProjectExportExecutor {
             }
             let produced = await produceArtifacts(
                 artifact: artifact,
+                projectPath: project.projectPath,
                 plan: plan,
                 router: router,
                 options: options

@@ -96,6 +96,7 @@ extension ProjectExportExecutor {
 
     static func produceArtifacts(
         artifact: ProjectExportPlanArtifact,
+        projectPath: String,
         plan: ProjectExportPlan,
         router: ChannelRouter,
         options: Options
@@ -103,11 +104,12 @@ extension ProjectExportExecutor {
         if artifact.filenamesLateBound == true {
             return await produceStem(artifact: artifact, plan: plan, options: options)
         }
-        return [await produce(artifact: artifact, plan: plan, router: router, options: options)]
+        return [await produce(artifact: artifact, projectPath: projectPath, plan: plan, router: router, options: options)]
     }
 
     private static func produce(
         artifact: ProjectExportPlanArtifact,
+        projectPath: String,
         plan: ProjectExportPlan,
         router: ChannelRouter,
         options: Options
@@ -123,7 +125,7 @@ extension ProjectExportExecutor {
         }
 
         let producedPath: String
-        if let bounce = options.bounceToPath {
+        if options.bounceToPath != nil || options.driveNativeBounce != nil || artifact.bounceSettings != nil {
             guard OperationTraceContext.claimDeadlineEffect("project_export_bounce") else {
                 return failedArtifact(
                     artifact,
@@ -131,7 +133,22 @@ extension ProjectExportExecutor {
                     bounceFired: false
                 )
             }
-            let bounceResult = await bounce(artifact.path)
+            let nativeResult: BounceHelperResult?
+            if artifact.kind == "bounce", let native = options.driveNativeBounce {
+                nativeResult = await native(artifact.path, projectPath, artifact.bounceSettings)
+            } else {
+                nativeResult = nil
+            }
+            let bounceResult: BounceHelperResult
+            if let nativeResult {
+                bounceResult = nativeResult
+            } else if artifact.bounceSettings != nil {
+                bounceResult = .failure("explicit_pcm_bounce_requires_logic_13")
+            } else if let legacy = options.bounceToPath {
+                bounceResult = await legacy(artifact.path)
+            } else {
+                bounceResult = .failure("bounce_route_unavailable")
+            }
             guard let produced = bounceResult.artifactPath else {
                 return RunArtifact(
                     kind: artifact.kind,
@@ -195,6 +212,9 @@ extension ProjectExportExecutor {
                 error: "artifact_path_unsafe: \(analysis.verification.detail ?? analysis.verification.reasons.joined(separator: ","))",
                 bounceFired: true
             )
+        }
+        if let settings = artifact.bounceSettings, !settings.matchesFile(producedPath) {
+            return failedArtifact(artifact, error: "rendered_pcm_settings_mismatch", bounceFired: true)
         }
         let evidence = ArtifactEvidence(from: analysis, source: "audio_analyzer")
         if analysis.verification.status == .pass {
@@ -619,6 +639,11 @@ extension ProjectExportExecutor {
             )
         }
         let evidence = ArtifactEvidence(from: analysis, source: "skip_reverify")
+        if artifact.bounceSettings != nil {
+            return RunArtifact(kind: artifact.kind, path: existingPath, state: "B", verified: false,
+                               bounceFired: false, writeAttempted: false, error: nil,
+                               reason: "existing_bounce_settings_provenance_unavailable", evidence: evidence)
+        }
         guard analysis.verification.status == .pass else {
             return RunArtifact(
                 kind: artifact.kind,

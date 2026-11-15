@@ -111,60 +111,7 @@ final class MIDITrackExportPanel {
                 return panel
             }
             ownedPanel = panel
-            stage = "save_panel_ready"
-            try assertOwned(panel, app: app)
-            guard try descendants(panel).allSatisfy({ try string(kAXRoleAttribute as String, of: $0) != kAXSheetRole as String }) else {
-                throw Failure.unavailable("unexpected_sheet")
-            }
-            try assertKeyboardFocus(panel, app: app)
-            guard keyboard.post(5, [.maskCommand, .maskShift]) else { throw Failure.unavailable("go_to_folder_key_refused") }
-            stage = "go_to_folder"
-            let go = try await wait("go_to_folder") { try self.unique(identifier: "GoToWindow", role: kAXSheetRole as String, in: panel, optional: true) }
-            try assertOwned(panel, app: app)
-            let path = try required(identifier: "PathTextField", role: kAXTextFieldRole as String, in: go)
-            let directory = destination.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
-            try setValue(directory, on: path)
-            guard let currentGo = try unique(identifier: "GoToWindow", role: kAXSheetRole as String, in: panel),
-                  CFEqual(currentGo, go) else { throw Failure.unavailable("owned_go_to_folder_lost") }
-            try assertKeyboardFocus(panel, app: app, sheet: go)
-            guard keyboard.post(36, []) else { throw Failure.unavailable("go_to_folder_return_refused") }
-            stage = "directory_navigation"
-            _ = try await wait("directory_navigation", allowingRetiringElement: true) { () throws -> AXUIElement? in
-                try self.assertOwned(panel, app: app)
-                return try self.unique(identifier: "GoToWindow", role: kAXSheetRole as String, in: panel, optional: true) == nil ? panel : nil
-            }
-            try assertOwned(panel, app: app)
-            stage = "destination_selection"
-            guard try directorySelected(directory, in: panel) else { throw Failure.unavailable("destination_directory_not_confirmed") }
-            let name = try required(identifier: "saveAsNameTextField", role: kAXTextFieldRole as String, in: panel)
-            try setValue(destination.lastPathComponent, on: name)
-            stage = "save"
-            // Repeat the scope and folder checks after the final field write.
-            try assertOwned(panel, app: app)
-            guard try directorySelected(directory, in: panel),
-                  !FileManager.default.fileExists(atPath: destination.path) else { throw Failure.unavailable("destination_changed") }
-            let save = try required(identifier: "OKButton", role: kAXButtonRole as String, in: panel)
-            try assertOwned(panel, app: app)
-            try act(save, action: kAXPressAction as String, panel: panel, app: app, beforeAction: {
-                // The Save capability read can outlive the earlier folder and
-                // filename proof. Renew the exact controls and destination
-                // after that read, not just the enclosing panel's identity.
-                guard let currentName = try self.unique(identifier: "saveAsNameTextField", role: kAXTextFieldRole as String, in: panel),
-                      let currentSave = try self.unique(identifier: "OKButton", role: kAXButtonRole as String, in: panel),
-                      CFEqual(currentName, name), CFEqual(currentSave, save),
-                      try self.directorySelected(directory, in: panel),
-                      try self.string(kAXValueAttribute as String, of: currentName)?.utf8.elementsEqual(destination.lastPathComponent.utf8) == true,
-                      !FileManager.default.fileExists(atPath: destination.path) else {
-                    throw Failure.unavailable("destination_changed")
-                }
-                try self.assertOwned(panel, app: app)
-            })
-            stage = "save_panel_closed"
-            _ = try await wait("save_panel_closed") {
-                let current = try self.windows(app)
-                return current.contains(where: { CFEqual($0, panel) }) ? nil : self.window
-            }
-            _ = try currentApp()
+            try await saveOpenedPanel(panel, to: destination, stage: &stage)
             // Panel disappearance is not artifact evidence. The shared file
             // flow separately opens, validates and binds the resulting SMF.
         } catch {
@@ -185,6 +132,70 @@ final class MIDITrackExportPanel {
             }
             throw error
         }
+    }
+
+    /// Complete an already acquired AppKit Save panel under the same project custody.
+    /// The producer owns the operation that acquired the panel and the file evidence.
+    func saveOpenedPanel(
+        _ panel: AXUIElement, to destination: URL, stage: inout String,
+        beforeCommit: @MainActor () throws -> Void = {}
+    ) async throws {
+        let app = try currentApp()
+        stage = "save_panel_ready"
+        try assertOwned(panel, app: app)
+        guard try descendants(panel).allSatisfy({ try string(kAXRoleAttribute as String, of: $0) != kAXSheetRole as String }) else {
+            throw Failure.unavailable("unexpected_sheet")
+        }
+        try assertKeyboardFocus(panel, app: app)
+        guard keyboard.post(5, [.maskCommand, .maskShift]) else { throw Failure.unavailable("go_to_folder_key_refused") }
+        stage = "go_to_folder"
+        let go = try await wait("go_to_folder") { try self.unique(identifier: "GoToWindow", role: kAXSheetRole as String, in: panel, optional: true) }
+        try assertOwned(panel, app: app)
+        let path = try required(identifier: "PathTextField", role: kAXTextFieldRole as String, in: go)
+        let directory = destination.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
+        try setValue(directory, on: path)
+        guard let currentGo = try unique(identifier: "GoToWindow", role: kAXSheetRole as String, in: panel),
+              CFEqual(currentGo, go) else { throw Failure.unavailable("owned_go_to_folder_lost") }
+        try assertKeyboardFocus(panel, app: app, sheet: go)
+        guard keyboard.post(36, []) else { throw Failure.unavailable("go_to_folder_return_refused") }
+        stage = "directory_navigation"
+        _ = try await wait("directory_navigation", allowingRetiringElement: true) { () throws -> AXUIElement? in
+            try self.assertOwned(panel, app: app)
+            return try self.unique(identifier: "GoToWindow", role: kAXSheetRole as String, in: panel, optional: true) == nil ? panel : nil
+        }
+        try assertOwned(panel, app: app)
+        stage = "destination_selection"
+        guard try directorySelected(directory, in: panel) else { throw Failure.unavailable("destination_directory_not_confirmed") }
+        let name = try required(identifier: "saveAsNameTextField", role: kAXTextFieldRole as String, in: panel)
+        try setValue(destination.lastPathComponent, on: name)
+        stage = "save"
+        // Repeat the scope and folder checks after the final field write.
+        try assertOwned(panel, app: app)
+        guard try directorySelected(directory, in: panel),
+              !FileManager.default.fileExists(atPath: destination.path) else { throw Failure.unavailable("destination_changed") }
+        let save = try required(identifier: "OKButton", role: kAXButtonRole as String, in: panel)
+        try assertOwned(panel, app: app)
+        try act(save, action: kAXPressAction as String, panel: panel, app: app, beforeAction: {
+            // The Save capability read can outlive the earlier folder and
+            // filename proof. Renew the exact controls and destination
+            // after that read, not just the enclosing panel's identity.
+            guard let currentName = try self.unique(identifier: "saveAsNameTextField", role: kAXTextFieldRole as String, in: panel),
+                  let currentSave = try self.unique(identifier: "OKButton", role: kAXButtonRole as String, in: panel),
+                  CFEqual(currentName, name), CFEqual(currentSave, save),
+                  try self.directorySelected(directory, in: panel),
+                  try self.string(kAXValueAttribute as String, of: currentName)?.utf8.elementsEqual(destination.lastPathComponent.utf8) == true,
+                  !FileManager.default.fileExists(atPath: destination.path) else {
+                throw Failure.unavailable("destination_changed")
+            }
+            try self.assertOwned(panel, app: app)
+            try beforeCommit()
+        })
+        stage = "save_panel_closed"
+        _ = try await wait("save_panel_closed") {
+            let current = try self.windows(app)
+            return current.contains(where: { CFEqual($0, panel) }) ? nil : self.window
+        }
+        _ = try currentApp()
     }
 
     private func currentApp() throws -> AXUIElement {

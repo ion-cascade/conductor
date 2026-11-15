@@ -13,6 +13,7 @@ enum ProjectExportPlanner {
         let projects = try projectPaths(from: params)
         let outputRoot = try outputRoot(from: params, fileManager: fileManager)
         let artifacts = try artifactKinds(from: params)
+        let bounceSettings = try ProjectPCMBounceSettings.parse(params["bounce_settings"], artifacts: artifacts)
         let collisionPolicy = stringParam(params, "collision_policy", default: "fail_if_exists")
         guard ["fail_if_exists", "skip_existing"].contains(collisionPolicy) else {
             throw ExportPlanError.invalid("collision_policy must be fail_if_exists or skip_existing")
@@ -36,7 +37,8 @@ enum ProjectExportPlanner {
                 artifactKinds: artifacts,
                 collisionPolicy: collisionPolicy,
                 fileManager: fileManager,
-                stemSubjects: stemSubjects
+                stemSubjects: stemSubjects,
+                bounceSettings: bounceSettings
             )
         }
 
@@ -59,7 +61,9 @@ enum ProjectExportPlanner {
 
         return ProjectExportPlan(
             schema: schema,
-            runID: deterministicRunID(projects: projects, outputRoot: outputRoot, artifacts: artifacts),
+            runID: deterministicRunID(projects: projects, outputRoot: outputRoot, artifacts: artifacts + (bounceSettings.map {
+                ["\($0.format.rawValue):\($0.sampleRate):\($0.bitDepth):\($0.includeAudioTail)"]
+            } ?? [])),
             // C3: real run-window anchor so the advertised mtime_within_run_window
             // gate is evaluable — an executor bounds post-export mtime to >= this.
             generatedAt: ISO8601DateFormatter.cacheFormatter.string(from: Date()),
@@ -94,7 +98,8 @@ enum ProjectExportPlanner {
         artifactKinds: [String],
         collisionPolicy: String,
         fileManager: FileManager,
-        stemSubjects: ProjectExportStemSubjectInventory?
+        stemSubjects: ProjectExportStemSubjectInventory?,
+        bounceSettings: ProjectPCMBounceSettings?
     ) -> ProjectExportPlanProject {
         var issues: [String] = []
         if !AppleScriptSafety.isValidProjectPath(path, requireExisting: false) {
@@ -114,7 +119,8 @@ enum ProjectExportPlanner {
                 collisionPolicy: collisionPolicy,
                 fileManager: fileManager,
                 projectPath: path,
-                stemSubjects: stemSubjects
+                stemSubjects: stemSubjects,
+                bounceSettings: kind == "bounce" ? bounceSettings : nil
             )
         }
 
@@ -137,7 +143,8 @@ enum ProjectExportPlanner {
         collisionPolicy: String,
         fileManager: FileManager,
         projectPath: String,
-        stemSubjects: ProjectExportStemSubjectInventory?
+        stemSubjects: ProjectExportStemSubjectInventory?,
+        bounceSettings: ProjectPCMBounceSettings?
     ) -> ProjectExportPlanArtifact {
         if kind == "stem" {
             return stemArtifact(
@@ -152,12 +159,13 @@ enum ProjectExportPlanner {
         // the check is non-vacuous. A raw displayName containing ".." or a path
         // separator can resolve outside outputRoot once standardized; the sanitized
         // url below can never express that, so it alone could only ever be true.
-        let rawComponent = "\(displayName)-\(kind).wav"
+        let fileExtension = bounceSettings?.format.outputExtension ?? "wav"
+        let rawComponent = "\(displayName)-\(kind).\(fileExtension)"
         let candidate = outputRoot.appendingPathComponent(rawComponent).standardizedFileURL
         let underRoot = candidate.path == outputRoot.path || candidate.path.hasPrefix(outputRoot.path + "/")
 
         let safeProject = sanitizeFileComponent(displayName)
-        let url = outputRoot.appendingPathComponent("\(safeProject)-\(kind).wav").standardizedFileURL
+        let url = outputRoot.appendingPathComponent("\(safeProject)-\(kind).\(fileExtension)").standardizedFileURL
         let existingVariant = ProjectExportArtifactPathPolicy.preferredExistingVariant(
             for: url.path,
             fileManager: fileManager
@@ -213,7 +221,8 @@ enum ProjectExportPlanner {
             destination: nil,
             subjects: nil,
             filenamesLateBound: nil,
-            planningReason: nil
+            planningReason: nil,
+            bounceSettings: bounceSettings
         )
     }
 
