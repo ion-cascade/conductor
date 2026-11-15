@@ -15,6 +15,12 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
 
+## 1.8.1 Native write qualification
+
+The operation-bound write matrix covers 14 writes across ten disposable fixture cases. On the supported Mac mini setup it checks named targets and neighboring state, including stale expectations and references where supported. Persistence checks acquire fresh references after closing and reopening the project. The region parameter and sidechain cases include measured bounces.
+
+The release artifact records results individually. The matrix uses the fixtures and preconditions described in the [qualification runner](../../Scripts/qualification_writes/README.md). Support for each write is bounded by its documented native control, selection and project requirements.
+
 ## 1.8 Audio-region gain and fades
 
 | Workflow | Mac mini qualification |

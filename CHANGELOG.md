@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.8.1] — 2026-11-16
+
+- Add operation-specific native qualification for Mixer switches, stock Compressor presets, bypass and sidechain, offscreen region edits, Stem Splitter, Step Sequencer steps, and track Volume and Pan automation. ([#39](https://github.com/ion-cascade/conductor/issues/39))
+- Add the audio-region gain and fade writes to that matrix, with native Inspector readback, persistence and measured bounces. ([#40](https://github.com/ion-cascade/conductor/issues/40))
+
 ## [1.8.0] — 2026-11-15
 
 - Read and set gain and linear fade times for one referenced audio region. Writes require the current Inspector value and verify the new setting and neighboring regions.
