@@ -28,6 +28,8 @@ enum ParamKind: String, Sendable, Equatable {
     case integer
     /// `doubleParamOrNil`: a number or a numeric string.
     case number
+    /// A JSON number without string coercion.
+    case jsonNumber = "JSON number"
     /// `stringParam`: a string, number or boolean, read as text.
     case scalar
     /// A raw `.stringValue` read: a string only.
@@ -54,6 +56,8 @@ enum ParamKind: String, Sendable, Equatable {
             return .object(["anyOf": .array([.object(["type": "integer"]), .object(["type": "string"])])])
         case .number:
             return .object(["anyOf": .array([.object(["type": "number"]), .object(["type": "string"])])])
+        case .jsonNumber:
+            return .object(["type": "number"])
         case .scalar:
             return .object(["type": .array(["string", "number", "boolean"])])
         case .string:
@@ -78,6 +82,8 @@ enum ParamKind: String, Sendable, Equatable {
         switch self {
         case .object, .array, .listOrString, .boolean:
             return .int(7)
+        case .jsonNumber:
+            return .string("1")
         default:
             return .object(["not": "this kind"])
         }
@@ -597,6 +603,24 @@ extension OperationRegistry {
                 "expected_enabled": .enforced(.boolean, .bool(false)),
                 "enabled": .enforced(.boolean, .bool(true)),
             ], required: [["address"], ["expected_enabled"], ["enabled"]]),
+            "project.get_region_gain": .init(params: [
+                "target_ref": .enforced(.string, .string("reg_test")),
+            ], required: [["target_ref"]]),
+            "project.set_region_gain": .init(params: [
+                "target_ref": .enforced(.string, .string("reg_test")),
+                "expected_gain_db": .enforced(.jsonNumber, .int(0)),
+                "gain_db": .enforced(.jsonNumber, .double(-6.0)),
+            ], required: [["target_ref"], ["expected_gain_db"], ["gain_db"]]),
+            "project.get_region_fade": .init(params: [
+                "target_ref": .enforced(.string, .string("reg_test")),
+                "edge": .enforced(.string, .string("in"), allowed: ["in", "out"]),
+            ], required: [["target_ref"], ["edge"]]),
+            "project.set_region_fade": .init(params: [
+                "target_ref": .enforced(.string, .string("reg_test")),
+                "edge": .enforced(.string, .string("in"), allowed: ["in", "out"]),
+                "expected_time_ms": .enforced(.jsonNumber, .int(0)),
+                "time_ms": .enforced(.jsonNumber, .int(500)),
+            ], required: [["target_ref"], ["edge"], ["expected_time_ms"], ["time_ms"]]),
             "project.edit_region": .init(params: [
                 "target_ref": .enforced(.string, .string("reg_test")),
                 "expected_start": .enforced(.string, .string("1.1.1.1")),

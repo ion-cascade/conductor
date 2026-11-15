@@ -315,6 +315,10 @@ extension ChannelRouter {
         // when there is something behind them.
         "region.scan":                [.accessibility],
         "region.edit_by_reference":   [.accessibility],
+        "region.get_gain":            [.accessibility],
+        "region.set_gain":            [.accessibility],
+        "region.get_fade":            [.accessibility],
+        "region.set_fade":            [.accessibility],
         "region.get_regions":         [.accessibility],
         // Reserved for a future region-editor tool that picks up the freshly
         // imported region and aligns it to the playhead. Currently unused by

@@ -1,6 +1,6 @@
-# Conductor 1.7 compatibility
+# Conductor 1.8 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.7 and the checks from earlier releases.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.8 and the checks from earlier releases.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -14,6 +14,16 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
+
+## 1.8 Audio-region gain and fades
+
+| Workflow | Mac mini qualification |
+| --- | --- |
+| Exact gain | Verified native Inspector values at +12.0, −24.0 and −6.0 dB on a referenced audio region. The 48 kHz stereo bounce measured the −6.0 dB change against a control. |
+| Fade times | Verified standard zero-curve fade-in and fade-out settings by reading the Inspector immediately and after reopening. A 500 ms fade-in and a 1000 ms fade-out matched their linear envelopes against the gain-only bounce. |
+| Selection and persistence | Tested with two audio tracks named `Twin`. Refused the unselected region, a two-region selection, stale values and stale references. Compared the neighboring tone, all four region boundaries and two source WAV checksums. |
+
+The workflow uses a saved project in stopped foreground Arrange with a single ordinary audio region selected and the required Inspector section expanded. [Audio-region commands](../API.md#set-audio-region-gain-and-fades)
 
 ## 1.7 Compressor sidechain
 

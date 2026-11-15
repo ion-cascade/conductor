@@ -34,7 +34,7 @@ Our focus is practical music work with trustworthy feedback: a command being acc
 | **Tracks** | Inspect and select tracks, adjust track controls, and create and edit Volume and absolute Pan automation |
 | **Mixer** | Channel strips, faders, stock insert bypass, Compressor presets, sends and guarded routing operations |
 | **MIDI** | Sequence creation and import, MIDI messages, region-event inspection and guarded MIDI export |
-| **Projects** | Open, save, find offscreen regions, edit exact boundaries and bounce an explicit musical range |
+| **Projects** | Open, save, find offscreen regions, edit boundaries, set audio-region gain and fades, and bounce an explicit range |
 | **Audio analysis** | File format, duration, levels and spectrum measurements |
 | **Remote access** | Owner-only Mac socket with an SSH relay for MCP clients on another machine |
 
@@ -83,7 +83,7 @@ Keep recordings and projects on your own machines. Conductor's bridge uses your 
 
 ## Tested status
 
-Conductor 1.7 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
+Conductor 1.8 was verified on an Apple M2 Pro Mac mini running macOS 27.2.1 and desktop Logic Pro 13.0 build 7801. The [compatibility matrix](docs/conductor/compatibility.md) lists the clean-install workflow, measured release checks, and the scope of Logic support.
 
 ### Turn a selected drum step on or off
 
@@ -108,6 +108,10 @@ Logic creates a staging track when it imports the Standard MIDI File. Conductor 
 ### Edit an offscreen region and bounce a range
 
 Run `logic_project.scan_regions` to sample the Arrange view and obtain a reference for each verified edit target. Pass the reference and both current bounds to `edit_region` to move or trim one ordinary audio or MIDI region. Save, then pass the desired start and end in `bounce_settings.range` to `export_run`. [Arrangement and bounce parameters](docs/API.md#sample-arrange-viewports-and-edit-one-region)
+
+### Set audio-region gain and fades
+
+Select one ordinary audio region in stopped Arrange and open its Region Inspector. Use `scan_regions` to get its reference, read the current value, then set the gain or the duration of one standard linear fade. Save the project to keep the edit. [Audio-region commands](docs/API.md#set-audio-region-gain-and-fades)
 
 ### Place and move a MIDI region
 

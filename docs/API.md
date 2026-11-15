@@ -396,7 +396,7 @@ If status reports a resumable partial delivery, reopen the same saved project, r
 
 ### `logic_project`
 
-Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `get_pattern_step`, `set_pattern_step_enabled`, `scan_regions`, `edit_region`, `export_plan`, `export_run`, `export_resume`, `export_status`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
+Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `get_pattern_step`, `set_pattern_step_enabled`, `scan_regions`, `edit_region`, `get_region_gain`, `set_region_gain`, `get_region_fade`, `set_region_fade`, `export_plan`, `export_run`, `export_resume`, `export_status`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
 
 File-writing paths require confirmation. `save_as` verifies the resulting `.logicx` package. `audit` marks GM Device and External MIDI tracks with MIDI regions as export blockers. Use the read-only `export_plan` and confirmed `export_run` to produce audio. The standalone `bounce` command is unsupported.
 
@@ -430,6 +430,21 @@ Use `logic_project.edit_region` with the reference and the region's exact curren
 ```
 
 A move keeps the region length. For `mode:"trim"`, give exactly one new `start` or `end` inside the original bounds. This route is for ordinary audio and MIDI regions on the 4/4, 1/16 Arrange grid. Use a zoom and snap setting that can represent the requested movement. The region and destination must fit in a sampled viewport. Deselect other regions before editing. A native edit can select its target track and region. The receipt reports whether Conductor restored the original viewport. References expire after three minutes and a new scan replaces them. After an edit attempt or a project reopen, scan again before using a reference. If a receipt reports a write attempt with unverified readback, inspect the observed region before retrying.
+
+#### Set audio-region gain and fades
+
+In a saved, stopped English Logic 13 project, select exactly one ordinary audio region in foreground Arrange. Open the Region Inspector and expand **General** for gain or **Fades** for a fade. Run `scan_regions` and use the selected region's current `target_ref`. These commands edit the region settings in Logic. The project must be saved separately to persist the edit.
+
+| Command | Parameters | Result |
+| --- | --- | --- |
+| `get_region_gain` | `target_ref` | Current `observed_gain_db` |
+| `set_region_gain` | `target_ref`, `expected_gain_db`, `gain_db` | Requested and observed gain |
+| `get_region_fade` | `target_ref`, `edge` | Current `observed_time_ms` for `in` or `out` |
+| `set_region_fade` | `target_ref`, `edge`, `expected_time_ms`, `time_ms` | Requested and observed time for the selected edge |
+
+Set gain from −24.0 to +12.0 dB in 0.1 dB steps. Use whole milliseconds from 0 to 1000 for standard **Fade-In** or **Fade-Out** with both curves at 0. Pass JSON numbers and use the current observed value as the expected value. Looped regions, alternate fade styles and curves, and non-audio regions are outside this scope.
+
+A changed value is verified when the Inspector reports the exact new setting for the still-selected region and the region boundaries and neighboring inventory agree with the pre-edit observation. A matching value returns `unchanged: true` with `write_attempted: false`. Scan again after any write attempt or project reopen. If a write returns State B, inspect the native value before issuing another write.
 
 #### Explicit stereo PCM bounce
 

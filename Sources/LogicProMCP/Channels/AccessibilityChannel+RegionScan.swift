@@ -311,7 +311,7 @@ extension AccessibilityChannel {
                                                   restoration: restored ? "restored" : "unverified"))
     }
 
-    private static func isOrdinaryRegion(_ info: RegionInfo) -> Bool {
+    static func isOrdinaryRegion(_ info: RegionInfo) -> Bool {
         guard let help = info.rawHelp?.lowercased() else { return false }
         let markers = ["looped region", "alias region", "take folder"]
         guard !markers.contains(where: { help.contains($0) }) else { return false }

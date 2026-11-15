@@ -74,6 +74,7 @@ struct QualificationConductorReadsTests {
     @Test(arguments: [
         OperationID.pluginsGetPresetVerified, .pluginsGetSidechainVerified,
         .projectGetPatternStep, .projectScanRegions, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
+        .projectGetRegionGain, .projectGetRegionFade,
     ])
     func receiptOnlyReadWithholdsCreditAndRejectsMalformedResponse(id: OperationID) throws {
         let spec = try #require(OperationRegistry.specs.first { $0.id == id })

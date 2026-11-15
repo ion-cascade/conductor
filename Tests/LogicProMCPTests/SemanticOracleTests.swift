@@ -646,25 +646,21 @@ struct SemanticOracleCensusTests {
         // Exact membership above also covers post-closure operations.
     }
 
-    /// #373 B4 — the mutating oracle inventory is CLOSED. Every supported
-    /// (non-`.unsupported`) mutating spec is EITHER covered by an oracle OR carries
-    /// an audited structural exclusion — the two partition the entire mutating
-    /// surface, with no implicit residual. This is the ticket's terminal invariant:
-    /// after B4 there is no mutating op left silently uncovered. (The two sets are
-    /// proven disjoint here too, so an op can never be both covered and excluded.)
+    /// Any supported write needs an oracle, an audited structural exclusion, or a tracked
+    /// deferral with the evidence still needed. Deferrals confer no qualification credit.
     @Test func everyMutatingSpecIsCoveredOrAuditedExcluded() {
         let covered = SemanticOracleTable.coveredMutatingOperationIDs
         let excluded = Set(SemanticOracleTable.structurallyUnverifiedMutatingOperationIDs.keys)
+        let deferrals = SemanticOracleTable.pendingConductorWriteOracles
+        let deferred = Set(deferrals.keys)
         #expect(covered.isDisjoint(with: excluded))
-        #expect(covered.union(excluded) == SemanticOracleTable.mutatingSpecIDs)
-        // The complement is empty: nothing supported-mutating is unaccounted for.
-        let unaccounted = SemanticOracleTable.mutatingSpecIDs
-            .subtracting(covered)
-            .subtracting(excluded)
-        #expect(
-            unaccounted.isEmpty,
-            "mutating specs neither covered nor excluded: \(unaccounted.map(\.rawValue).sorted())"
-        )
+        #expect(covered.union(excluded).isDisjoint(with: deferred))
+        #expect(deferrals.values.allSatisfy { !$0.isEmpty })
+        let accounted = covered.union(excluded).union(deferred)
+        #expect(accounted == SemanticOracleTable.mutatingSpecIDs)
+        let unaccounted = SemanticOracleTable.mutatingSpecIDs.subtracting(accounted)
+        #expect(unaccounted.isEmpty,
+                "mutating specs without an oracle or disposition: \(unaccounted.map(\.rawValue).sorted())")
     }
 
     /// #291 — pin the product's Bus 1 -> Stereo Output State-A envelope, whose

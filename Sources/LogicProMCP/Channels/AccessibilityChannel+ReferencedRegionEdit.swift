@@ -204,16 +204,16 @@ extension AccessibilityChannel {
         return .success(HonestContract.encodeStateA(extras: fields))
     }
 
-    private typealias EditRegionRow = (item: AXUIElement, info: RegionInfo)
+    typealias EditRegionRow = (item: AXUIElement, info: RegionInfo)
 
-    private static func regionEditCensus(scope: ArrangeRegionScope) -> [EditRegionRow]? {
+    static func regionEditCensus(scope: ArrangeRegionScope) -> [EditRegionRow]? {
         guard scope.holdsArrange(), scope.holdsHeaders(),
               case .success(let result) = enumerateRegionItems(runtime: scope.runtime, includeOffscreen: true),
               scope.holdsArrange(), scope.holdsHeaders() else { return nil }
         return result.regions
     }
 
-    private static func sameRegionPeers(_ before: [EditRegionRow], _ after: [EditRegionRow], ignoring item: AXUIElement) -> Bool {
+    static func sameRegionPeers(_ before: [EditRegionRow], _ after: [EditRegionRow], ignoring item: AXUIElement) -> Bool {
         guard before.count == after.count else { return false }
         return before.filter { !CFEqual($0.item, item) }.allSatisfy { previous in
             after.filter {

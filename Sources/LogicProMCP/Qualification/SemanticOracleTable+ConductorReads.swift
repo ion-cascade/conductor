@@ -1,7 +1,7 @@
 extension SemanticOracleTable {
     static let conductorReceiptOnlyReadIDs: Set<OperationID> = [
         .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep,
-        .projectScanRegions, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
+        .projectScanRegions, .projectGetRegionGain, .projectGetRegionFade, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
     ]
 
     static let pluginsGetPresetVerified = receiptOnlyRead(
@@ -49,6 +49,27 @@ extension SemanticOracleTable {
             ]),
         ],
         reason: "Project info cannot independently identify the selected pattern cell or verify its enabled state and velocity."
+    )
+
+    static let projectGetRegionGain = receiptOnlyRead(
+        .projectGetRegionGain, operation: "project.get_region_gain",
+        constraints: [
+            .typedField(key: "target_ref", type: .string),
+            .typedField(key: "observed_gain_db", type: .number),
+            .valueEquals(key: "verify_source", expected: .string("ax_region_inspector")),
+        ],
+        reason: "The qualification harness has no separate observation of the held audio region's Inspector gain."
+    )
+
+    static let projectGetRegionFade = receiptOnlyRead(
+        .projectGetRegionFade, operation: "project.get_region_fade",
+        constraints: [
+            .typedField(key: "target_ref", type: .string),
+            .typedField(key: "edge", type: .string),
+            .typedField(key: "observed_time_ms", type: .number),
+            .valueEquals(key: "verify_source", expected: .string("ax_region_inspector")),
+        ],
+        reason: "The qualification harness has no separate observation of the held audio region's Inspector fade."
     )
 
     static let projectScanRegions = OperationOracle(

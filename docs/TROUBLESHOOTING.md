@@ -218,6 +218,10 @@ Only Compressor `threshold` is currently verified writable. Unsupported paramete
 
 ## Project Lifecycle
 
+### Audio-region gain or fade is refused
+
+Select just the referenced region in foreground Arrange, stop the transport, and open **Region Inspector > General** or **Fades**. Start with a fresh `scan_regions` and pass the value returned by the corresponding read. For writes, use an ASCII keyboard layout such as ABC or U.S. and grant keyboard event access to the launcher. State B means the change could not be verified. Inspect the setting in Logic before trying another edit.
+
 ### `project.open` cannot verify the project
 
 Use an absolute `.logicx` path and confirm the project opens in Logic. Path validation rejects ambiguous or unsafe inputs before touching Logic.

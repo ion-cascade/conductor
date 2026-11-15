@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.8.0] — 2026-11-15
+
+- Read and set gain and linear fade times for one referenced audio region. Writes require the current Inspector value and verify the new setting and neighboring regions.
+- Account for twelve existing write-oracle gaps in the qualification inventory. Track the separate harness work in [#39](https://github.com/ion-cascade/conductor/issues/39).
+
 ## [1.7.2] — 2026-11-15
 
 - Qualify export status against an independently checked saved receipt, project data and PCM artifact owned by the verifier.

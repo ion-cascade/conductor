@@ -8,7 +8,7 @@ extension SemanticOracleFixtures {
         .mixerGetSendBypassVerified, .pluginsPlanParameterChanges, .pluginsGetHostParameterManifest,
         .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified,
         .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep, .projectScanRegions,
-        .tracksGetPanAutomation, .tracksGetVolumeAutomation,
+        .tracksGetPanAutomation, .tracksGetVolumeAutomation, .projectGetRegionGain, .projectGetRegionFade,
     ]
 
     static let conductorReads: [OperationID: SemanticOracleFixture] = [
@@ -22,6 +22,14 @@ extension SemanticOracleFixtures {
         ),
         .projectGetPatternStep: .init(
             response: #"{"operation":"project.get_pattern_step","state":"A","success":true,"verified":true,"write_attempted":false,"address":{"project_path":"/tmp/Pattern.logicx","region_name":"Pattern","region_location":"1.1.1.1","track":"Drums","row":"Kick","step":2},"enabled":true,"velocity":64,"visible_grid":[{"row":"Kick","steps":[1,2]}]}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
+        .projectGetRegionGain: .init(
+            response: #"{"operation":"project.get_region_gain","state":"A","success":true,"verified":true,"write_attempted":false,"target_ref":"reg_fixture","observed_gain_db":-6.0,"verify_source":"ax_region_inspector"}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
+        .projectGetRegionFade: .init(
+            response: #"{"operation":"project.get_region_fade","state":"A","success":true,"verified":true,"write_attempted":false,"target_ref":"reg_fixture","edge":"out","observed_time_ms":500,"verify_source":"ax_region_inspector"}"#,
             readback: #"{"independent_readback":false}"#
         ),
         .projectScanRegions: .init(

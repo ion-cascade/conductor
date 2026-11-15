@@ -262,11 +262,8 @@ enum SemanticOracleTable {
     /// UNION the B2 transport/navigate increment UNION the B3
     /// project/tracks/system/midi increment UNION the B4 plugin-insert / export /
     /// cleanup / edit increment, UNION anything registered after B4 closed the
-    /// inventory. Together with `structurallyUnverifiedMutatingOperationIDs` these
-    /// account for the ENTIRE mutating surface
-    /// (`everyMutatingSpecIsCoveredOrAuditedExcluded`), so no mutating spec is left
-    /// implicitly uncovered — an invariant that is maintained on every change, not
-    /// established once.
+    /// inventory. This set, the structural exclusions and the pending write oracles
+    /// account for every supported write.
     static var coveredMutatingOperationIDs: Set<OperationID> {
         phaseB1MutatingOperationIDs
             .union(phaseB2MutatingOperationIDs)
@@ -286,6 +283,25 @@ enum SemanticOracleTable {
         )
     }
 
+    /// Writes tracked separately from structural exclusions. Each row has a scoped
+    /// native release check and still needs a harness recipe for independent readback.
+    static let pendingConductorWriteOracles: [OperationID: String] = [
+        .mixerSetMute: "#39 · same-name strip mute and restore",
+        .mixerSetSolo: "#39 · same-name strip solo and restore",
+        .pluginsSetPresetVerified: "#39 · stock Compressor preset on a held insert",
+        .tracksCreateVolumeAutomation: "#39 · event-list observations at region borders",
+        .tracksSetVolumeAutomationPoint: "#39 · exact volume event address and value",
+        .tracksSplitSelectedAudio: "#39 · generated assets and source mute after reopen",
+        .projectEditRegion: "#39 · exact region boundaries and unchanged peers",
+        .tracksCreatePanAutomation: "#39 · new Pan event address and value",
+        .tracksSetPanAutomationPoint: "#39 · exact existing Pan event address and value",
+        .pluginsSetBypassVerified: "#39 · occupied slot and same-name peer preservation",
+        .projectSetPatternStepEnabled: "#39 · exact step, velocity and unchanged peers",
+        .pluginsSetSidechainVerified: "#39 · held Compressor insert and keyed/control audio",
+        .projectSetRegionGain: "1.8 native fixture · exact Inspector gain and control/edited bounce",
+        .projectSetRegionFade: "1.8 native fixture · exact fade times and control/edited bounce",
+    ]
+
     /// Every operation the table may legitimately carry an oracle for: the FULLY
     /// covered read-only surface UNION the mutating surface. An oracle outside
     /// this union is dead weight (no spec) or bound to an unsupported spec — the
@@ -301,7 +317,7 @@ enum SemanticOracleTable {
     /// imply an unrun live proof. Kept EXPLICIT so the exclusion is a reviewed
     /// decision, not an accidental gap: the census asserts each is a real
     /// mutating spec, is DISJOINT from the covered set, and carries a reason —
-    /// so the uncovered complement is never fully implicit.
+    /// with further pending work tracked by `pendingConductorWriteOracles`.
     static let structurallyUnverifiedMutatingOperationIDs: [OperationID: String] = [
         .systemSetupMIDIKeyCommands:
             "the public surface is check-only and drives Logic's Key Commands UI, but its exact-row "
@@ -543,6 +559,8 @@ enum SemanticOracleTable {
         projectGetRegions,
         projectGetPatternStep,
         projectScanRegions,
+        projectGetRegionGain,
+        projectGetRegionFade,
         projectExportStatus,
         projectExportPlan,
         projectAudit,

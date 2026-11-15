@@ -709,6 +709,7 @@ struct Issue957ParameterContractCensusTests {
         let accepted: [ParamKind: [Value]] = [
             .integer: [.int(5), .double(5.0), .string("5")],
             .number: [.double(0.5), .int(1), .string("0.5")],
+            .jsonNumber: [.double(0.5), .int(1)],
             .scalar: [.string("x"), .int(1), .double(1.5), .bool(true)],
             .string: [.string("x")],
             .boolean: [.bool(true), .bool(false)],

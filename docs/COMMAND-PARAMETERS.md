@@ -128,6 +128,8 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `export_run` | `artifact`, `artifacts`, `bounce_settings`, `collision_policy`, `confirmed`: boolean, `kind`, `naming_policy`, `outputRoot`, `output_root`, `path`, `project`, `projects`, `stem_settings` | `projects` or `project` or `path`; `output_root` or `outputRoot` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `export_status` | `delivery_id`: string, `expected_settings`: object, `output_root`: string | `delivery_id`; `output_root` | closed | read_only | none | none | none | never_automatic | default_install |
 | `get_pattern_step` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
+| `get_region_fade` | `edge`: string (in, out), `target_ref`: string | `target_ref`; `edge` | closed | read_only | none | none | none | never_automatic | default_install |
+| `get_region_gain` | `target_ref`: string | `target_ref` | closed | read_only | none | none | none | never_automatic | default_install |
 | `get_regions` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `inspect_session` | `allow_ui_navigation`: boolean, `domains`, `project_ref`, `scope`, `snapshot_id` | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `is_running` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
@@ -140,6 +142,8 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `save_as` | `confirmed`: boolean, `path`: scalar | `path` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `scan_regions` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `set_pattern_step_enabled` | `address`: object, `enabled`: boolean, `expected_enabled`: boolean | `address`; `expected_enabled`; `enabled` | closed | mutating | none | none | readback_required | never_automatic | default_install |
+| `set_region_fade` | `edge`: string (in, out), `expected_time_ms`: JSON number, `target_ref`: string, `time_ms`: JSON number | `target_ref`; `edge`; `expected_time_ms`; `time_ms` | closed | mutating | none | none | readback_required | never_automatic | default_install |
+| `set_region_gain` | `expected_gain_db`: JSON number, `gain_db`: JSON number, `target_ref`: string | `target_ref`; `expected_gain_db`; `gain_db` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 
 ## `logic_system`
 
