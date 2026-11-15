@@ -491,6 +491,7 @@ extension AccessibilityChannel {
             var revealedStacksWereClosed = false
         }
         private let viewport: [Viewport]
+        private var originalWorkspaceBlank: AXUIElement?
         private var observedFocus: AXUIElement
         private var expandedHeaders: [AXUIElement]?
         private var releaseUnverified = false
@@ -1163,6 +1164,15 @@ extension AccessibilityChannel {
         }
 
         func expand(stoppingWhen stop: @Sendable () -> Bool) async {
+            if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+               hiddenControl == nil, !CFEqual(originalFocus, rail) {
+                // A disclosure click moves keyboard focus to the rail. Logic
+                // acknowledges AXFocused writes on this workspace without moving focus.
+                guard let blank = blankWorkspacePoint()?.element else {
+                    effects.reason = "keyboard_focus_restoration_unavailable"; return
+                }
+                originalWorkspaceBlank = blank
+            }
             exposure = .init(header: header, disclosure: disclosure, runtime: logic, originalHeaders: originalHeaders,
                 hiddenViewWindow: hiddenControl == nil ? nil : window)
             var beforeHeaders = originalHeaders
@@ -1337,6 +1347,10 @@ extension AccessibilityChannel {
                 guard acquired.isEmpty else { return false }
                 target = (header, disclosure); expectedHeaders = originalHeaders; expectedValue = 0
             }
+            if !beforeHiddenViewInverse, let blank = originalWorkspaceBlank {
+                return await restoreLogic13WorkspaceFocus(blank, target: target,
+                    expectedHeaders: expectedHeaders, stoppingWhen: stop)
+            }
             guard !releaseUnverified, let originalWorkspacePath,
                   permitsHeldFocusRestoration(),
                   await owned(target: target, expectedHeaders: expectedHeaders, expectedValue: expectedValue, stoppingWhen: stop),
@@ -1363,6 +1377,73 @@ extension AccessibilityChannel {
                     return true
                 }
                 guard CFEqual(focus, observedFocus), attempt < 2 else { return false }
+                do { try await Task.sleep(for: .milliseconds(25)) }
+                catch { return false }
+            }
+            return false
+        }
+
+        private func blankWorkspacePoint() -> (element: AXUIElement, point: CGPoint)? {
+            let ax = logic.ax
+            guard AXLocalePolicy.trackContentExplicit.matches(AXHelpers.getDescription(originalFocus, runtime: ax)),
+                  let originalWorkspacePath, originalWorkspacePath.count > 1,
+                  let currentPath = Self.workspacePath(originalFocus, in: window, ax: ax),
+                  same(currentPath, originalWorkspacePath),
+                  case .success(let lanes) = AXHelpers.childrenResult(originalFocus, runtime: ax),
+                  !lanes.isEmpty else { return nil }
+            // Clicking blank Arrange space can change region selection. Only
+            // authorize the held focus inverse if native selection is clear now.
+            for element in [originalFocus] + lanes {
+                guard case .success(.some(let selected)) = AXHelpers.getAttributeResult(
+                    element, kAXSelectedChildrenAttribute as String, runtime: ax
+                ) as Result<[AXUIElement]?, AXHelpers.AXStatusError>, selected.isEmpty else { return nil }
+            }
+            let candidates = lanes.filter {
+                AXHelpers.getRole($0, runtime: ax) == kAXLayoutAreaRole as String
+                    && AXHelpers.getDescription($0, runtime: ax) == ""
+            }
+            let scroll = originalWorkspacePath[1]
+            guard candidates.count == 1, let blank = candidates.first,
+                  AXHelpers.getRole(scroll, runtime: ax) == kAXScrollAreaRole as String,
+                  let origin = AXHelpers.getPosition(scroll, runtime: ax),
+                  let size = AXHelpers.getSize(scroll, runtime: ax),
+                  size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0,
+                  origin.x.isFinite, origin.y.isFinite, let hitTest = ax.elementAtPosition else { return nil }
+            for fraction in [0.5, 0.75, 0.25, 0.9] {
+                let point = CGPoint(x: origin.x + size.width / 2, y: origin.y + size.height * fraction)
+                if case .success(.some(let hit)) = hitTest(app, point), CFEqual(hit, blank) {
+                    return (blank, point)
+                }
+            }
+            return nil
+        }
+
+        private func restoreLogic13WorkspaceFocus(
+            _ blank: AXUIElement, target: Disclosure, expectedHeaders: [AXUIElement],
+            stoppingWhen stop: @Sendable () -> Bool
+        ) async -> Bool {
+            guard !releaseUnverified, permitsHeldFocusRestoration(),
+                  await owned(target: target, expectedHeaders: expectedHeaders, expectedValue: 0, stoppingWhen: stop),
+                  let before = blankWorkspacePoint(), CFEqual(before.element, blank),
+                  let pair = mouse.prepareMouseClick(before.point, 1),
+                  let final = blankWorkspacePoint(), CFEqual(final.element, blank), final.point == before.point,
+                  focusRestorationActionBoundary(stoppingWhen: stop) else { return false }
+            if !effects.attempted.contains("keyboard_focus_restoration") {
+                effects.attempted.append("keyboard_focus_restoration")
+            }
+            guard pair.postDown() else { return false }
+            releaseUnverified = true
+            guard pair.postUp() else { return false }
+            releaseUnverified = false
+            for _ in 0..<11 {
+                guard !stop(), (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
+                      let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedUIElementAttribute as String, runtime: logic.ax)
+                else { return false }
+                if CFEqual(focus, originalFocus) {
+                    observedFocus = focus
+                    return await owned(target: target, expectedHeaders: expectedHeaders, expectedValue: 0, stoppingWhen: stop)
+                }
+                guard CFEqual(focus, observedFocus) else { return false }
                 do { try await Task.sleep(for: .milliseconds(25)) }
                 catch { return false }
             }
