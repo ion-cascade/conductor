@@ -535,7 +535,9 @@ extension AccessibilityChannel {
         var changedRenewal: OriginalHeaderSourceRenewal?
         var attemptedAssociation = false
         let startedReadback = Date()
-        let deadline = startedReadback.addingTimeInterval(Double(timing.readbackTimeoutMs) / 1000.0)
+        let readbackSeconds = Double(timing.readbackTimeoutMs) / 1000.0
+        let redrawSettle = redrawWitness != nil && readbackSeconds > 0 ? 1.5 : 0
+        let deadline = startedReadback.addingTimeInterval(readbackSeconds + redrawSettle)
         let associationReadbackStart = startedReadback.addingTimeInterval(
             min(0.5, Double(timing.readbackTimeoutMs) / 2000.0))
         repeat {
@@ -557,7 +559,8 @@ extension AccessibilityChannel {
                 }
             }
             after = afterLabel.flatMap(OutputAssignment.observed(slotLabel:))
-            if afterLabel == nil, Date() >= associationReadbackStart, let redrawWitness,
+            if afterLabel == nil, let redrawWitness,
+               enumeration?.strips.contains(where: { CFEqual($0, redrawWitness.original.strip) }) == false,
                let renewed = redrawWitness.readReplacement(runtime: runtime) {
                 afterLabel = renewed.label
                 after = OutputAssignment.observed(slotLabel: renewed.label)
@@ -662,7 +665,10 @@ extension AccessibilityChannel {
                   let header = Self.selectedChild(of: rail, within: headers, runtime: runtime.ax),
                   let presentation = AXTrackBinding.presentation(of: header, runtime: runtime.ax),
                   let strip = Self.selectedChild(of: original.mixer, within: strips, runtime: runtime.ax),
-                  CFEqual(strip, original.strip) else { return nil }
+                  CFEqual(strip, original.strip) else {
+                Log.debug("Output redraw baseline: original Mixer selection or rail focus unavailable", subsystem: "ax")
+                return nil
+            }
             self.original = original
             self.originalStrips = strips
             self.previous = index > 0 ? strips[index - 1] : nil
@@ -672,7 +678,10 @@ extension AccessibilityChannel {
             self.headers = headers
             self.selectedHeader = header
             self.selectedPresentation = presentation
-            guard scopeIsCurrent(runtime: runtime), original.currentIndex(runtime: runtime) != nil else { return nil }
+            guard scopeIsCurrent(runtime: runtime), original.currentIndex(runtime: runtime) != nil else {
+                Log.debug("Output redraw baseline: initial scope unavailable", subsystem: "ax")
+                return nil
+            }
         }
 
         private static func selectedChild(of parent: AXUIElement, within rows: [AXUIElement],
@@ -688,7 +697,8 @@ extension AccessibilityChannel {
 
         private func scopeIsCurrent(runtime: AXLogicProElements.Runtime) -> Bool {
             guard (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
-                  let pid = runtime.logicProPID(), pid == runtime.focusedApplicationPID(),
+                  let windows = runtime.onScreenWindowList(), let pid = runtime.logicProPID(),
+                  pid == runtime.focusedApplicationPID(), LogicOnScreenWindows.popupMenuCount(windows, logicPID: pid) == 0,
                   let app = AXLogicProElements.appRoot(runtime: runtime),
                   let main: AXUIElement = AXHelpers.getAttribute(app, kAXMainWindowAttribute as String, runtime: runtime.ax),
                   let front: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute as String, runtime: runtime.ax),
@@ -701,9 +711,13 @@ extension AccessibilityChannel {
                   let selected = Self.selectedChild(of: rail, within: currentHeaders, runtime: runtime.ax),
                   CFEqual(selected, selectedHeader),
                   AXTrackBinding.presentation(of: selected, runtime: runtime.ax) == selectedPresentation,
-                  !AXLogicProElements.dialogPresent(runtime: runtime),
+                  AXLogicProElements.dialogPresenceReason(runtime: runtime,
+                    renewingRetiredNonMainWindowCensusAround: main) == .noBlockingWindow,
                   case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(main, runtime: runtime),
-                  document.utf8.elementsEqual(original.document.utf8) else { return false }
+                  document.utf8.elementsEqual(original.document.utf8) else {
+                Log.debug("Output redraw readback: project, window or selection scope unavailable", subsystem: "ax")
+                return false
+            }
             return true
         }
 
@@ -724,7 +738,10 @@ extension AccessibilityChannel {
                   previous.map({ position > 0 && CFEqual($0, enumeration.strips[position - 1]) }) ?? (position == 0),
                   next.map({ position + 1 < enumeration.strips.count && CFEqual($0, enumeration.strips[position + 1]) })
                     ?? (position == enumeration.strips.count - 1)
-            else { return nil }
+            else {
+                Log.debug("Output redraw readback: selected replacement or adjacent strips unavailable", subsystem: "ax")
+                return nil
+            }
             let binding = AXMixerStripBinding.Binding(window: original.window, mixer: original.mixer,
                 strip: selected, document: original.document)
             guard let index = binding.currentIndex(runtime: runtime), enumeration.strips.indices.contains(index),
