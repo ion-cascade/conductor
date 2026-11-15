@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.2.0] — 2026-11-15
+
+### Added
+
+- Sample Arrange across both scroll axes with `logic_project.scan_regions`. The report identifies sampled viewports, coverage gaps and restored presentation. A fully observed ordinary region can carry a short-lived edit reference. ([#23](https://github.com/ion-cascade/conductor/issues/23))
+- Move a referenced audio or MIDI region or trim one boundary with `logic_project.edit_region`. The caller supplies both current boundaries, and Conductor reads back the edited region and its neighbors. ([#24](https://github.com/ion-cascade/conductor/issues/24))
+- Specify a musical start and end with `bounce_settings.range`. The PCM export receipt includes the range observed in Logic before saving. ([#25](https://github.com/ion-cascade/conductor/issues/25))
+
 ## [1.1.0] — 2026-11-15
 
 - Report whether an inspected track can be targeted now, needs exposure in Logic, or needs a fresh reference after Logic reassigns Accessibility rows.
