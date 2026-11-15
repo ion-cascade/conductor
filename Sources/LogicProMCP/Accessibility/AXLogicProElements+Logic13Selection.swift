@@ -12,6 +12,12 @@ extension AXLogicProElements {
         permittingWrite: () -> Bool, willWrite: (() -> Void)? = nil
     ) -> Bool {
         let ax = runtime.ax
+        func selectionWindows(in app: AXUIElement) -> [AXUIElement]? {
+            let windows: [AXUIElement]? = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax)
+            // Logic lists transient tooltips in AXWindows. Ignore only entries
+            // that explicitly read as help tags; an unknown role stays in view.
+            return windows?.filter { AXHelpers.getRole($0, runtime: ax) != kAXHelpTagRole as String }
+        }
         guard let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
               let app = appRoot(runtime: runtime),
               AXHelpers.getAttribute(app, kAXFrontmostAttribute as String, runtime: ax) as Bool? == true,
@@ -23,7 +29,7 @@ extension AXLogicProElements {
               case .success(let name?) = AXValueExtractors.extractTrackNameResult(from: header, runtime: ax),
               let description = AXHelpers.getDescription(header, runtime: ax),
               description.hasPrefix("Track \(index + 1) "),
-              let windows: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax),
+              let windows = selectionWindows(in: app),
               windows.count == 1, CFEqual(windows[0], window) else { return false }
         func current() -> Bool {
             guard !Task.isCancelled, permittingWrite(),
@@ -48,7 +54,7 @@ extension AXLogicProElements {
         willWrite?()
         _ = AXHelpers.performAction(search[0], kAXPressAction, runtime: ax)
         keys.sleepMicros(150_000)
-        guard let after: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax) else { return false }
+        guard let after = selectionWindows(in: app) else { return false }
         let added = after.filter { w in !windows.contains { CFEqual($0, w) } }
         guard added.count == 1 else { return false }
         let popup = added[0]
@@ -65,7 +71,7 @@ extension AXLogicProElements {
                     guard runtime.logicProPID() == pid, runtime.focusedApplicationPID() == pid,
                           AXHelpers.getAttribute(app, kAXFrontmostAttribute as String, runtime: ax) as Bool? == true,
                           projectPickerDocumentRead(window, runtime: runtime) == .success(document),
-                          let remaining: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax),
+                          let remaining = selectionWindows(in: app),
                           remaining.count == 2,
                           remaining.contains(where: { CFEqual($0, window) }),
                           remaining.contains(where: { CFEqual($0, popup) }),
@@ -98,7 +104,7 @@ extension AXLogicProElements {
         for _ in 0..<6 {
             keys.sleepMicros(50_000)
             if rows.enumerated().allSatisfy({ AXValueExtractors.extractSelectedState($0.element, runtime: ax) == ($0.offset == index) }) {
-                guard current(), let remaining: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax),
+                guard current(), let remaining = selectionWindows(in: app),
                       !remaining.contains(where: { CFEqual($0, popup) }) else { return false }
                 confirmed = true
                 return true
