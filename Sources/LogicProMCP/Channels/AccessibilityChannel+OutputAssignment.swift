@@ -64,7 +64,7 @@ extension AccessibilityChannel {
             ))
         }
         let physical = AXMixerStripBinding.current
-        let outputAssociation: HeldSelectionAssociation.Pair?
+        var outputAssociation: HeldSelectionAssociation.Pair?
         if let physical, let pair = AXMixerStripBinding.outputAssociation,
            pair.strip.matches(physical), pair.track.currentIndex() != nil { outputAssociation = pair }
         else { outputAssociation = nil }
@@ -351,6 +351,40 @@ extension AccessibilityChannel {
             }
         }
 
+        // A direct physical-strip reference can recover a redraw when the
+        // selected Arrange header and this exact strip survive a checked
+        // away-and-back association challenge before the popup.
+        if outputAssociation == nil, let physical, AXMixerStripBinding.outputAssociation == nil,
+           ApprovedSessionRepair.current == nil, ApprovedSessionRepair.outputLeafPermission == nil,
+           ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+           let observation = HeldSelectionAssociation(window: physical.window, logic: runtime,
+               expectedProject: nil, requiresProjectReference: false, allowsSelectedChildRailEntry: true,
+               retainedMixerSource: physical),
+           CFEqual(observation.mixer, physical.mixer),
+           observation.document.utf8.elementsEqual(physical.document.utf8) {
+            let current: @Sendable () -> Bool = {
+                (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil
+            }
+            let pairs = await observation.observe(referenceIsCurrent: current,
+                stoppingWhen: { !current() }, allHeldHeaders: true, observingPeerHeaders: [])
+            let effects = observation.effects
+            if effects.navigationPerformed, effects.restoration != "restored" {
+                return refusal(.readbackUnavailable,
+                    "The Mixer association did not restore the original presentation. No output destination was selected.",
+                    ["association_restoration": effects.restoration])
+            }
+            let candidates = pairs.filter { $0.strip.matches(physical) }
+            if candidates.count == 1, let pair = candidates.first, effects.restoration == "restored",
+               CFEqual(pair.track.header, observation.headers[observation.originalIndex]) {
+                outputAssociation = pair
+            }
+            guard current(), physical.currentIndex(runtime: runtime) == index,
+                  AXLogicProElements.outputSlotDestination(in: physical.strip, runtime: runtime.ax) == beforeLabel
+            else {
+                return refusal(.staleSnapshot, "The source changed during Mixer association readback. No destination was selected.")
+            }
+        }
+
         // Keep the actual pre-popup presentation duty. The destination can
         // retire the strip or move the omitted native Mixer bars; sampling only
         // during header renewal would adopt that changed position as original.
@@ -526,7 +560,10 @@ extension AccessibilityChannel {
         var populationAfter: [AXUIElement]?
         var changedRenewal: OriginalHeaderSourceRenewal?
         var attemptedAssociation = false
-        let deadline = Date().addingTimeInterval(Double(timing.readbackTimeoutMs) / 1000.0)
+        let startedReadback = Date()
+        let deadline = startedReadback.addingTimeInterval(Double(timing.readbackTimeoutMs) / 1000.0)
+        let associationReadbackStart = startedReadback.addingTimeInterval(
+            min(0.5, Double(timing.readbackTimeoutMs) / 2000.0))
         repeat {
             let enumeration = (physical?.mixer ?? AXLogicProElements.getMixerArea(runtime: runtime))
                 .flatMap { AXLogicProElements.stripEnumeration(in: $0, runtime: runtime.ax) }
@@ -547,7 +584,7 @@ extension AccessibilityChannel {
             }
             after = afterLabel.flatMap(OutputAssignment.observed(slotLabel:))
             if !attemptedAssociation, let physical, let outputAssociation,
-               enumeration?.strips.count == strips.count {
+               Date() >= associationReadbackStart, enumeration?.strips.count == strips.count {
                 let currentIndex = physical.currentIndex(runtime: runtime)
                 let retired = afterLabel == nil && currentIndex == nil
                 // A No Output transition can commit while the exact surviving
@@ -629,6 +666,7 @@ extension AccessibilityChannel {
         effects: SessionPopulationObservation.UIEffects) {
         let observed = await renewSourceThroughOriginalHeader(originalPair, original: original, runtime: runtime,
             sourceDisposition: sourceDisposition, restoringMixerGeometry: restoringMixerGeometry,
+            observingPeerHeaders: [],
             recoveringRetiredFocusFrom: focusBaseline)
         guard let source = observed.source,
               let label = AXLogicProElements.outputSlotDestination(in: source.pair.strip.strip, runtime: runtime.ax),
