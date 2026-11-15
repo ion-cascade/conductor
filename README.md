@@ -62,7 +62,15 @@ Download the versioned source archive and checksums from the [GitHub release](ht
 - [Connect a local or SSH MCP client](docs/conductor/remote-bridge.md)
 - [Compatibility and verified workflows](docs/conductor/compatibility.md)
 
-To work on the source directly, run `swift build -c release` from the repository. The package executable is `.build/release/LogicProMCP`.
+To work on the source directly:
+
+```bash
+git clone https://github.com/ion-cascade/conductor.git
+cd conductor
+swift build -c release
+```
+
+The package executable is `.build/release/LogicProMCP`.
 
 ### Start with a small check
 

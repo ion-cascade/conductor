@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.0.0] — 2026-11-15
+
+- Build and install a released source archive into a per-user directory with a stable launcher and MCP relay.
+- Switch to a new release after stopping the bridge, or return to the previous installed release. A failed build leaves the selected release available.
+- Publish the measured Logic and macOS compatibility matrix and the clean-install, update, rollback, and recovery workflow.
+
 ## [0.5.0] — 2026-11-15
 
 - Request a native stereo WAVE or AIFF bounce at 44.1, 48 or 96 kHz and 16 or 24 bits. Verify delivery settings and completed audio and refuse to overwrite an existing destination.

@@ -9,6 +9,7 @@
   "repository": "https://github.com/ion-cascade/conductor",
   "platforms": ["macos"],
   "runtime": "native",
+  "compatibility_matrix": "docs/conductor/compatibility.md",
   "qualified_environment": {
     "architecture": "arm64",
     "logic_pro_version": "13.0",
@@ -51,6 +52,8 @@
   "installation": {
     "macos": {
       "distribution": "source",
+      "installer": "Scripts/install.sh",
+      "launcher": "conductor",
       "command": ".build/release/LogicProMCP",
       "args": [],
       "release_url": "https://github.com/ion-cascade/conductor/releases/tag/v1.0.0"
