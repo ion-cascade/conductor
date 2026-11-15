@@ -52,27 +52,47 @@ extension AXLogicProElements {
         let added = after.filter { w in !windows.contains { CFEqual($0, w) } }
         guard added.count == 1 else { return false }
         let popup = added[0]
-        var confirmed = false
-        defer {
-            // Close only our retained palette. Never send a global Escape.
-            if !confirmed, let nodes = searchPaletteNodes(popup, runtime: ax) {
-                let close = nodes.filter { AXHelpers.getRole($0, runtime: ax) == kAXButtonRole as String && AXHelpers.getDescription($0, runtime: ax) == "Close" }
-                if close.count == 1 { _ = AXHelpers.performAction(close[0], kAXPressAction, runtime: ax) }
-            }
-        }
         guard let nodes = searchPaletteNodes(popup, runtime: ax),
               nodes.filter({ AXHelpers.getRole($0, runtime: ax) == kAXImageRole as String && AXHelpers.getDescription($0, runtime: ax) == "Search" }).count == 1 else { return false }
         let fields = nodes.filter { AXHelpers.getRole($0, runtime: ax) == kAXTextFieldRole as String }
-        guard fields.count == 1, current() else { return false }
+        guard fields.count == 1, let field = fields.first else { return false }
+        var confirmed = false
+        defer {
+            if !confirmed {
+                // An empty search can leave its field focused with no Close button.
+                // Dismiss only this operation's palette while it still has keyboard focus.
+                func stillOwnsPalette() -> Bool {
+                    guard runtime.logicProPID() == pid, runtime.focusedApplicationPID() == pid,
+                          AXHelpers.getAttribute(app, kAXFrontmostAttribute as String, runtime: ax) as Bool? == true,
+                          projectPickerDocumentRead(window, runtime: runtime) == .success(document),
+                          let remaining: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax),
+                          remaining.count == 2,
+                          remaining.contains(where: { CFEqual($0, window) }),
+                          remaining.contains(where: { CFEqual($0, popup) }),
+                          let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedUIElementAttribute as String, runtime: ax)
+                    else { return false }
+                    return CFEqual(focused, field)
+                }
+                if stillOwnsPalette() {
+                    let close = nodes.filter {
+                        AXHelpers.getRole($0, runtime: ax) == kAXButtonRole as String
+                            && AXHelpers.getDescription($0, runtime: ax) == "Close"
+                    }
+                    if close.count == 1 { _ = AXHelpers.performAction(close[0], kAXPressAction, runtime: ax) }
+                    if stillOwnsPalette() { _ = keys.postKeyEvent(53) }
+                }
+            }
+        }
+        guard current() else { return false }
         willWrite?()
-        guard AXHelpers.setAttribute(fields[0], kAXValueAttribute, String(index + 1) as CFString, runtime: ax) else { return false }
+        guard AXHelpers.setAttribute(field, kAXValueAttribute, String(index + 1) as CFString, runtime: ax) else { return false }
         keys.sleepMicros(150_000)
         guard let resultNodes = searchPaletteNodes(popup, runtime: ax) else { return false }
         let labels = resultNodes.filter { AXHelpers.getRole($0, runtime: ax) == kAXStaticTextRole as String }
             .compactMap { AXHelpers.getAttribute($0, kAXValueAttribute as String, runtime: ax) as String? }
         guard searchTrackResultMatches(labels, number: index + 1, name: name), current(),
               let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedUIElementAttribute as String, runtime: ax),
-              CFEqual(focused, fields[0]) else { return false }
+              CFEqual(focused, field) else { return false }
         willWrite?()
         guard keys.postKeyEvent(36) else { return false }
         for _ in 0..<6 {
