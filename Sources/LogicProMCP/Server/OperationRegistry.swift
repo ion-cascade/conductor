@@ -136,6 +136,7 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case tracksRecordSequence = "tracks.record_sequence"
     case tracksSortVerified = "tracks.sort_verified"
     case tracksSetAutomation = "tracks.set_automation"
+    case tracksSplitSelectedAudio = "tracks.split_selected_audio"
     case tracksCreateVolumeAutomation = "tracks.create_volume_automation_at_region_borders"
     case tracksGetVolumeAutomation = "tracks.get_volume_automation"
     case tracksSetVolumeAutomationPoint = "tracks.set_volume_automation_point"
@@ -382,7 +383,7 @@ enum OperationRegistry {
             "tracks.create_drummer", "tracks.create_external_midi", "tracks.delete",
             "tracks.duplicate", "tracks.rename", "tracks.mute", "tracks.solo", "tracks.arm",
             "tracks.arm_only", "tracks.record_sequence", "tracks.sort_verified", "tracks.set_automation",
-            "tracks.get_volume_automation", "tracks.set_volume_automation_point", "tracks.create_volume_automation_at_region_borders",
+            "tracks.split_selected_audio", "tracks.get_volume_automation", "tracks.set_volume_automation_point", "tracks.create_volume_automation_at_region_borders",
             "tracks.set_instrument", "tracks.list_library", "tracks.scan_library",
             "tracks.resolve_path", "tracks.scan_plugin_presets",
         ],
@@ -439,7 +440,7 @@ enum OperationRegistry {
             "select", "create_audio", "create_instrument", "create_drummer",
             "create_external_midi", "delete", "duplicate", "rename", "mute", "solo", "arm",
             "arm_only", "record_sequence", "sort_verified", "set_automation", "set_instrument", "list_library",
-            "scan_library", "resolve_path", "scan_plugin_presets", "get_volume_automation", "set_volume_automation_point", "create_volume_automation_at_region_borders",
+            "scan_library", "resolve_path", "scan_plugin_presets", "split_selected_audio", "get_volume_automation", "set_volume_automation_point", "create_volume_automation_at_region_borders",
         ],
     ]
 
@@ -1054,6 +1055,7 @@ enum OperationRegistry {
         // confirmation but accepts no track target reference.
         (.tracksSortVerified, "sort_verified", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.none, ["confirmed", "criterion", "expected_order"]),
         (.tracksSetAutomation, "set_automation", Mutability.`mutating`, DeadlineClass.short, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["index", "mode", "track"]),
+        (.tracksSplitSelectedAudio, "split_selected_audio", Mutability.`mutating`, DeadlineClass.long, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["region_name", "start", "end", "confirmed"]),
         (.tracksCreateVolumeAutomation, "create_volume_automation_at_region_borders", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["start", "end"]),
         (.tracksGetVolumeAutomation, "get_volume_automation", Mutability.readOnly, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, []),
         (.tracksSetVolumeAutomationPoint, "set_volume_automation_point", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["position", "expected_current", "value", "linked_position"]),
@@ -1068,7 +1070,7 @@ enum OperationRegistry {
             tool: .logicTracks,
             command: entry.1,
             mutability: entry.2,
-            confirmation: entry.0 == .tracksSortVerified ? .l2 : .none,
+            confirmation: entry.0 == .tracksSortVerified || entry.0 == .tracksSplitSelectedAudio ? .l2 : .none,
             target: entry.5,
             verification: entry.4,
             retry: .neverAutomatic,

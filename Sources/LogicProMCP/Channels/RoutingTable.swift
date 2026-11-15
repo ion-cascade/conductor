@@ -66,6 +66,7 @@ extension ChannelRouter {
         // Track state reading
         "track.get_tracks":           [.accessibility],
         "track.get_selected":         [.accessibility],
+        "track.split_selected_audio": [.accessibility],
         "track.get_volume_automation": [.accessibility],
         "track.set_volume_automation_point": [.accessibility],
         "track.create_volume_automation_at_region_borders": [.accessibility],
