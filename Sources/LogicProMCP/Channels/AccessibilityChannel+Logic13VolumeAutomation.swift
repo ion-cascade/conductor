@@ -95,44 +95,63 @@ extension AccessibilityChannel {
              "before": expected, "observed": value, "requested": requested,
              "changed": value != expected, "write_attempted": attempted]
         }
-        func uncertain(_ value: Int) -> ChannelResult {
+        func uncertain(_ value: Int, stage: String, actual: Int? = nil, actionAccepted: Bool? = nil) -> ChannelResult {
             var evidence = result(value, attempted: true)
             evidence.removeValue(forKey: "observed")
             evidence["last_verified_value"] = value
             evidence["safe_to_retry"] = false
             evidence["effect_unknown"] = true
+            evidence["readback_stage"] = stage
+            evidence["native_action_accepted"] = actionAccepted
+            evidence["actual_value"] = actual
             return .success(HonestContract.encodeStateB(reason: .readbackMismatch, extras: evidence))
         }
         guard stopped(), current() else {
             return refusal(.readbackUnavailable, "Stop playback and keep the referenced Track Automation Event List focused.")
         }
-        let control = points[index].slider
         let step = requested > expected ? 10 : -10
         let action = step > 0 ? kAXIncrementAction : kAXDecrementAction
         var observed = expected
         var attempted = false
-        func matches(_ value: Int) -> Bool {
-            guard let fresh = editor.points(), points.count == fresh.count else { return false }
+        func matches(_ fresh: [Logic13VolumeEventList.Point], value: Int) -> Bool {
+            guard points.count == fresh.count else { return false }
             return zip(points, fresh).enumerated().allSatisfy { pair in
                 let (original, live) = pair.element
                 return original.position == live.position
                     && (pair.offset == index ? value : original.value) == live.value
-                    && CFEqual(original.slider, live.slider)
             }
         }
         while observed != requested {
-            guard matches(observed), stopped(), current(),
+            guard stopped(), current(), let fresh = editor.points(), matches(fresh, value: observed),
+                  editor.ownsEditor(),
                   OperationTraceContext.claimDeadlineEffect("track_volume_automation_edit") else {
-                return attempted ? uncertain(observed)
+                return attempted ? uncertain(observed, stage: "before_next_step")
                     : refusal(.staleSnapshot, "The native Volume event changed before the edit.")
             }
             attempted = true
-            _ = AXHelpers.performAction(control, action, runtime: logic.ax)
-            do { try await Task.sleep(for: .milliseconds(50)) }
-            catch { return uncertain(observed) }
+            let applied = AXHelpers.performAction(fresh[index].slider, action, runtime: logic.ax)
             let wanted = observed + step
-            guard matches(wanted), current() else { return uncertain(observed) }
-            observed = wanted
+            var lastActual: Int?
+            var readbackStage = "event_value_after_step"
+            for _ in 0..<5 {
+                do { try await Task.sleep(for: .milliseconds(70)) }
+                catch { return uncertain(observed, stage: "cancelled_after_step", actionAccepted: applied) }
+                guard current() else {
+                    return uncertain(observed, stage: "ownership_after_step", actionAccepted: applied)
+                }
+                guard let after = editor.points(onRefusal: { readbackStage = $0 }) else { continue }
+                if after.indices.contains(index), after[index].position == position {
+                    lastActual = after[index].value
+                }
+                if matches(after, value: wanted), editor.ownsEditor() {
+                    observed = wanted
+                    break
+                }
+                if !matches(after, value: observed) { break }
+            }
+            guard observed == wanted else {
+                return uncertain(observed, stage: readbackStage, actual: lastActual, actionAccepted: applied)
+            }
         }
         var evidence = result(observed, attempted: attempted)
         evidence["verify_source"] = "ax_automation_event_list"
