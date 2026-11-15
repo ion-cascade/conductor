@@ -1,4 +1,4 @@
 #!/bin/bash
-# Conductor distribution is source-only until its packages are qualified.
-printf "%s\n" "Build Ion Cascade Conductor from source using README.md; the inherited upstream binary installer is archived in docs/upstream/." >&2
-exit 1
+set -euo pipefail
+source_root="$(cd "$(dirname "$0")/.." && pwd -P)"
+exec /usr/bin/python3 "$source_root/tools/conductor_install.py" install --source "$source_root" "$@"
