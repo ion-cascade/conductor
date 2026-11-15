@@ -1601,14 +1601,13 @@ actor AccessibilityChannel: Channel {
             var strips: [ChannelStripState]?
             var presentation: AXLogicProElements.MixerPresentationRead?
             let directToolbar: AXUIElement?
-            if !wantsStrips, exposure == nil,
-               ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
+            if exposure == nil, ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
                 directToolbar = AXLogicProElements.logic13ControlBarContainer(in: window, runtime: logic.ax)
             } else {
                 directToolbar = nil
             }
             let lookup: (lookup: AXLogicProElements.MixerAreaLookup, binding: AXLogicProElements.MixerAreaBinding?)
-            if let directToolbar,
+            if !wantsStrips, let directToolbar,
                let toggle = AXLogicProElements.directToolbarControl(AXLocalePolicy.controlBarMixerToggle,
                    in: directToolbar, runtime: logic.ax),
                AXValueExtractors.extractButtonState(toggle, runtime: logic.ax) == false {
