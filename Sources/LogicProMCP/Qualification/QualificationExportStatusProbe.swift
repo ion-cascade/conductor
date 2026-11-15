@@ -30,8 +30,11 @@ final class QualificationExportStatusProbe {
     }
 
     init() throws {
-        let folder = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
-            .appendingPathComponent("Conductor Qualification \(UUID().uuidString)", isDirectory: true)
+        // Foundation can canonicalize a temporary directory to /var while enumerating its
+        // children as /private/var. A canonical home-directory child keeps the same spelling
+        // through the export status path checks and the saved-project directory walk.
+        let folder = FileManager.default.homeDirectoryForCurrentUser.resolvingSymlinksInPath()
+            .appendingPathComponent(".conductor-qualification-\(UUID().uuidString)", isDirectory: true)
         root = folder
         guard mkdir(folder.path, 0o700) == 0 else {
             throw QualificationTransportError.protocolViolation("could not create export status fixture")
