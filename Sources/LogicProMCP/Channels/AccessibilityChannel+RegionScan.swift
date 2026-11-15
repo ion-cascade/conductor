@@ -261,8 +261,10 @@ extension AccessibilityChannel {
                 else { continue }
                 let clearance: CGFloat
                 if let viewport, let frame = scope.frame(row.item), viewport.contains(frame) {
+                    // The top lane can begin at the viewport edge. The move and
+                    // trim handles are farther down in the region itself.
                     clearance = min(frame.minX - viewport.minX, viewport.maxX - frame.maxX,
-                                    frame.minY - viewport.minY, viewport.maxY - frame.maxY)
+                                    viewport.maxY - frame.maxY)
                 } else { clearance = -1 }
                 let candidate = HeldRegion(item: row.item, header: scope.headers[index],
                     headerPresentation: presentation, info: row.info, page: page, viewportClearance: clearance)
@@ -285,7 +287,7 @@ extension AccessibilityChannel {
         } else { restored = false }
         var targets: [String: HeldRegion] = [:]
         let rows = observed.map { held -> RegionScanReport.Row in
-            guard restored, held.viewportClearance >= 8, held.info.startPosition != nil, held.info.endPosition != nil,
+            guard restored, held.viewportClearance >= 0, held.info.startPosition != nil, held.info.endPosition != nil,
                   Self.isOrdinaryRegion(held.info),
                   observed.filter({ CFEqual($0.item, held.item) }).count == 1 else {
                 return .init(region: held.info, reference: nil)
