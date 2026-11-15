@@ -24,7 +24,7 @@ It is the **complete server maintained by Ion Cascade**: native control channels
 
 Our focus is practical music work with trustworthy feedback: a command being accepted is different from the intended track changing, a cached reading is different from a fresh observation, and a MIDI region is different from a rendered audio file.
 
-> **Development preview.** Conductor is undergoing live qualification on Logic Pro 13. Use a disposable project for initial tests. See the tested status below before relying on an operation.
+> Conductor 1.0 supports the Logic workflows listed in the [compatibility matrix](docs/conductor/compatibility.md). Start with a disposable project.
 
 ## What Conductor does
 
@@ -54,48 +54,15 @@ Missing, stale and partial observations remain explicit. An incomplete track inv
 
 ## Getting started
 
-### Requirements
+### Install and connect
 
-- A Mac with Logic Pro installed and an open project.
-- A Swift toolchain capable of building the pinned package dependencies. Local qualification currently uses Swift 6.4.2 on Apple silicon.
-- An MCP client, such as Codex, Claude Desktop or another client supporting stdio servers.
-- macOS Accessibility permission for the application responsible for launching Conductor. Other operations can require additional permissions.
+Download the versioned source archive and checksums from the [GitHub release](https://github.com/ion-cascade/conductor/releases/latest). Verify the archive, extract it, then run `./Scripts/install.sh` on the Mac that runs Logic. The installer builds Conductor with your Swift toolchain, keeps each installed release separate, and installs the stable `conductor` command in your account.
 
-### Build from this repository
+- [Install, update and roll back](docs/conductor/install.md)
+- [Connect a local or SSH MCP client](docs/conductor/remote-bridge.md)
+- [Compatibility and verified workflows](docs/conductor/compatibility.md)
 
-```bash
-git clone https://github.com/ion-cascade/conductor.git
-cd conductor
-swift build -c release
-```
-
-The executable currently remains **`.build/release/LogicProMCP`** for compatibility with the inherited Swift package and tooling. Conductor identifies itself independently in the MCP handshake; tool names such as `logic_tracks` remain compatible.
-
-### Connect a local MCP client
-
-Set the command to the absolute path of the built executable. For clients using a JSON MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "conductor": {
-      "command": "/absolute/path/to/conductor/.build/release/LogicProMCP",
-      "env": {
-        "LOGIC_PRO_BUNDLE_ID": "com.apple.logic10",
-        "LOGIC_MCP_DIRECT_TOOLBAR": "1",
-        "LOGIC_MCP_BOUNDED_MIXER_POLL": "1",
-        "LOGIC_MCP_DIRECT_MIXER_PANEL": "1",
-        "LOGIC_MCP_LOGIC13_TRACKS": "1",
-        "LOGIC_MCP_COHERENT_READS": "1"
-      }
-    }
-  }
-}
-```
-
-The flags select the Logic 13 paths currently being qualified. They are opt-in so the existing compatibility paths remain available.
-
-macOS associates permissions with the launching application. Granting Accessibility to Terminal does not establish that a server launched directly over SSH has the same access. [The remote bridge guide](docs/conductor/remote-bridge.md) explains the Terminal-launched approach.
+To work on the source directly, run `swift build -c release` from the repository. The package executable is `.build/release/LogicProMCP`.
 
 ### Start with a small check
 

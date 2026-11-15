@@ -1,31 +1,25 @@
-# Connect to a remote Mac
+# Connect a client to Conductor
 
-The bridge runs on the Mac in an application context that has macOS Accessibility permission. MCP clients connect through an existing SSH configuration. Multiple clients share one Logic session and one serialized upstream server; they do not get separate projects.
+Install and start the [managed bridge](install.md) on the Mac that runs Logic. The broker runs under that Mac’s logged-in GUI account in the Terminal permission context. Multiple clients share one serialized Logic session.
 
-## Mac: start from Terminal
+## Local Mac client
 
-Build Conductor and open a disposable Logic project. In the Mac's Terminal, with Accessibility enabled for Terminal:
+Set the client’s stdio command to the absolute installed path, with `relay` as its only argument.
 
-```bash
-export LOGIC_MCP_EXECUTABLE="$HOME/Projects/conductor/.build/release/LogicProMCP"
-export LOGIC_PRO_BUNDLE_ID=com.apple.logic10
-export LOGIC_MCP_DIRECT_TOOLBAR=1
-export LOGIC_MCP_BOUNDED_MIXER_POLL=1
-export LOGIC_MCP_DIRECT_MIXER_PANEL=1
-export LOGIC_MCP_LOGIC13_TRACKS=1
-export LOGIC_MCP_COHERENT_READS=1
-/usr/bin/python3 "$HOME/Projects/conductor/tools/logic_bridge_server.py"
+```json
+{
+  "mcpServers": {
+    "conductor": {
+      "command": "/Users/your-name/Library/Application Support/Ion Cascade Conductor/conductor",
+      "args": ["relay"]
+    }
+  }
+}
 ```
 
-Adjust the checkout path to your installation. The broker uses an owner-only directory and Unix socket under `~/Library/Application Support/Logic MCP Bridge`. It keeps one server process alive across client disconnects. Stop the broker deliberately when no operation is in flight.
+## Client on another computer
 
-For persistent use, launch the same Terminal-context bootstrap at login. The running broker writes `bridge.pid` after acquiring the directory lock and opening its socket. Leave that file to the broker. A duplicate start exits without replacing the live socket or PID.
-
-Run the bootstrap again if the upstream server exits. Then reconnect the MCP client and inspect the current project before continuing an interrupted edit. A direct SSH launch uses a different macOS permission context. Verify Accessibility and a live Logic observation through the configured client after login.
-
-## Client computer: use the SSH relay
-
-Use an SSH host alias you have already verified and configured for your Mac. A generic MCP configuration is:
+Use an SSH host alias you have already configured and verified for the Mac. The relay runs on the Mac through that connection.
 
 ```json
 {
@@ -35,15 +29,19 @@ Use an SSH host alias you have already verified and configured for your Mac. A g
       "args": [
         "-T", "-o", "BatchMode=yes",
         "your-mac-host-alias",
-        "/usr/bin/python3 $HOME/Projects/conductor/tools/logic_bridge_relay.py"
+        "exec \"$HOME/Library/Application Support/Ion Cascade Conductor/conductor\" relay"
       ]
     }
   }
 }
 ```
 
-The relay waits up to eight seconds for startup before sending protocol bytes. It never reconnects and replays an attempted action. If the upstream server exits, reconnect and reacquire target references.
+For a non-default prefix, point both Mac Terminal and the relay at the `conductor` command in that prefix.
 
-The broker bounds client and queue counts, serializes requests, translates request IDs, negotiates initialization, forwards notifications and handles cancellation. A disconnected client's already-dispatched operation is allowed to reach a terminal response; its writes are not repeated for another client.
+## Check or reconnect
 
-Launch the broker before connecting. For a custom socket directory, set `LOGIC_MCP_BRIDGE_DIR` identically on the Mac broker and relay.
+- Once the bridge reports ready, read `logic://system/health`, `logic://project/info` and `logic://tracks` from the client. Compare the project and track names against Logic before editing.
+- If the relay says the bridge is unavailable, check the Mac Terminal tab. Start the selected release again if the broker exited.
+- If a write was interrupted, inspect the actual project before retrying and fetch fresh target references. A reconnect never replays a request.
+
+The bridge listens on a per-user Unix socket. SSH authentication and host identity are managed by your SSH client.
