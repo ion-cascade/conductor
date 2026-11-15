@@ -158,7 +158,7 @@ func driveStemPanel(
     )
 }
 
-private final class StemExportPanelAXFixtureState: @unchecked Sendable {
+final class StemExportPanelAXFixtureState: @unchecked Sendable {
     let builder: FakeAXRuntimeBuilder
     let app: AXUIElement
     let panel: AXUIElement
@@ -431,7 +431,7 @@ struct ProgressWindowAXFixture {
 /// Finder-column AX fixture for the measured destination route. Each URL entry
 /// is `AXList -> AXGroup -> AXTextField(AXURL)`; selecting its group can
 /// materialize the next column, exactly the readback the production code needs.
-private final class DestinationBrowserFixtureState: @unchecked Sendable {
+final class DestinationBrowserFixtureState: @unchecked Sendable {
     let builder: FakeAXRuntimeBuilder
     let panel: AXUIElement
     private var nextElementID = 100
