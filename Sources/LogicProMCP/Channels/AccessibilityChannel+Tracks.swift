@@ -1400,7 +1400,7 @@ extension AccessibilityChannel {
                CFEqual(focus, observedFocus),
                (CFEqual(focus, disclosure)
                 && AXHelpers.getRole(focus, runtime: logic.ax) == kAXDisclosureTriangleRole as String)
-                    || isHeldHeaderRestorationOrigin(focus),
+                    || isHeldHeaderRestorationOrigin(focus) || isHeldRailFocus(focus),
                AXLogicProElements.heldTrackDisclosureValue(header: header, disclosure: disclosure, runtime: logic) == 0,
                let finalFocus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedUIElementAttribute as String, runtime: logic.ax),
                CFEqual(finalFocus, focus) { return true }
@@ -1424,12 +1424,24 @@ extension AccessibilityChannel {
             return true
         }
 
+        private func isHeldRailFocus(_ focus: AXUIElement) -> Bool {
+            guard ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
+                  hiddenControl == nil, CFEqual(focus, rail),
+                  AXLogicProElements.uniqueTrackHeaderRail(in: window, runtime: logic)
+                    .map({ CFEqual($0, rail) }) == true,
+                  Self.workspacePath(focus, in: window, ax: logic.ax) != nil,
+                  noEditingAttribute(focus, kAXInsertionPointLineNumberAttribute as String),
+                  noEditingAttribute(focus, kAXSelectedTextRangeAttribute as String) else { return false }
+            return true
+        }
+
         /// A completed click may focus its held target. Corroborate that limited
         /// effect before accepting capture or authorizing another click.
         private func acceptHeldGestureFocus(_ target: Disclosure) -> Bool {
             guard let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedUIElementAttribute as String, runtime: logic.ax),
                   CFEqual(focus, observedFocus) || CFEqual(focus, originalFocus)
                     || CFEqual(focus, target.disclosure) || CFEqual(focus, target.header)
+                    || isHeldRailFocus(focus)
                     || (completedClickFocus.map { CFEqual($0.target.header, target.header)
                         && CFEqual($0.target.disclosure, target.disclosure) } == true
                         && permitsHeldPassiveHeaderFocus()) else { return false }
