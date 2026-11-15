@@ -6,6 +6,12 @@ extension AccessibilityChannel {
         runtime logic: AXLogicProElements.Runtime
     ) -> ChannelResult {
         let operation = "track.get_volume_automation"
+        func unavailable() -> ChannelResult {
+            .error(HonestContract.encodeStateC(
+                error: .readbackUnavailable,
+                hint: "Open the Track Automation Event List for the referenced track and expose its Volume events.",
+                extras: ["operation": operation, "write_attempted": false]))
+        }
         guard let binding = AXTrackBinding.current,
               let index = binding.currentIndex(),
               let app = AXLogicProElements.appRoot(runtime: logic),
@@ -15,18 +21,12 @@ extension AccessibilityChannel {
               let arrangeTitle = AXHelpers.getTitle(binding.window, runtime: logic.ax),
               arrangeTitle.hasSuffix(" - Tracks"),
               let editor: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute as String, runtime: logic.ax),
-              !CFEqual(editor, binding.window),
-              let read = Logic13VolumeEventList(app: app, editor: editor, arrange: binding.window,
-                  title: String(arrangeTitle.dropLast(" - Tracks".count)),
-                  trackName: trackName, runtime: logic.ax),
-              let points = read.points(),
-              binding.currentIndex() == index, logic.focusedApplicationPID() == pid,
-              read.ownsEditor() else {
-            return .error(HonestContract.encodeStateC(
-                error: .readbackUnavailable,
-                hint: "Open the Track Automation Event List for the referenced track and expose its Volume events.",
-                extras: ["operation": operation, "write_attempted": false]))
-        }
+              !CFEqual(editor, binding.window) else { return unavailable() }
+        let read = Logic13VolumeEventList(app: app, editor: editor, arrange: binding.window,
+            title: String(arrangeTitle.dropLast(" - Tracks".count)),
+            trackName: trackName, runtime: logic.ax)
+        guard let points = read.points(), binding.currentIndex() == index,
+              logic.focusedApplicationPID() == pid, read.ownsEditor() else { return unavailable() }
         return .success(HonestContract.encodeStateA(extras: [
             "operation": operation,
             "lane": "volume",

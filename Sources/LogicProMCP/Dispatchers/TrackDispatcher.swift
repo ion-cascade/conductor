@@ -99,7 +99,7 @@ struct TrackDispatcher: OperationTraceDispatching {
         switch command {
         case "get_volume_automation":
             let operation = "track.get_volume_automation"
-            guard nonEmptyString(params, "target_ref") != nil else {
+            guard params["target_ref"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
                 return toolInvalidParamsResult("get_volume_automation requires a track target_ref")
             }
             switch await TargetRefResolver.resolveMutationIndex(
