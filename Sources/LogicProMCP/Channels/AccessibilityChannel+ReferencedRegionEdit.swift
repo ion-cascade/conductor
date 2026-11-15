@@ -91,10 +91,11 @@ extension AccessibilityChannel {
               Self.sameRegionPeers(initial, before, ignoring: held.item),
               scope.selectionIsOriginal(),
               Self.safeDragMode(scope: scope, held: held, change: change, census: before),
-              let drag = Self.regionDragPoints(held, change: change, scope: scope),
               let hitTest = ax.elementAtPosition,
-              case .success(.some(let hit)) = hitTest(scope.app, drag.start),
-              Self.ownsRegionGesture(hit, held: held, edge: change.edge, runtime: ax),
+              let drag = Self.regionDragPoints(held, change: change, scope: scope, hitTest: { point in
+                  guard case .success(.some(let hit)) = hitTest(scope.app, point) else { return false }
+                  return Self.ownsRegionGesture(hit, held: held, edge: change.edge, runtime: ax)
+              }),
               scope.holdsArrange(), scope.page()?.matches(held.page) == true,
               OperationTraceContext.claimDeadlineEffect("region_drag")
         else {
@@ -106,7 +107,6 @@ extension AccessibilityChannel {
 
         regionScan = nil
         let mouse = AXMouseHelper.Runtime.production
-        let priorPointer = CGEvent(source: nil)?.location
         _ = mouse.postMouseEvent(.mouseMoved, drag.start, 0)
         mouse.sleepMicros(70_000)
         guard scope.holdsArrange(), scope.page()?.matches(held.page) == true, scope.selectionIsOriginal(),
@@ -133,8 +133,7 @@ extension AccessibilityChannel {
         if let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
            let current: AXUIElement = AXHelpers.getAttribute(scope.app, kAXMainWindowAttribute, runtime: ax),
            CFEqual(current, scope.window), let frame = scope.frame(scope.window) {
-            let resting = priorPointer.flatMap { frame.contains($0) && abs($0.y - drag.end.y) > 24 ? $0 : nil }
-                ?? CGPoint(x: frame.minX + 180, y: frame.minY + 10)
+            let resting = CGPoint(x: frame.minX + frame.width / 2, y: frame.minY + 12)
             _ = mouse.postMouseEvent(.mouseMoved, resting, 0)
         }
 
@@ -145,7 +144,8 @@ extension AccessibilityChannel {
             guard let after = Self.regionEditCensus(scope: scope) else { continue }
             let matches = after.filter {
                 CFEqual($0.item, held.item) && $0.info.trackIndex == held.info.trackIndex
-                    && $0.info.name.utf8.elementsEqual(held.info.name.utf8) && $0.info.kind == held.info.kind
+                    && $0.info.name.utf8.elementsEqual(held.info.name.utf8)
+                    && $0.info.startPosition != nil && $0.info.endPosition != nil
             }
             if matches.count == 1 { observed = matches[0].info }
             peersVerified = Self.sameRegionPeers(before, after, ignoring: held.item)
@@ -225,8 +225,9 @@ extension AccessibilityChannel {
             }
     }
 
-    private static func regionDragPoints(_ held: HeldRegion, change: RegionChange, scope: ArrangeRegionScope)
-        -> (start: CGPoint, end: CGPoint)? {
+    private static func regionDragPoints(
+        _ held: HeldRegion, change: RegionChange, scope: ArrangeRegionScope, hitTest: (CGPoint) -> Bool
+    ) -> (start: CGPoint, end: CGPoint)? {
         guard let viewport = scope.frame(scope.pane), let region = scope.frame(held.item), viewport.contains(region),
               region.width > 12, region.height > 12,
               let start = held.info.startPosition.flatMap(ArrangeMusicalGrid.ticks),
@@ -234,16 +235,23 @@ extension AccessibilityChannel {
               end > start else { return nil }
         let pixels = region.width * CGFloat(change.delta) / CGFloat(end - start)
         guard abs(pixels) >= 3 else { return nil }
-        let origin: CGPoint
+        let candidates: [CGPoint]
         switch change.edge {
-        case .middle: origin = .init(x: region.midX, y: region.midY)
-        case .start: origin = .init(x: region.minX + 2, y: region.maxY - 3)
-        case .end: origin = .init(x: region.maxX - 2, y: region.maxY - 3)
+        case .middle: candidates = [.init(x: region.midX, y: region.midY)]
+        case .start, .end:
+            let left = change.edge == .start
+            let edgeX = left ? region.minX : region.maxX
+            candidates = [3.0, 6, 10].flatMap { insetY in
+                [2.0, 4, 6].map { insetX in
+                    CGPoint(x: edgeX + (left ? insetX : -insetX), y: region.maxY - insetY)
+                }
+            }
         }
-        let destination = CGPoint(x: origin.x + pixels, y: origin.y)
         let envelope = change.edge == .middle ? region.offsetBy(dx: pixels, dy: 0) : region
-        guard viewport.insetBy(dx: 8, dy: 0).contains(destination),
-              viewport.contains(envelope) else { return nil }
-        return (origin, destination)
+        guard viewport.contains(envelope),
+              let origin = candidates.first(where: { point in
+                  viewport.insetBy(dx: 8, dy: 0).contains(CGPoint(x: point.x + pixels, y: point.y)) && hitTest(point)
+              }) else { return nil }
+        return (origin, CGPoint(x: origin.x + pixels, y: origin.y))
     }
 }

@@ -18,7 +18,7 @@ extension AccessibilityChannel {
         let headerPresentation: Data
         let info: RegionInfo
         let page: RegionPage
-        let fullFrameObserved: Bool
+        let viewportClearance: CGFloat
     }
 
     struct RegionScanSnapshot: @unchecked Sendable {
@@ -259,11 +259,15 @@ extension AccessibilityChannel {
                 guard scope.headers.indices.contains(index),
                       let presentation = AXTrackBinding.presentation(of: scope.headers[index], runtime: runtime.ax)
                 else { continue }
-                let full = viewport.map { visible in scope.frame(row.item).map { visible.contains($0) } == true } == true
+                let clearance: CGFloat
+                if let viewport, let frame = scope.frame(row.item), viewport.contains(frame) {
+                    clearance = min(frame.minX - viewport.minX, viewport.maxX - frame.maxX,
+                                    frame.minY - viewport.minY, viewport.maxY - frame.maxY)
+                } else { clearance = -1 }
                 let candidate = HeldRegion(item: row.item, header: scope.headers[index],
-                    headerPresentation: presentation, info: row.info, page: page, fullFrameObserved: full)
+                    headerPresentation: presentation, info: row.info, page: page, viewportClearance: clearance)
                 if let existing = observed.firstIndex(where: { Self.sameRegionObservation($0, item: row.item, info: row.info) }) {
-                    if full && !observed[existing].fullFrameObserved { observed[existing] = candidate }
+                    if clearance > observed[existing].viewportClearance { observed[existing] = candidate }
                 } else {
                     observed.append(candidate)
                 }
@@ -281,7 +285,7 @@ extension AccessibilityChannel {
         } else { restored = false }
         var targets: [String: HeldRegion] = [:]
         let rows = observed.map { held -> RegionScanReport.Row in
-            guard restored, held.fullFrameObserved, held.info.startPosition != nil, held.info.endPosition != nil,
+            guard restored, held.viewportClearance >= 8, held.info.startPosition != nil, held.info.endPosition != nil,
                   Self.isOrdinaryRegion(held.info),
                   observed.filter({ CFEqual($0.item, held.item) }).count == 1 else {
                 return .init(region: held.info, reference: nil)
