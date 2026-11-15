@@ -218,12 +218,12 @@ struct ProjectLogic13StemSplitter {
     }
 
     private func wait(
-        _ stage: String, attempts: Int, observe: () -> AXUIElement?
+        _ stage: String, attempts: Int, observe: () throws -> AXUIElement?
     ) async throws -> AXUIElement {
         for _ in 0..<attempts {
             try Task.checkCancellation()
             guard holdsProject() else { throw Failure.unavailable("project_custody_lost:\(stage)") }
-            if let found = observe() { return found }
+            if let found = try observe() { return found }
             try await Task.sleep(for: .milliseconds(100))
         }
         throw Failure.unavailable(stage)
