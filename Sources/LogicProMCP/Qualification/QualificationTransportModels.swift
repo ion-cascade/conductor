@@ -657,6 +657,13 @@ struct QualificationOperationResult: Equatable, Sendable {
 
     private var readbackFreshness: QualificationReadbackFreshness.Verdict {
         guard let readbackData else { return .cacheAgeUnknown }
+        if readbackSource == QualificationSemanticReadbackValidator.responseOnlySource,
+           let id = OperationID(rawValue: operationID),
+           SemanticOracleTable.conductorReceiptOnlyReadIDs.contains(id),
+           readbackData == QualificationSemanticReadbackValidator.responseOnlyRecord {
+            // A recorded absence of independent evidence allows only response validation.
+            return .admissible
+        }
         return QualificationReadbackFreshness.verdict(
             for: readbackData,
             uri: readbackSource,
@@ -817,6 +824,8 @@ struct QualificationLiveGateSummary: Equatable, Sendable {
 }
 
 enum QualificationSemanticReadbackValidator {
+    static let responseOnlySource = "qualification://no-independent-readback"
+    static let responseOnlyRecord = Data(#"{"independent_readback":false}"#.utf8)
     static let coreMIDIPortReadbackSource = "host://coremidi/ports"
     static let libraryPanelReadbackSource = "host://accessibility/library-panel"
 
@@ -845,6 +854,10 @@ enum QualificationSemanticReadbackValidator {
         readbackData: Data,
         readbackSource: String? = nil
     ) -> Bool? {
+        if operationID == OperationID.projectExportStatus.rawValue,
+           !QualificationExportStatusProbe.accepts(source: readbackSource, data: readbackData) {
+            return false
+        }
         switch OperationID(rawValue: operationID) {
         case .systemHealth:
             // Bespoke: full typed-payload equality against the independent read.

@@ -622,6 +622,10 @@ struct QualificationSemanticPolicy: Codable, Equatable, Sendable {
                 readbackSource: readbackSource
             ) == true
         case .declarative:
+            if operationID == OperationID.projectExportStatus.rawValue,
+               !QualificationExportStatusProbe.accepts(source: readbackSource, data: readbackData) {
+                return false
+            }
             guard strength != nil,
                   strength != .custom,
                   !constraints.isEmpty,

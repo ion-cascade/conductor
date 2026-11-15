@@ -302,7 +302,7 @@ enum SemanticOracleFixtures {
         ])
     }()
 
-    static let byOperationID: [OperationID: SemanticOracleFixture] = [
+    private static let inheritedOperationFixtures: [OperationID: SemanticOracleFixture] = [
         .pluginsGetHostParameterManifest: hostParameterManifestRead,
         .pluginsPlanParameterChanges: SemanticOracleFixture(response: HonestContract.encodeV2StateA(extras: [
             "operation": "logic_plugins.plan_parameter_changes", "complete": true,
@@ -1622,4 +1622,8 @@ enum SemanticOracleFixtures {
             readback: "{}"
         ),
     ]
+
+    static let byOperationID = inheritedOperationFixtures.merging(conductorReads) { _, _ in
+        preconditionFailure("duplicate operation oracle fixture")
+    }
 }

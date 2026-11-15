@@ -2278,9 +2278,7 @@ struct QualificationRunnerTests {
         let readOnlyCount = OperationRegistry.specs.filter { $0.mutability == .readOnly }.count
         let marked = Set(SemanticOracleTable.all
             .filter { $0.independentReadbackDeferral != nil }.map(\.operationID))
-        #expect(marked == Set<OperationID>([.midiListPorts, .tracksListLibrary, .midiReadSelectedRegionEvents, .mixerGetOutputVerified, .mixerGetSendDestinationVerified,
-            .mixerGetInputBusVerified, .mixerGetSendBypassVerified, .pluginsPlanParameterChanges,
-            .pluginsGetHostParameterManifest, .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified]))
+        #expect(marked == SemanticOracleFixtures.expectedReadDeferralIDs)
         let smokeOnly = marked.subtracting([.midiListPorts, .tracksListLibrary])
         let readOnlyIDs = Set(OperationRegistry.specs.filter { $0.mutability == .readOnly }.map(\.id.rawValue))
         let smokeOnlyIDs = Set(smokeOnly.map(\.rawValue))
@@ -4827,9 +4825,7 @@ struct QualificationRunnerTests {
         let readOnlyCount = OperationRegistry.specs.filter { $0.mutability == .readOnly }.count
         let marked = Set(SemanticOracleTable.all
             .filter { $0.independentReadbackDeferral != nil }.map(\.operationID))
-        #expect(marked == Set<OperationID>([.midiListPorts, .tracksListLibrary, .midiReadSelectedRegionEvents, .mixerGetOutputVerified, .mixerGetSendDestinationVerified,
-            .mixerGetInputBusVerified, .mixerGetSendBypassVerified, .pluginsPlanParameterChanges,
-            .pluginsGetHostParameterManifest, .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified]))
+        #expect(marked == SemanticOracleFixtures.expectedReadDeferralIDs)
         let smokeOnly = marked.subtracting([.midiListPorts, .tracksListLibrary])
         let smokeOnlyIDs = Set(smokeOnly.map(\.rawValue))
         let readOnlyIDs = Set(OperationRegistry.specs.filter { $0.mutability == .readOnly }.map(\.id.rawValue))
@@ -5895,6 +5891,8 @@ struct QualificationRunnerTests {
                         ?? (spec.id == .midiListPorts ? nil : false),
                     readbackSource: spec.id == .midiListPorts
                         ? QualificationSemanticReadbackValidator.coreMIDIPortReadbackSource
+                        : spec.id == .projectExportStatus
+                            ? QualificationExportStatusProbe.source
                         : spec.id == .tracksListLibrary
                             ? QualificationSemanticReadbackValidator.libraryPanelReadbackSource
                         : spec.tool == .logicTransport

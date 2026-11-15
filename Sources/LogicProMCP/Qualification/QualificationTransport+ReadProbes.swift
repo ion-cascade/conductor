@@ -54,10 +54,27 @@ extension QualificationTransport {
     }
     static let pluginReadProbeOperationIDs: Set<OperationID> = [
         .pluginsGetHostParameterManifest,
+        .pluginsGetPresetVerified,
+        .pluginsGetSidechainVerified,
         .pluginsGetParamVerified,
         .pluginsGetChannelEQStateVerified,
         .pluginsPlanParameterChanges,
     ]
+    static func selectedAutomationTarget(from data: Data, deadline: DeadlineClass) -> String? {
+        guard QualificationReadbackFreshness.verdict(for: data, uri: "logic://tracks",
+            verification: .readbackRequired, deadline: deadline).isAdmissible,
+            let envelope = JSONInspector.parse(data) as? [String: Any],
+            let tracks = envelope["data"] as? [[String: Any]] else { return nil }
+        let selection = tracks.filter { track in
+            guard let selected = track["isSelected"], JSONInspector.isBoolean(selected) else { return false }
+            return selected as? Bool == true
+        }
+        guard selection.count == 1, let reference = selection[0]["track_ref"] as? String,
+              reference.hasPrefix("trk_"), reference.count > 4,
+              tracks.filter({ $0["track_ref"] as? String == reference }).count == 1 else { return nil }
+        return reference
+    }
+
     static let qualificationHostBuildFingerprint = "logic-pro-mcp-qualification-unverified"
 
     /// Read-only Mixer probes must address the exact physical sources the current server issued.
@@ -234,6 +251,11 @@ extension QualificationTransport {
                 "target_ref": candidate.reference,
                 "expected_build_fingerprint": Self.qualificationHostBuildFingerprint,
             ]
+        }
+
+        if let compressor = candidates.first(where: { $0.pluginID == "logic.stock.effect.compressor" }) {
+            params[.pluginsGetPresetVerified] = ["target_ref": compressor.reference]
+            params[.pluginsGetSidechainVerified] = ["target_ref": compressor.reference]
         }
 
         // Gain's scalar is the least invasive measured reader in the qualification fixture. Keep

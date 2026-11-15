@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.7.2] — 2026-11-15
+
+- Qualify export status against an independently checked saved receipt, project data and PCM artifact owned by the verifier.
+- Validate the reply contracts for six existing UI reads and record explicit qualification deferrals for their independent readback. ([#38](https://github.com/ion-cascade/conductor/issues/38))
+
 ## [1.7.1] — 2026-11-15
 
 - Separate qualification transport, project cleanup execution, and stem export test fixtures by responsibility. Document the 1,500-line target for authored files. ([#37](https://github.com/ion-cascade/conductor/pull/37))

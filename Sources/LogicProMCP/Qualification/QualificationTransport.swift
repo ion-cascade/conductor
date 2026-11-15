@@ -274,6 +274,19 @@ struct QualificationTransport: Sendable {
                     default: nil
                     }
                 }
+                let exportStatusProbe: QualificationExportStatusProbe?
+                if spec.id == .projectExportStatus {
+                    do {
+                        let probe = try QualificationExportStatusProbe()
+                        exportStatusProbe = probe
+                        preparedReadParams[spec.id] = probe.params
+                    } catch {
+                        exportStatusProbe = nil
+                        responseFailure = Self.observedFailureReason(from: error, during: "export status fixture")
+                    }
+                } else {
+                    exportStatusProbe = nil
+                }
                 var phaseBRecord: QualificationMutationRestoreRecord?
                 var phaseBRefusal: String?
                 // `tracks.rename` reuses the negative probe's response below and never reaches the
@@ -607,6 +620,15 @@ struct QualificationTransport: Sendable {
                                     from: error, during: "fresh mixer read-probe inspection")
                             }
                         }
+                        if spec.id == .tracksGetPanAutomation || spec.id == .tracksGetVolumeAutomation {
+                            let trackReadID = nextID
+                            nextID += 1
+                            let tracks = try resourceReadback(session, id: trackReadID,
+                                uri: "logic://tracks", phase: "automation_read_probe_track")
+                            if let reference = Self.selectedAutomationTarget(from: tracks, deadline: spec.deadline) {
+                                preparedReadParams[spec.id] = ["target_ref": reference]
+                            }
+                        }
                         let responseID = nextID
                         nextID += 1
                         responseRequestID = String(responseID)
@@ -637,7 +659,17 @@ struct QualificationTransport: Sendable {
                 var readbackData: Data?
                 var readbackFailure: String?
                 do {
-                    if spec.id == .systemExportSupportBundle, let phaseBRecord {
+                    if let exportStatusProbe {
+                        readbackSource = QualificationExportStatusProbe.source
+                        readbackRequestID = "operation-readback-\(nextID)"
+                        nextID += 1
+                        readbackData = try exportStatusProbe.readback()
+                    } else if SemanticOracleTable.conductorReceiptOnlyReadIDs.contains(spec.id) {
+                        readbackSource = QualificationSemanticReadbackValidator.responseOnlySource
+                        readbackRequestID = "operation-readback-\(nextID)"
+                        nextID += 1
+                        readbackData = QualificationSemanticReadbackValidator.responseOnlyRecord
+                    } else if spec.id == .systemExportSupportBundle, let phaseBRecord {
                         // The recipe already read the exact verifier-owned directory through
                         // no-follow descriptors and verified every published digest. Re-reading
                         // `logic://system/health` says nothing about that artifact and, because it

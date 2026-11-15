@@ -1803,14 +1803,14 @@ struct SemanticOracleMutationTests {
     func validatorRoutesEachOracleOperationToItsOracle(operationID: OperationID) throws {
         let marked = Set(SemanticOracleTable.all
             .filter { $0.independentReadbackDeferral != nil }.map(\.operationID))
-        #expect(marked == Set<OperationID>([.midiListPorts, .tracksListLibrary, .midiReadSelectedRegionEvents, .mixerGetOutputVerified, .mixerGetSendDestinationVerified,
-            .mixerGetInputBusVerified, .mixerGetSendBypassVerified, .pluginsPlanParameterChanges,
-            .pluginsGetHostParameterManifest, .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified]))
+        #expect(marked == SemanticOracleFixtures.expectedReadDeferralIDs)
         let fixture = try #require(SemanticOracleFixtures.byOperationID[operationID])
+        let readbackSource = operationID == .projectExportStatus ? QualificationExportStatusProbe.source : nil
         let routed = QualificationSemanticReadbackValidator.validate(
             operationID: operationID.rawValue,
             responseData: fixture.responseData,
-            readbackData: fixture.readbackData
+            readbackData: fixture.readbackData,
+            readbackSource: readbackSource
         )
         if marked.contains(operationID) {
             // The raw oracle still checks protocol consistency; its declared same-handler
@@ -1834,7 +1834,8 @@ struct SemanticOracleMutationTests {
         let corrupt: Bool = try #require(QualificationSemanticReadbackValidator.validate(
             operationID: operationID.rawValue,
             responseData: Data(#"{"__corrupt__":true}"#.utf8),
-            readbackData: fixture.readbackData
+            readbackData: fixture.readbackData,
+            readbackSource: readbackSource
         ) as Bool?)
         #expect(!corrupt, "\(operationID.rawValue) passed a corrupt payload")
     }
