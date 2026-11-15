@@ -172,7 +172,7 @@ extension AccessibilityChannel {
             // Audio-region trimming can redraw the Arrange pane after the
             // cursor has been cleared. Bind the new presentation to the same
             // window, track and viewport before accepting a post-edit census.
-            guard let current = ArrangeRegionScope(runtime: runtime),
+            guard let current = ArrangeRegionScope(runtime: runtime, afterOwnedEdit: true),
                   CFEqual(current.window, scope.window), current.document == scope.document,
                   current.headers.indices.contains(held.info.trackIndex),
                   CFEqual(current.headers[held.info.trackIndex], held.header),

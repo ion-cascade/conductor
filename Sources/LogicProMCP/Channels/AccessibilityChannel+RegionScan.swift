@@ -40,8 +40,9 @@ extension AccessibilityChannel {
         let headers: [AXUIElement]
         let originalPage: RegionPage
         let originalSelection: [AXUIElement]
+        let afterOwnedEdit: Bool
 
-        init?(runtime: AXLogicProElements.Runtime) {
+        init?(runtime: AXLogicProElements.Runtime, afterOwnedEdit: Bool = false) {
             _ = runtime.onScreenWindowList()
             guard ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
                   (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil else {
@@ -55,7 +56,8 @@ extension AccessibilityChannel {
                 Log.debug("Arrange region document unavailable", subsystem: "ax")
                 return nil
             }
-            guard ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime, ignoringHelpTags: true) else {
+            guard ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime,
+                    ignoringHelpTags: true, checkingMainWindow: afterOwnedEdit) else {
                 Log.debug("Arrange region foreground or stopped transport unavailable", subsystem: "ax")
                 return nil
             }
@@ -77,6 +79,7 @@ extension AccessibilityChannel {
                 return nil
             }
             self.runtime = runtime
+            self.afterOwnedEdit = afterOwnedEdit
             self.app = app
             self.window = window
             self.document = document
@@ -123,7 +126,8 @@ extension AccessibilityChannel {
             guard OperationTraceContext.current?.ownsGate() == true,
                   case .found(let current) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: runtime),
                   CFEqual(current, window),
-                  ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime, ignoringHelpTags: true),
+                  ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime,
+                    ignoringHelpTags: true, checkingMainWindow: afterOwnedEdit),
                   AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime) == .success(document),
                   AXLogicProElements.logic13TrackContent(in: window, runtime: runtime).map({ CFEqual($0, content) }) == true,
                   case .success(let nodes) = AXHelpers.childrenResult(pane, runtime: runtime.ax),

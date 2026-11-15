@@ -1,3 +1,4 @@
+@preconcurrency import AppKit
 @preconcurrency import ApplicationServices
 import Foundation
 
@@ -117,10 +118,17 @@ enum ControlBarDisplayMode {
     }
 
     static func foregroundStoppedProject(
-        window: AXUIElement, runtime: AXLogicProElements.Runtime, ignoringHelpTags: Bool = false
+        window: AXUIElement, runtime: AXLogicProElements.Runtime, ignoringHelpTags: Bool = false,
+        checkingMainWindow: Bool = false
     ) -> Bool {
         let ax = runtime.ax
-        guard !Task.isCancelled, let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
+        guard !Task.isCancelled, let pid = runtime.logicProPID() else { return false }
+        // After an owned mouse edit, require the live foreground process and
+        // its sole document's main window. There is no keyboard write to guard.
+        let foreground = checkingMainWindow
+            ? NSRunningApplication(processIdentifier: pid)?.isActive == true
+            : runtime.focusedApplicationPID() == pid
+        guard foreground,
               let app = AXLogicProElements.appRoot(runtime: runtime),
               let observed: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax),
               let toolbar = AXLogicProElements.directLogic13Toolbar(in: window, runtime: ax),
@@ -132,7 +140,8 @@ enum ControlBarDisplayMode {
             : observed
         guard windows.count == 1, CFEqual(windows[0], window) else { return false }
         if ignoringHelpTags {
-            guard let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: ax),
+            let attribute = checkingMainWindow ? kAXMainWindowAttribute : kAXFocusedWindowAttribute
+            guard let focus: AXUIElement = AXHelpers.getAttribute(app, attribute, runtime: ax),
                   CFEqual(focus, window),
                   case .success(let children) = AXHelpers.childrenResult(window, runtime: ax),
                   !children.contains(where: { AXHelpers.getRole($0, runtime: ax) == kAXSheetRole as String })
