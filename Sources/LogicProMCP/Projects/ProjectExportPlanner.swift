@@ -87,7 +87,8 @@ enum ProjectExportPlanner {
             projects: resolvedProjectPlans,
             requiredConfirmations: requiredConfirmations(artifactKinds: artifacts),
             unsupportedOrBlockedSteps: surfacedConstraints,
-            executionPreconditions: executionPreconditions(artifactKinds: artifacts),
+            executionPreconditions: executionPreconditions(artifactKinds: artifacts,
+                explicitPCM: bounceSettings != nil, alignedStems: stemSettings != nil),
             baselineVerification: [
                 "artifact_exists",
                 "file_size_non_zero",

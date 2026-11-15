@@ -150,15 +150,17 @@ extension ProjectExportExecutor {
                 bounceResult = .failure("bounce_route_unavailable")
             }
             guard let produced = bounceResult.artifactPath else {
+                let uncertain = nativeResult != nil && bounceResult.bounceFired
+                let detail = "bounce_failed: \(bounceResult.error ?? "no verified artifact produced for \(artifact.path)")"
                 return RunArtifact(
                     kind: artifact.kind,
                     path: artifact.path,
-                    state: "C",
+                    state: uncertain ? "B" : "C",
                     verified: false,
                     bounceFired: bounceResult.bounceFired,
                     writeAttempted: bounceResult.bounceFired,
-                    error: "bounce_helper_failed: \(bounceResult.error ?? "no verified artifact produced for \(artifact.path)")",
-                    reason: nil,
+                    error: uncertain ? nil : (nativeResult == nil ? "bounce_helper_failed: \(bounceResult.error ?? artifact.path)" : detail),
+                    reason: uncertain ? detail : nil,
                     evidence: nil
                 )
             }

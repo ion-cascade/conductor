@@ -140,7 +140,7 @@ extension ProjectExportPlanner {
         if artifactKinds.contains("stem") {
             steps.append(ProjectExportBlockedStep(
                 operation: "export_resume",
-                reason: "Stem filenames are assigned by Logic after export, so existing artifact identity cannot be established before a run.",
+                reason: "Each stem export writes into a fresh private directory, so existing outputs cannot be reused as evidence for a new run.",
                 safeAlternative: "No automatic resume is available; partial stem artifacts remain unchanged and this request terminates."
             ))
         }
@@ -152,9 +152,19 @@ extension ProjectExportPlanner {
     /// `validation_status: valid`. The default export path drives Logic's Bounce
     /// dialog out-of-process with the bundled `logic_bounce.py` helper. This is
     /// an internal phase of confirmed export_run, not standalone project.bounce.
-    static func executionPreconditions(artifactKinds: [String]) -> [ProjectExportPrecondition] {
+    static func executionPreconditions(
+        artifactKinds: [String], explicitPCM: Bool, alignedStems: Bool
+    ) -> [ProjectExportPrecondition] {
         var preconditions: [ProjectExportPrecondition] = []
-        if artifactKinds.contains(where: { $0 != "stem" }) {
+        if explicitPCM {
+            preconditions.append(ProjectExportPrecondition(
+                requirement: "logic_13_native_pcm_bounce",
+                appliesToCommands: ["export_run", "export_resume"],
+                detail: "Explicit PCM delivery requires a logged-in Logic Pro 13 session with Accessibility and PostEvent access, a stopped transport, and a writable destination exposed to Logic’s save panel. The current keyboard layout must provide the native Go to Folder shortcut. Conductor reads back the PCM controls before saving and verifies the written audio.",
+                verifyWith: "LogicProMCP doctor"
+            ))
+        }
+        if artifactKinds.contains(where: { $0 != "stem" && ($0 != "bounce" || !explicitPCM) }) {
             preconditions += [
             ProjectExportPrecondition(
                 requirement: "automation_permission",
@@ -200,7 +210,9 @@ extension ProjectExportPlanner {
             preconditions.append(ProjectExportPrecondition(
                 requirement: "accessibility_export_panel",
                 appliesToCommands: ["export_run"],
-                detail: "The stem phase is executed only inside logic_project export_run; there is no standalone stem command. It opens Logic's File > Export > All Tracks as Audio Files panel through Accessibility, creates a private per-run subdirectory under output_root, selects that exact folder in the panel browser, and requires the observed One File per Track value. Completion uses a progress round trip or stable, structurally complete and decodable WAV/AIFF files in the private directory. A sole output can be bound to a sole populated track only after a fresh complete native track census; general multi-track file binding remains unverified. A dry plan validates only the filesystem directory: browser visibility is an execution-time precondition that can be observed only after the panel opens, where an unreachable folder is refused before Export is pressed. It does not use project.bounce or the keyboard-driven bounce helper. Eligible outputs are only top-level non-directory entries with suffix wav, wave, aif, aiff, aifc, m4a, or mp3; no output format is selected or promised by this driver.",
+                detail: alignedStems
+                    ? "Aligned stems require Logic Pro 13, a complete fresh track and region inventory, unique eligible track names, and an output directory visible to Logic’s Export panel. Conductor verifies the native naming and format settings, then checks every 24-bit WAVE file against its track name and the common frame extent."
+                    : "The stem phase is executed only inside logic_project export_run; there is no standalone stem command. It opens Logic's File > Export > All Tracks as Audio Files panel through Accessibility, creates a private per-run subdirectory under output_root, selects that exact folder in the panel browser, and requires the observed One File per Track value. Completion uses a progress round trip or stable, structurally complete and decodable WAV/AIFF files in the private directory. A sole output can be bound to a sole populated track only after a fresh complete native track census; general multi-track file binding remains unverified. A dry plan validates only the filesystem directory: browser visibility is an execution-time precondition that can be observed only after the panel opens, where an unreachable folder is refused before Export is pressed. It does not use project.bounce or the keyboard-driven bounce helper. Eligible outputs are only top-level non-directory entries with suffix wav, wave, aif, aiff, aifc, m4a, or mp3; no output format is selected or promised by this driver.",
                 verifyWith: "LogicProMCP --check-permissions"
             ))
         }
