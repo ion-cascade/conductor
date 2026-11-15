@@ -55,7 +55,7 @@ extension AccessibilityChannel {
                 Log.debug("Arrange region document unavailable", subsystem: "ax")
                 return nil
             }
-            guard ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime) else {
+            guard ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime, ignoringHelpTags: true) else {
                 Log.debug("Arrange region foreground or stopped transport unavailable", subsystem: "ax")
                 return nil
             }
@@ -122,7 +122,7 @@ extension AccessibilityChannel {
             guard OperationTraceContext.current?.ownsGate() == true,
                   case .found(let current) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: runtime),
                   CFEqual(current, window),
-                  ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime),
+                  ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime, ignoringHelpTags: true),
                   AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime) == .success(document),
                   AXLogicProElements.logic13TrackContent(in: window, runtime: runtime).map({ CFEqual($0, content) }) == true,
                   case .success(let nodes) = AXHelpers.childrenResult(pane, runtime: runtime.ax),
@@ -301,7 +301,7 @@ extension AccessibilityChannel {
     }
 
     private static func isOrdinaryRegion(_ info: RegionInfo) -> Bool {
-        let help = info.rawHelp.lowercased()
+        guard let help = info.rawHelp?.lowercased() else { return false }
         let markers = ["looped region", "alias region", "take folder"]
         guard !markers.contains(where: { help.contains($0) }) else { return false }
         return (info.kind == "audio" && help.contains("audio region."))

@@ -127,6 +127,7 @@ extension AccessibilityChannel {
             mouse.sleepMicros(25_000)
         }
         posted = mouse.postMouseEvent(.leftMouseUp, drag.end, 1) && posted
+        mouse.sleepMicros(180_000)
         // A hovered resize handle replaces the region's ordinary AXHelp.
         // Move off the region before reading its actual post-edit evidence.
         if let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,

@@ -117,17 +117,27 @@ enum ControlBarDisplayMode {
     }
 
     static func foregroundStoppedProject(
-        window: AXUIElement, runtime: AXLogicProElements.Runtime
+        window: AXUIElement, runtime: AXLogicProElements.Runtime, ignoringHelpTags: Bool = false
     ) -> Bool {
         let ax = runtime.ax
         guard !Task.isCancelled, let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
               let app = AXLogicProElements.appRoot(runtime: runtime),
-              let windows: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax),
-              windows.count == 1, CFEqual(windows[0], window),
+              let observed: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute as String, runtime: ax),
               let toolbar = AXLogicProElements.directLogic13Toolbar(in: window, runtime: ax),
               let play = AXLogicProElements.directToolbarControl(AXLocalePolicy.transportPlayControl, in: toolbar, runtime: ax),
               let record = AXLogicProElements.directToolbarControl(AXLocalePolicy.transportRecordControl, in: toolbar, runtime: ax)
         else { return false }
+        let windows = ignoringHelpTags
+            ? observed.filter { AXHelpers.getRole($0, runtime: ax) != kAXHelpTagRole as String }
+            : observed
+        guard windows.count == 1, CFEqual(windows[0], window) else { return false }
+        if ignoringHelpTags {
+            guard let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: ax),
+                  CFEqual(focus, window),
+                  case .success(let children) = AXHelpers.childrenResult(window, runtime: ax),
+                  !children.contains(where: { AXHelpers.getRole($0, runtime: ax) == kAXSheetRole as String })
+            else { return false }
+        }
         return AXValueExtractors.extractButtonState(play, runtime: ax) == false
             && AXValueExtractors.extractButtonState(record, runtime: ax) == false
     }
