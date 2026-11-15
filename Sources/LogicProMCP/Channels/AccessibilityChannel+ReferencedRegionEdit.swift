@@ -258,17 +258,20 @@ extension AccessibilityChannel {
     private static func safeDragMode(scope: ArrangeRegionScope, held: HeldRegion, change: RegionChange,
                                      census: [EditRegionRow]) -> Bool {
         let ax = scope.runtime.ax
-        // Logic 13 exposes Drag Mode directly under Window → Tracks → Tracks.
-        // Descending through the whole Arrange tree can enter track editors.
-        func tracksGroup(in parent: AXUIElement) -> AXUIElement? {
-            guard case .success(let children) = AXHelpers.childrenResult(parent, runtime: ax) else { return nil }
-            let groups = children.filter {
-                AXHelpers.getRole($0, runtime: ax) == kAXGroupRole
-                    && AXHelpers.getDescription($0, runtime: ax) == "Tracks"
-            }
-            return groups.count == 1 ? groups.first : nil
+        // The held pane sits below the Arrange group's two split views.
+        // Follow its owners so a separate Tracks group cannot supply Drag Mode.
+        func parent(_ element: AXUIElement) -> AXUIElement? {
+            AXHelpers.getAttribute(element, kAXParentAttribute, runtime: ax)
         }
-        guard let outer = tracksGroup(in: scope.window), let inner = tracksGroup(in: outer),
+        guard let laneSplit = parent(scope.pane), let arrangeSplit = parent(laneSplit),
+              AXHelpers.getRole(laneSplit, runtime: ax) == kAXSplitGroupRole,
+              AXHelpers.getRole(arrangeSplit, runtime: ax) == kAXSplitGroupRole,
+              let inner = parent(arrangeSplit), let outer = parent(inner),
+              [inner, outer].allSatisfy({
+                  AXHelpers.getRole($0, runtime: ax) == kAXGroupRole
+                      && AXHelpers.getDescription($0, runtime: ax) == "Tracks"
+              }),
+              parent(outer).map({ CFEqual($0, scope.window) }) == true,
               case .success(let children) = AXHelpers.childrenResult(inner, runtime: ax) else { return false }
         let controls = children.filter {
             AXHelpers.getRole($0, runtime: ax) == kAXPopUpButtonRole
