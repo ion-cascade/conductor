@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.7.1] — 2026-11-15
+
+- Separate qualification transport, project cleanup execution, and stem export test fixtures by responsibility. Document the 1,500-line target for authored files. ([#37](https://github.com/ion-cascade/conductor/pull/37))
+- Record the existing qualification test failures for seven read-only operations that lack a semantic validator or declared deferral. See the [1.7.1 release notes](https://github.com/ion-cascade/conductor/releases/tag/v1.7.1) for test names and scope.
+
 ## [1.7.0] — 2026-11-15
 
 - Read and select an independently verified stock Compressor sidechain source on a referenced insert. ([#28](https://github.com/ion-cascade/conductor/issues/28))
