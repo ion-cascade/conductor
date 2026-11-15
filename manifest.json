@@ -2,7 +2,7 @@
   "name": "ion-cascade-conductor",
   "display_name": "Ion Cascade Conductor",
   "description": "A native MCP server for Apple Logic Pro with live track readback, verified MIDI import and per-track export across 10 tools + 19 resources + 12 templates.",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "author": "Ion Cascade",
   "license": "MIT",
   "homepage": "https://github.com/ion-cascade/conductor",
@@ -53,7 +53,7 @@
       "distribution": "source",
       "command": ".build/release/LogicProMCP",
       "args": [],
-      "release_url": "https://github.com/ion-cascade/conductor/releases/tag/v0.5.0"
+      "release_url": "https://github.com/ion-cascade/conductor/releases/tag/v1.0.0"
     }
   },
   "permissions": [
