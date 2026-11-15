@@ -1398,12 +1398,20 @@ extension AccessibilityChannel {
                     element, kAXSelectedChildrenAttribute as String, runtime: ax
                 ) as Result<[AXUIElement]?, AXHelpers.AXStatusError>, selected.isEmpty else { return nil }
             }
-            let candidates = lanes.filter {
-                AXHelpers.getRole($0, runtime: ax) == kAXLayoutAreaRole as String
-                    && AXHelpers.getDescription($0, runtime: ax) == ""
-            }
+            // Logic 13 exposes empty canvas as a final layout area with no
+            // description or children. Ordinary track lanes have a description
+            // even when their children are empty.
             let scroll = originalWorkspacePath[1]
-            guard candidates.count == 1, let blank = candidates.first,
+            guard let blank = lanes.last,
+                  AXHelpers.getRole(blank, runtime: ax) == kAXLayoutAreaRole as String,
+                  case .failure(let description) = AXHelpers.getAttributeResult(
+                    blank, kAXDescriptionAttribute as String, runtime: ax
+                  ) as Result<AnyObject?, AXHelpers.AXStatusError>,
+                  description.raw == AXError.illegalArgument.rawValue,
+                  case .failure(let children) = AXHelpers.getAttributeResult(
+                    blank, kAXChildrenAttribute as String, runtime: ax
+                  ) as Result<AnyObject?, AXHelpers.AXStatusError>,
+                  children.raw == AXError.noValue.rawValue,
                   AXHelpers.getRole(scroll, runtime: ax) == kAXScrollAreaRole as String,
                   let origin = AXHelpers.getPosition(scroll, runtime: ax),
                   let size = AXHelpers.getSize(scroll, runtime: ax),
