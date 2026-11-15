@@ -24,16 +24,59 @@ struct ProjectLogic13Bounce {
         path: String, projectPath: String, settings: ProjectPCMBounceSettings,
         runtime: AXLogicProElements.Runtime = .production
     ) async -> ProjectExportBounceHelperResult {
-        guard let pid = runtime.logicProPID(), isSupported(runtime: runtime),
-              let app = AXLogicProElements.appRoot(runtime: runtime),
+        guard AXIsProcessTrusted(), CGPreflightPostEventAccess(),
+              MIDITrackExportPanel.Keyboard.goToFolderKeyIsMapped(using: .production) else {
+            return .failure("pcm_bounce_permissions_or_keyboard_access")
+        }
+        let destination = URL(fileURLWithPath: path)
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        var pending = "logic_host_unreadable"
+        repeat {
+            guard !Task.isCancelled else { return .failure("pcm_bounce_cancelled") }
+            switch readiness(projectPath: projectPath, runtime: runtime) {
+            case .ready(let driver):
+                return await driver.render(to: destination, settings: settings)
+            case .refused(let reason):
+                return .failure("pcm_bounce_\(reason)")
+            case .wait(let reason):
+                pending = reason
+            }
+            do { try await Task.sleep(for: .milliseconds(125)) }
+            catch { return .failure("pcm_bounce_cancelled") }
+        } while ContinuousClock.now < deadline
+        return .failure("pcm_bounce_not_ready:\(pending)")
+    }
+
+    private enum Readiness {
+        case ready(ProjectLogic13Bounce)
+        case refused(String)
+        case wait(String)
+    }
+
+    private static func readiness(projectPath: String, runtime: AXLogicProElements.Runtime) -> Readiness {
+        // Refresh window-server state before the system-wide focused-process read.
+        guard runtime.onScreenWindowList() != nil, let pid = runtime.logicProPID() else {
+            return .wait("logic_process_unreadable")
+        }
+        guard let version = runtime.observeHost(pid)?.logicVersion else {
+            return .wait("logic_version_unreadable")
+        }
+        guard version.hasPrefix("13.") else { return .refused("unsupported_logic_version") }
+        let dialog = AXLogicProElements.dialogPresenceReason(runtime: runtime)
+        if dialog.namesAnActualDialog { return .refused("blocking_logic_dialog") }
+        guard dialog == .noBlockingWindow else { return .wait(dialog.rawValue) }
+        guard let app = AXLogicProElements.appRoot(runtime: runtime),
               case .found(let window) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: runtime),
               case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
-              let url = URL(string: document), url.isFileURL,
-              AppleScriptChannel.projectPathsMatch(projectPath, url.path)
-        else { return .failure("pcm_bounce_project_unavailable") }
+              let url = URL(string: document), url.isFileURL else { return .wait("arrange_document_unreadable") }
+        guard AppleScriptChannel.projectPathsMatch(projectPath, url.path) else { return .refused("different_arrange_document") }
         let driver = Self(runtime: runtime, app: app, window: window, document: document, pid: pid,
                           title: "Bounce “" + url.deletingPathExtension().lastPathComponent + "”")
-        return await driver.render(to: URL(fileURLWithPath: path), settings: settings)
+        guard driver.holdsProject(), driver.focused(window) else { return .wait("arrange_window_not_focused") }
+        guard let transport = try? AXLogicProElements.observedTransportActivity(in: window, runtime: runtime, checking: {})
+        else { return .wait("transport_unreadable") }
+        guard !transport.isPlaying, !transport.isRecording else { return .refused("transport_running") }
+        return .ready(driver)
     }
 
     private func render(

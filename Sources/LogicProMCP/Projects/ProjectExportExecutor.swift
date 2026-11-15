@@ -114,7 +114,7 @@ enum ProjectExportExecutor {
                 minimumDurationSeconds: 0.05,
                 bounceToPath: { artifactPath in await ProjectExportExecutor.runBounceHelper(artifactPath: artifactPath) },
                 driveNativeBounce: { path, project, requested in
-                    guard await ProjectLogic13Bounce.isSupported() else { return nil }
+                    if requested == nil, !(await ProjectLogic13Bounce.isSupported()) { return nil }
                     let settings = requested ?? ProjectPCMBounceSettings(
                         format: .wav, sampleRate: 44_100, bitDepth: 24, includeAudioTail: false)
                     return await ProjectLogic13Bounce.run(path: path, projectPath: project, settings: settings)
