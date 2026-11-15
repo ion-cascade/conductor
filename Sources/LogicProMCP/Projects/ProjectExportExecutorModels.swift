@@ -149,6 +149,7 @@ struct ProjectExportArtifactEvidence: Codable, Sendable, Equatable {
     let durationSeconds: Double
     let sampleRate: Int
     let channelCount: Int
+    let frameCount: Int64?
     let silenceRatio: Double
     let peakDbfs: Double
     let verificationStatus: String
@@ -161,6 +162,7 @@ struct ProjectExportArtifactEvidence: Codable, Sendable, Equatable {
         case durationSeconds = "duration_seconds"
         case sampleRate = "sample_rate"
         case channelCount = "channel_count"
+        case frameCount = "frame_count"
         case silenceRatio = "silence_ratio"
         case peakDbfs = "peak_dbfs"
         case verificationStatus = "verification_status"
@@ -174,6 +176,7 @@ struct ProjectExportArtifactEvidence: Codable, Sendable, Equatable {
         self.durationSeconds = analysis.durationSeconds
         self.sampleRate = analysis.sampleRate
         self.channelCount = analysis.channelCount
+        self.frameCount = analysis.frameCount
         self.silenceRatio = analysis.silenceRatio
         self.peakDbfs = analysis.peakDbfs
         self.verificationStatus = analysis.verification.status.rawValue

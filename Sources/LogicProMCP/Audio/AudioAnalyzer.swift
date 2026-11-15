@@ -102,6 +102,7 @@ enum AudioAnalyzer {
         var maximumPeakDbfs: Double?
         var nearSilenceThresholdDbfs: Double
         var maximumSilenceRatio: Double
+        var allowsSilentOutput: Bool
         var expectedSampleRate: Int?
         var expectedChannelCount: Int?
         var outputRoot: String?
@@ -117,6 +118,7 @@ enum AudioAnalyzer {
             maximumPeakDbfs: Double? = nil,
             nearSilenceThresholdDbfs: Double = -60.0,
             maximumSilenceRatio: Double = 0.98,
+            allowsSilentOutput: Bool = false,
             expectedSampleRate: Int? = nil,
             expectedChannelCount: Int? = nil,
             outputRoot: String? = nil
@@ -131,6 +133,7 @@ enum AudioAnalyzer {
             self.maximumPeakDbfs = maximumPeakDbfs
             self.nearSilenceThresholdDbfs = nearSilenceThresholdDbfs
             self.maximumSilenceRatio = maximumSilenceRatio
+            self.allowsSilentOutput = allowsSilentOutput
             self.expectedSampleRate = expectedSampleRate
             self.expectedChannelCount = expectedChannelCount
             self.outputRoot = outputRoot
@@ -455,7 +458,8 @@ enum AudioAnalyzer {
            result.peakDbfs > maximumPeakDbfs {
             reasons.append("peak_above_threshold")
         }
-        if result.peakDbfs <= policy.nearSilenceThresholdDbfs || result.silenceRatio >= policy.maximumSilenceRatio {
+        if !policy.allowsSilentOutput,
+           result.peakDbfs <= policy.nearSilenceThresholdDbfs || result.silenceRatio >= policy.maximumSilenceRatio {
             reasons.append("near_silent_output")
         }
         if let expectedSampleRate = policy.expectedSampleRate,

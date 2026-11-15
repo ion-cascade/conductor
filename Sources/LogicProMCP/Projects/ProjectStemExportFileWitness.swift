@@ -7,6 +7,7 @@ import Foundation
 final class ProjectStemExportFileWitness: @unchecked Sendable {
     let directory: String
     private let expectedCount: Int
+    private let allowsSilentOutput: Bool
     private let directoryInode: UInt64
     private let directoryDevice: Int32
     private var previous: [String] = []
@@ -18,6 +19,7 @@ final class ProjectStemExportFileWitness: @unchecked Sendable {
     init(
         root: String,
         expectedCount: Int,
+        allowsSilentOutput: Bool = false,
         settleNanos: UInt64 = 1_000_000_000,
         now: @escaping @Sendable () -> UInt64 = { DispatchTime.now().uptimeNanoseconds }
     ) throws {
@@ -39,6 +41,7 @@ final class ProjectStemExportFileWitness: @unchecked Sendable {
         directoryInode = info.st_ino
         directoryDevice = info.st_dev
         self.expectedCount = expectedCount
+        self.allowsSilentOutput = allowsSilentOutput
         self.now = now
         self.settleNanos = settleNanos
     }
@@ -48,7 +51,7 @@ final class ProjectStemExportFileWitness: @unchecked Sendable {
     }
 
     /// Requiring a closed panel and an observed absence of progress is owned
-    /// by the caller. Here require a stable, fully decodable, non-silent set.
+    /// by the caller. Here require a stable, fully decodable set. Aligned project-length stems may contain silence.
     func observe() -> Bool {
         files = []
         var directoryInfo = stat()
@@ -79,7 +82,7 @@ final class ProjectStemExportFileWitness: @unchecked Sendable {
         for path in paths {
             let result = AudioAnalyzer.analyzeFile(
                 path: path,
-                policy: .init(minimumDurationSeconds: 0.05, outputRoot: directory)
+                policy: .init(minimumDurationSeconds: 0.05, allowsSilentOutput: allowsSilentOutput, outputRoot: directory)
             )
             guard result.verification.status == .pass else { return reset() }
         }

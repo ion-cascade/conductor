@@ -399,7 +399,9 @@ extension ProjectExportExecutor {
         }
 
         if artifact.stemSettings != nil {
-            let observations = isolatedFiles.map { stemOutputObservation(path: $0, plan: plan, options: options) }
+            let observations = isolatedFiles.map {
+                stemOutputObservation(path: $0, plan: plan, options: options, allowsSilentOutput: true)
+            }
             var byTrack: [String: ProjectExportObservedStemOutput] = [:]
             for output in observations {
                 let key = URL(fileURLWithPath: output.path).lastPathComponent
@@ -411,10 +413,10 @@ extension ProjectExportExecutor {
             }
             let paired = subjects.compactMap { byTrack[$0.name + ".wav"] }
             let rate = observations.first?.evidence.sampleRate
-            let duration = observations.first?.evidence.durationSeconds
-            guard paired.count == subjects.count, paired.count == observations.count, let rate, let duration,
+            let frames = observations.first?.evidence.frameCount
+            guard paired.count == subjects.count, paired.count == observations.count, let rate, let frames,
                   paired.allSatisfy({
-                      $0.evidence.sampleRate == rate && $0.evidence.durationSeconds == duration
+                      $0.evidence.sampleRate == rate && $0.evidence.frameCount == frames
                           && ProjectPCMBounceSettings.isStemWAVE24($0.path, sampleRate: rate)
                   }) else {
                 return stemSubjectArtifacts(artifact: artifact, destination: destination, subjects: subjects,
@@ -503,9 +505,12 @@ extension ProjectExportExecutor {
     private static func stemOutputObservation(
         path: String,
         plan: ProjectExportPlan,
-        options: Options
+        options: Options,
+        allowsSilentOutput: Bool = false
     ) -> ProjectExportObservedStemOutput {
-        let analysis = options.analyze(path, analysisPolicy(plan: plan, options: options))
+        var policy = analysisPolicy(plan: plan, options: options)
+        policy.allowsSilentOutput = allowsSilentOutput
+        let analysis = options.analyze(path, policy)
         let evidence = ArtifactEvidence(from: analysis, source: "audio_analyzer")
         if analysis.verification.reasons.contains("unsafe_path") {
             return ProjectExportObservedStemOutput(

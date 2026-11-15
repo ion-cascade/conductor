@@ -13,7 +13,9 @@ enum ProjectIsolatedStemExport {
     ) async -> ProjectIsolatedStemExportResult {
         let witness: ProjectStemExportFileWitness
         do {
-            witness = try ProjectStemExportFileWitness(root: root, expectedCount: expectedCount)
+            witness = try ProjectStemExportFileWitness(
+                root: root, expectedCount: expectedCount, allowsSilentOutput: aligned != nil
+            )
         } catch {
             return .init(outcome: .refused("stem_isolated_destination_unavailable: \(error)"), directory: nil, files: [])
         }
