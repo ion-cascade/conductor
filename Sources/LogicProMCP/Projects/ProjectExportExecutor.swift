@@ -91,6 +91,22 @@ enum ProjectExportExecutor {
         /// Defaults to `{ false }` so hermetic unit tests never trip the preflight;
         /// `.live()` wires it to the real AX dialog probe.
         var dialogPresent: @Sendable () -> Bool = { false }
+        var pcmDialogDecision: (@Sendable () -> (reason: AXLogicProElements.DialogPresenceReason, windowsReadError: Int32?))?
+
+        /// A transient AX failure and an actual Logic dialog both block writes.
+        /// Once an actual dialog is observed, leave its custody to the caller.
+        func pcmOpenBlocker(rechecking blocked: @Sendable () -> Bool) async
+            -> (reason: AXLogicProElements.DialogPresenceReason, windowsReadError: Int32?)? {
+            guard let pcmDialogDecision else { return nil }
+            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            repeat {
+                let decision = pcmDialogDecision()
+                if decision.reason.namesAnActualDialog { return decision }
+                if decision.reason == .noBlockingWindow, !blocked() { return nil }
+                guard !Task.isCancelled, ContinuousClock.now < deadline else { return decision }
+                await sleep(125_000_000)
+            } while true
+        }
         /// nil means the stem panel route is unavailable. The ordinary bounce
         /// seam is intentionally never reused for stems: it would produce the
         /// old project-level artifact behind the word "stem".
@@ -120,6 +136,7 @@ enum ProjectExportExecutor {
                     return await ProjectLogic13Bounce.run(path: path, projectPath: project, settings: settings)
                 },
                 dialogPresent: { AXLogicProElements.dialogPresent() },
+                pcmDialogDecision: { AXLogicProElements.dialogPresenceDecision() },
                 driveIsolatedStemExport: { destination, count in
                     await ProjectIsolatedStemExport.live(root: destination, expectedCount: count)
                 },
@@ -260,14 +277,27 @@ enum ProjectExportExecutor {
         // driving `project.open` through it is unsafe. Fail closed for every
         // pending artifact instead — mirrors the project_invalid / open_failed
         // fail-closed shape below.
+        let hasExplicitPCM = project.expectedArtifacts.contains { $0.bounceSettings != nil }
         if options.dialogPresent() {
+            let decision = hasExplicitPCM
+                ? await options.pcmOpenBlocker(rechecking: options.dialogPresent) : nil
+            if let decision {
+                return blockedProject(decision.reason.namesAnActualDialog
+                    ? "blocking_dialog_present: modal Logic dialog or sheet observed before project.open"
+                    : "pcm_bounce_not_ready:\(decision.reason.rawValue)")
+            }
+            if !hasExplicitPCM || options.pcmDialogDecision == nil || options.dialogPresent() {
+                return blockedProject("blocking_dialog_present: refused project.open while a modal Logic dialog/sheet is present")
+            }
+        }
+        func blockedProject(_ failure: String) -> RunProject {
             let arts = zip(project.expectedArtifacts, preflightArtifacts).flatMap { pair -> [RunArtifact] in
                 let (artifact, preflight) = pair
                 if let preflight { return subjectScopedArtifacts(preflight, for: artifact) }
                 return subjectScopedArtifacts(
                     failedArtifact(
                         artifact,
-                        error: "blocking_dialog_present: refused project.open while a modal Logic dialog/sheet is present"
+                        error: failure
                     ),
                     for: artifact
                 )
@@ -334,7 +364,14 @@ enum ProjectExportExecutor {
         // (3b) Identity readback — the OBSERVED front document MUST match the
         // planned project path or we fail closed for every pending artifact
         // (never bounce the wrong project).
-        let observedPath = await options.identityReadback()
+        var observedPath = await options.identityReadback()
+        if hasExplicitPCM, observedPath == nil {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            while observedPath == nil, !Task.isCancelled, ContinuousClock.now < deadline {
+                await options.sleep(125_000_000)
+                observedPath = await options.identityReadback()
+            }
+        }
         let identityVerified = observedPath.map {
             AppleScriptChannel.projectPathsMatch(project.projectPath, $0)
         } ?? false

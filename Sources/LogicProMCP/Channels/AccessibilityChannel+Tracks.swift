@@ -74,6 +74,9 @@ extension AccessibilityChannel {
                 AXHelpers.HelpReadGuard(allowHelpReads: false, stop: { false }), operation: extract)
             guard var state = extracted else { return (nil, true) }
             if !readingTypeHelp, let window {
+                if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
+                    state.headerPresentation = AXTrackBinding.presentation(of: header, runtime: runtime.ax)
+                }
                 state.hideButtonReadback = readTrackHideButton(header, in: window, runtime: runtime, exposure: exposure)
             }
             exposure?.observeStackState(header: header, isStackHeader: state.isStackHeader, collapsed: state.stackCollapsed)
@@ -81,7 +84,7 @@ extension AccessibilityChannel {
                 // Baseline rows were already exposed and keep ordinary custody. Only
                 // newly acquired headers depend on this temporary disclosure's lifetime.
                 let scope = exposure.flatMap { value in
-                    value.originalHeaders.contains(where: { CFEqual($0, header) }) ? nil : value
+                    value.preservesOriginalHeader(header, presentation: state.headerPresentation) ? nil : value
                 }
                 // Original rows return to the owned navigation's original
                 // population. Newly exposed rows instead retain its lifetime.
@@ -477,6 +480,7 @@ extension AccessibilityChannel {
         private let hiddenMenuPath: [AXUIElement]?
         private let originalSelectionPresentation: [[Data]]?
         let originalHeaders: [AXUIElement]
+        private let originalPresentation: [Data]?
         let originalFocus: AXUIElement
         private let originalWorkspacePath: [AXUIElement]?
         let selected: [AXUIElement]
@@ -488,6 +492,9 @@ extension AccessibilityChannel {
             let target: Disclosure
             let beforeHeaders: [AXUIElement]
             let afterHeaders: [AXUIElement]
+            let beforePresentation: [Data]?
+            let afterPresentation: [Data]?
+            let revealedPresentation: [Data]?
             var revealedStacksWereClosed = false
         }
         private let viewport: [Viewport]
@@ -565,6 +572,12 @@ extension AccessibilityChannel {
             self.logic = logic; self.mouse = mouse; self.pid = pid; self.app = app
             self.window = window; self.title = title; self.document = document; self.rail = rail
             header = first.0; disclosure = first.1; originalHeaders = headers
+            if ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1" {
+                guard let presentation = Self.presentation(of: headers, runtime: logic.ax) else { return nil }
+                originalPresentation = presentation
+            } else {
+                originalPresentation = nil
+            }
             self.hiddenControl = hiddenControl
             self.hiddenMenuPath = hiddenMenuPath
             pending = targets
@@ -745,6 +758,23 @@ extension AccessibilityChannel {
             return result
         }
 
+        private static func presentation(of headers: [AXUIElement], runtime: AXHelpers.Runtime) -> [Data]? {
+            var descriptions: [Data] = []
+            for header in headers {
+                guard (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
+                      let description = AXTrackBinding.presentation(of: header, runtime: runtime) else { return nil }
+                descriptions.append(description)
+            }
+            return Set(descriptions).count == headers.count ? descriptions : nil
+        }
+
+        private func selectedPresentation(_ selection: [AXUIElement], in headers: [AXUIElement],
+                                          descriptions: [Data]) -> [Data] {
+            headers.indices.compactMap { index in
+                selection.contains(where: { CFEqual($0, headers[index]) }) ? descriptions[index] : nil
+            }
+        }
+
         private func selectedTracksRemainVisible(_ selected: [AXUIElement]) -> Bool {
             for header in selected {
                 guard case .success(let children) = AXHelpers.childrenResult(header, runtime: logic.ax) else { return false }
@@ -867,7 +897,8 @@ extension AccessibilityChannel {
         }
 
         private func owned(target: Disclosure, expectedHeaders: [AXUIElement]?, expectedValue: Int?,
-                           hiddenViewCleanup: Bool = false, stoppingWhen stop: @Sendable () -> Bool) async -> Bool {
+                           expectedPresentation: [Data]? = nil, hiddenViewCleanup: Bool = false,
+                           stoppingWhen stop: @Sendable () -> Bool) async -> Bool {
             guard !stop(), (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
                   await referenceIsCurrent(), logic.logicProPID() == pid,
                   isBoundHiddenMenuTarget(target) || logic.focusedApplicationPID() == pid,
@@ -896,9 +927,27 @@ extension AccessibilityChannel {
                   expectedHeaders.map({ same(headers, $0) }) ?? true else {
                 Log.info("Population navigation ownership unavailable: process, project or held rail membership", subsystem: "ax"); return false
             }
-            let sampledSelection = Self.selectedHeaders(headers, ax: logic.ax)
-            guard let currentSelection = sampledSelection else { return false }
-            if hiddenViewCleanup {
+            guard let currentSelection = Self.selectedHeaders(headers, ax: logic.ax) else { return false }
+            if let originalPresentation {
+                // Logic 13 reuses positional AX objects when rows are inserted.
+                // The native presentation can corroborate our temporary view
+                // and selection inverse, without transferring edit authority.
+                guard let presentation = Self.presentation(of: headers, runtime: logic.ax),
+                      selectedPresentation(currentSelection, in: headers, descriptions: presentation)
+                        == selectedPresentation(selected, in: originalHeaders, descriptions: originalPresentation)
+                else {
+                    Log.info("Population navigation ownership unavailable: current row presentation or selection", subsystem: "ax")
+                    return false
+                }
+                let expected = expectedPresentation ?? acquired.last?.afterPresentation ?? originalPresentation
+                if hiddenViewCleanup, expectedValue == 1 {
+                    let original = Set(originalPresentation)
+                    guard presentation.filter({ original.contains($0) }) == originalPresentation,
+                          selectedTracksRemainVisible(currentSelection) else { return false }
+                } else {
+                    guard presentation == expected else { return false }
+                }
+            } else if hiddenViewCleanup {
                 guard restorationStarted, acquired.isEmpty, isBoundHiddenMenuTarget(target),
                       let originalSelectionPresentation,
                       Self.selectionPresentation(currentSelection, headers: headers, ax: logic.ax) == originalSelectionPresentation,
@@ -1174,9 +1223,21 @@ extension AccessibilityChannel {
                 originalWorkspaceBlank = blank
             }
             exposure = .init(header: header, disclosure: disclosure, runtime: logic, originalHeaders: originalHeaders,
-                hiddenViewWindow: hiddenControl == nil ? nil : window)
+                hiddenViewWindow: hiddenControl == nil ? nil : window, originalPresentation: originalPresentation)
             var beforeHeaders = originalHeaders
+            var beforePresentation = originalPresentation
+            func presentation(of targets: [Disclosure], headers: [AXUIElement], descriptions: [Data]?) -> [Data?] {
+                targets.map { target in
+                    headers.firstIndex(where: { CFEqual($0, target.header) }).flatMap { descriptions?[$0] }
+                }
+            }
+            var pendingPresentation = presentation(of: pending, headers: beforeHeaders, descriptions: beforePresentation)
             while let target = pending.first {
+                let currentTarget = presentation(of: [target], headers: beforeHeaders, descriptions: beforePresentation)[0]
+                if beforePresentation != nil, currentTarget == nil || currentTarget != pendingPresentation[0] {
+                    effects.reason = "stack_header_moved_after_exposure"
+                    return
+                }
                 guard await click(target: target, expectedHeaders: beforeHeaders, expectedValue: 0, stoppingWhen: stop) else {
                     effects.reason = releaseUnverified ? "stack_mouse_release_unverified" : "stack_expansion_unverified"
                     return
@@ -1193,8 +1254,27 @@ extension AccessibilityChannel {
                       same(headers.filter { row in beforeHeaders.contains { CFEqual($0, row) } }, beforeHeaders) else {
                     effects.reason = "stack_expansion_unverified"; return
                 }
+                let afterPresentation: [Data]?
+                let revealedPresentation: [Data]?
+                let newlyExposed: [AXUIElement]
+                if let beforePresentation {
+                    let before = Set(beforePresentation)
+                    guard let current = Self.presentation(of: headers, runtime: logic.ax),
+                          current.filter({ before.contains($0) }) == beforePresentation else {
+                        effects.reason = "stack_population_changed"; return
+                    }
+                    let newRows = headers.indices.filter { !before.contains(current[$0]) }
+                    afterPresentation = current
+                    revealedPresentation = newRows.map { current[$0] }
+                    newlyExposed = newRows.map { headers[$0] }
+                } else {
+                    afterPresentation = nil
+                    revealedPresentation = nil
+                    newlyExposed = headers.filter { row in !beforeHeaders.contains { CFEqual($0, row) } }
+                }
                 guard acceptHeldGestureFocus(target),
-                      await owned(target: target, expectedHeaders: headers, expectedValue: 1, stoppingWhen: stop) else {
+                      await owned(target: target, expectedHeaders: headers, expectedValue: 1,
+                          expectedPresentation: afterPresentation, stoppingWhen: stop) else {
                     exposure?.end()
                     effects.reason = "stack_navigation_ownership_lost"; return
                 }
@@ -1202,10 +1282,12 @@ extension AccessibilityChannel {
                    exposure?.retainAcquiredDisclosure(header: target.header, disclosure: target.disclosure) != true {
                     effects.reason = "stack_navigation_ownership_lost"; return
                 }
-                acquired.append(.init(target: target, beforeHeaders: beforeHeaders, afterHeaders: headers))
+                acquired.append(.init(target: target, beforeHeaders: beforeHeaders, afterHeaders: headers,
+                    beforePresentation: beforePresentation, afterPresentation: afterPresentation,
+                    revealedPresentation: revealedPresentation))
                 pending.removeFirst()
+                pendingPresentation.removeFirst()
                 expandedHeaders = headers
-                let newlyExposed = headers.filter { row in !beforeHeaders.contains { CFEqual($0, row) } }
                 guard let disclosureRead = Self.disclosureStates(in: newlyExposed, runtime: logic) else {
                     effects.reason = "stack_disclosure_unreadable"; return
                 }
@@ -1218,7 +1300,9 @@ extension AccessibilityChannel {
                     effects.reason = "stack_navigation_ownership_lost"; return
                 }
                 pending.append(contentsOf: collapsed)
+                pendingPresentation.append(contentsOf: presentation(of: collapsed, headers: headers, descriptions: afterPresentation))
                 beforeHeaders = headers
+                beforePresentation = afterPresentation
             }
         }
 
@@ -1244,7 +1328,15 @@ extension AccessibilityChannel {
                 // Hide View is a presentation toggle, not a stack/parent witness.
                 if hiddenControl.map({ CFEqual($0, entry.target.disclosure) }) == true { continue }
                 guard let stack = binding(entry.target.header) else { return [] }
-                let exposed = entry.afterHeaders.filter { row in !entry.beforeHeaders.contains { CFEqual($0, row) } }
+                let exposed: [AXUIElement]
+                if let revealed = entry.revealedPresentation, let final = acquired.last?.afterPresentation {
+                    guard zip(tracks, final).allSatisfy({ $0.headerPresentation == $1 }) else { return [] }
+                    let newRows = Set(revealed)
+                    exposed = final.indices.filter { newRows.contains(final[$0]) }.map { headers[$0] }
+                    guard exposed.count == revealed.count else { return [] }
+                } else {
+                    exposed = entry.afterHeaders.filter { row in !entry.beforeHeaders.contains { CFEqual($0, row) } }
+                }
                 let members = exposed.compactMap(binding)
                 guard members.count == exposed.count else { return [] }
                 // A leaf that became a stack after the deciding pass cannot
@@ -1320,7 +1412,8 @@ extension AccessibilityChannel {
                 }
                 guard await observeCompletedClick(target: entry.target, expectedValue: 0, stoppingWhen: stop),
                       acceptHeldGestureFocus(entry.target),
-                      await owned(target: entry.target, expectedHeaders: entry.beforeHeaders, expectedValue: 0, stoppingWhen: stop) else {
+                      await owned(target: entry.target, expectedHeaders: entry.beforeHeaders, expectedValue: 0,
+                          expectedPresentation: entry.beforePresentation, stoppingWhen: stop) else {
                     effects.reason = "stack_restoration_unverified"; return effects
                 }
                 acquired.removeLast()
@@ -1547,7 +1640,9 @@ extension AccessibilityChannel {
         }
 
         func matchesRestoredTracks(_ tracks: [TrackState]?) -> Bool {
-            guard let tracks, tracks.count == originalHeaders.count else { return false }
+            guard let tracks, tracks.count == originalHeaders.count,
+                  originalPresentation.map({ zip(tracks, $0).allSatisfy { $0.headerPresentation == $1 } }) ?? true
+            else { return false }
             return zip(tracks, originalHeaders).allSatisfy { row, header in
                 row.physicalBinding.map { CFEqual($0.header, header) && $0.exposure == nil } == true
             }

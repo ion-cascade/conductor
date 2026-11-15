@@ -152,11 +152,15 @@ struct ProjectDispatcher: OperationTraceDispatching {
             }
             let traceID = await startTraceIfEnabled(command: command)
             if dialogPresent() {
-                audit(command, phase: .rejected, reason: "blocking dialog")
-                return await finalizeTrace(
-                    blockingLogicDialogResult(operation: "project.\(command)"),
-                    traceID: traceID
-                )
+                let explicitPCM = params["bounce_settings"] != nil
+                let decision = explicitPCM ? await exportOptions.pcmOpenBlocker(rechecking: dialogPresent) : nil
+                if !explicitPCM || exportOptions.pcmDialogDecision == nil || decision != nil || dialogPresent() {
+                    audit(command, phase: .rejected, reason: "blocking dialog")
+                    return await finalizeTrace(
+                        blockingLogicDialogResult(operation: "project.\(command)", decision: decision),
+                        traceID: traceID
+                    )
+                }
             }
             let confirmation = strictBoolParam(params, "confirmed")
             if case .invalid(let hint) = confirmation {

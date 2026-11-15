@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.1.0] — 2026-11-15
+
+- Report whether an inspected track can be targeted now, needs exposure in Logic, or needs a fresh reference after Logic reassigns Accessibility rows.
+- Renew output readback through the observed Arrange header when Logic replaces a supported Mixer strip.
+- Wait briefly for transient native document, window and transport readings before explicit PCM export, and keep the existing project and destination checks at commit.
+
 ## [1.0.0] — 2026-11-15
 
 - Build and install a released source archive into a per-user directory with a stable launcher and MCP relay.

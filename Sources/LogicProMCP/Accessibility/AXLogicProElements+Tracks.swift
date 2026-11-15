@@ -3,6 +3,15 @@ import Foundation
 
 /// Issuance-time, process-local custody. Never encoded or reconstructed from a name/index.
 enum AXTrackBinding {
+    /// A native row description can corroborate a presentation change. Its
+    /// text and displayed track number never establish a mutation identity.
+    static func presentation(of header: AXUIElement, runtime: AXHelpers.Runtime) -> Data? {
+        guard case .success(.some(let description)) = AXHelpers.getAttributeResult(
+            header, kAXDescriptionAttribute as String, runtime: runtime) as Result<String?, AXHelpers.AXStatusError>,
+              !description.isEmpty else { return nil }
+        return Data(description.utf8)
+    }
+
     /// Only the owned temporary disclosure can create this non-Codable scope.
     /// Restoration or an observed loss ends it irreversibly, including recycled AX handles.
     final class Exposure: @unchecked Sendable {
@@ -13,14 +22,21 @@ enum AXTrackBinding {
         let disclosure: AXUIElement
         let runtime: AXLogicProElements.Runtime
         let originalHeaders: [AXUIElement]
+        let originalPresentation: [Data]?
         private let hiddenViewWindow: AXUIElement?
         private var controls: [(header: AXUIElement, disclosure: AXUIElement)]
         init(header: AXUIElement, disclosure: AXUIElement, runtime: AXLogicProElements.Runtime,
-             originalHeaders: [AXUIElement] = [], hiddenViewWindow: AXUIElement? = nil) {
+             originalHeaders: [AXUIElement] = [], hiddenViewWindow: AXUIElement? = nil,
+             originalPresentation: [Data]? = nil) {
             self.header = header; self.disclosure = disclosure; self.runtime = runtime
             self.originalHeaders = originalHeaders
+            self.originalPresentation = originalPresentation
             self.hiddenViewWindow = hiddenViewWindow
             controls = [(header, disclosure)]
+        }
+        func preservesOriginalHeader(_ header: AXUIElement, presentation: Data?) -> Bool {
+            guard let index = originalHeaders.firstIndex(where: { CFEqual($0, header) }) else { return false }
+            return originalPresentation.map { $0[index] == presentation } ?? true
         }
         private func isHiddenControl(_ element: AXUIElement) -> Bool {
             hiddenViewWindow != nil && CFEqual(element, disclosure)

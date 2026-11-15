@@ -772,6 +772,7 @@ enum SessionPopulationObservation {
     enum TrackTargetAvailability: String, Encodable, Sendable {
         case current
         case requiresExposure = "requires_exposure"
+        case rereadRequired = "reread_required"
         case unavailable
     }
 
@@ -1245,6 +1246,9 @@ enum SessionPopulationObservation {
         let referencesStale = capture.referencesEnabled && capture.issued == nil
         let issued = capture.referencesEnabled ? capture.issued : nil
 
+        let restoredPresentation = capture.freshPopulation?.restoredTracks.map {
+            Set($0.compactMap(\.headerPresentation))
+        }
         let allRows: [TrackRow] = live.enumerated().map { index, track in
             var reference: String?
             if let issued, index < issued.byRow.count {
@@ -1252,7 +1256,11 @@ enum SessionPopulationObservation {
             }
             let availability: TrackTargetAvailability
             if track.physicalBinding?.exposure != nil {
-                availability = .requiresExposure
+                if let presentation = track.headerPresentation, restoredPresentation?.contains(presentation) == true {
+                    availability = .rereadRequired
+                } else {
+                    availability = .requiresExposure
+                }
             } else if reference != nil, !moved {
                 availability = .current
             } else {

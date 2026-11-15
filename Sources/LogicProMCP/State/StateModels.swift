@@ -107,6 +107,8 @@ struct TrackState: Sendable, Codable, Identifiable {
     var selectionReadback: Bool? = nil
     /// Fresh-request direct Hide checkbox read only; never imported from Codable/MCU.
     var hideButtonReadback: Bool? = nil
+    /// Native row presentation used by owned reveal/restore, never decoded or published.
+    var headerPresentation: Data? = nil
     var volume: Double = 0.0   // dB, 0 = unity
     var pan: Double = 0.0      // -1.0 (L) to 1.0 (R)
     /// Verified header scalars from the typed native observation. Legacy cached defaults are not evidence.
