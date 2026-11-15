@@ -1607,12 +1607,25 @@ actor AccessibilityChannel: Channel {
                 directToolbar = nil
             }
             let lookup: (lookup: AXLogicProElements.MixerAreaLookup, binding: AXLogicProElements.MixerAreaBinding?)
-            if !wantsStrips, let directToolbar,
-               let toggle = AXLogicProElements.directToolbarControl(AXLocalePolicy.controlBarMixerToggle,
-                   in: directToolbar, runtime: logic.ax),
-               AXValueExtractors.extractButtonState(toggle, runtime: logic.ax) == false {
+            let stripWindow: AXUIElement
+            let floating = wantsStrips && exposure == nil
+                ? try AXLogicProElements.focusedFloatingMixer(in: window, runtime: logic, checking: checkAXRead) : nil
+            if let floating {
+                stripWindow = floating.window
+                lookup = (.found(floating.binding.mixer), floating.binding)
+            } else if let directToolbar,
+                      let toggle = AXLogicProElements.directToolbarControl(AXLocalePolicy.controlBarMixerToggle,
+                        in: directToolbar, runtime: logic.ax),
+                      AXValueExtractors.extractButtonState(toggle, runtime: logic.ax) == false {
+                stripWindow = window
                 lookup = (.notFound, nil)
+            } else if directToolbar != nil,
+                      let shallow = try AXLogicProElements.shallowOwnedMixerPopulationAreaBinding(
+                        in: window, runtime: logic, checking: checkAXRead) {
+                stripWindow = window
+                lookup = (.found(shallow.mixer), shallow)
             } else {
+                stripWindow = window
                 lookup = try AXLogicProElements.mixerPopulationAreaLookup(in: window, runtime: logic,
                     requiresCompleteAbsence: true, observingExposure: exposure, checking: checkAXRead)
             }
@@ -1632,7 +1645,7 @@ actor AccessibilityChannel: Channel {
                     if let enumeration = AXLogicProElements.mixerChannelStripsIfCompletelyRead(in: binding.mixer, runtime: logic.ax) {
                         stripElements = enumeration.strips
                         strips = Self.readChannelStrips(from: enumeration.strips, runtime: logic,
-                            window: window, mixer: binding.mixer,
+                            window: stripWindow, mixer: binding.mixer,
                             // Routing/association bookends still need physical strips,
                             // but classify inserts only for a requested strip footprint.
                             // Default and explicit strip requests retain the full chain.
