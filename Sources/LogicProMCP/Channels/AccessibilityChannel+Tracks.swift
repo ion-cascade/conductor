@@ -1435,7 +1435,8 @@ extension AccessibilityChannel {
                   let before = blankWorkspacePoint(), CFEqual(before.element, blank),
                   let pair = mouse.prepareMouseClick(before.point, 1),
                   let final = blankWorkspacePoint(), CFEqual(final.element, blank), final.point == before.point,
-                  focusRestorationActionBoundary(stoppingWhen: stop) else { return false }
+                  focusRestorationActionBoundary(stoppingWhen: stop),
+                  logic.focusedApplicationPID() == pid else { return false }
             if !effects.attempted.contains("keyboard_focus_restoration") {
                 effects.attempted.append("keyboard_focus_restoration")
             }
