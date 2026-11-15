@@ -151,7 +151,8 @@ extension ProjectExportExecutor {
             }
             guard let produced = bounceResult.artifactPath else {
                 let uncertain = nativeResult != nil && bounceResult.bounceFired
-                let detail = "bounce_failed: \(bounceResult.error ?? "no verified artifact produced for \(artifact.path)")"
+                let prefix = nativeResult == nil ? "bounce_helper_failed" : "bounce_failed"
+                let detail = "\(prefix): \(bounceResult.error ?? "no verified artifact produced for \(artifact.path)")"
                 return RunArtifact(
                     kind: artifact.kind,
                     path: artifact.path,
@@ -159,7 +160,7 @@ extension ProjectExportExecutor {
                     verified: false,
                     bounceFired: bounceResult.bounceFired,
                     writeAttempted: bounceResult.bounceFired,
-                    error: uncertain ? nil : (nativeResult == nil ? "bounce_helper_failed: \(bounceResult.error ?? artifact.path)" : detail),
+                    error: uncertain ? nil : detail,
                     reason: uncertain ? detail : nil,
                     evidence: nil
                 )
