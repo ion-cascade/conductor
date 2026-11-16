@@ -260,6 +260,8 @@ final class MIDITrackExportPanel {
             switch AXHelpers.childrenResult(element, runtime: runtime.ax) {
             case .success(let values): children = values
             case .failure(let error) where error.isDefinitiveAbsence: children = []
+            case .failure(let error) where error.raw == AXError.invalidUIElement.rawValue:
+                throw AttributeReadError(attribute: kAXChildrenAttribute, status: error.raw)
             case .failure(let error): throw Failure.unavailable("panel_tree_unreadable:\(error.raw)")
             }
             for child in children {
