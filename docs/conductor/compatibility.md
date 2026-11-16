@@ -23,6 +23,8 @@ Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, 
 | Volume envelope | The 48 kHz stereo control and edited renders differed by about +2.05 dB at the beginning. They were sample-identical from frame 3360 onward. The edited render used the owned native Save panel after Conductor's bounce guard refused submission. |
 | Curve shapes and region automation | The tested curve canvas exposed a single Accessibility control. The region Event List exposed converted points as generic Fader events. Both need independent readback before edits can be supported. |
 | Plug-in parameter automation | Logic exposed the specific Gain lane in the automation menu and showed two new Gain events after native creation. Verification of a sweep, exact insert binding at write time and saved readback remains open. |
+| Stock mono Gain | Exact insert and Controls view readback from −6.0 to 0.0 dB, in 0.1 dB steps. Gain phase controls are read-only. |
+| Channel EQ | The existing reader reports all eight bands. The qualified Peak 1 gain write was checked against the other settings in the same instance. |
 | Third-party Audio Units | The Mac mini's registered Audio Unit catalogue contained Apple manufacturers only. Third-party read or write compatibility requires qualification against a specific installed unit. |
 
 [Track automation commands](../API.md#move-a-track-volume-point)

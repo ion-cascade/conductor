@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ## [1.10.0] — 2026-11-16
 
 - Move one selected track Volume point within its current division using its exact position, value and adjacent points. Conductor checks native readback after each step. ([#44](https://github.com/ion-cascade/conductor/issues/44))
+- Set the stock mono Gain level between −6.0 and 0.0 dB in 0.1 dB steps on a referenced insert, with native readback. ([#46](https://github.com/ion-cascade/conductor/issues/46))
 - Record the native curve, region automation and plug-in automation qualification limits. ([#44](https://github.com/ion-cascade/conductor/issues/44), [#45](https://github.com/ion-cascade/conductor/issues/45))
 
 ## [1.9.0] — 2026-11-16
