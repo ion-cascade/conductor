@@ -127,6 +127,7 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case midiReadTrackNotes = "midi.read_track_notes"
     case midiReadSelectedRegionEvents = "midi.read_selected_region_events"
     case midiGetRegionNotes = "midi.get_region_notes"
+    case midiEditRegionExpression = "midi.edit_region_expression"
     case midiEditRegionNote = "midi.edit_region_note"
     case midiListPorts = "midi.list_ports"
     case midiCreateVirtualPort = "midi.create_virtual_port"
@@ -392,7 +393,7 @@ enum OperationRegistry {
             "midi.send_note", "midi.send_chord", "midi.send_cc", "midi.send_program_change",
             "midi.send_pitch_bend", "midi.send_aftertouch", "midi.send_sysex",
             "midi.play_sequence", "midi.import_file", "midi.list_ports",
-            "midi.export_track_midi", "midi.read_track_notes", "midi.read_selected_region_events", "midi.get_region_notes", "midi.edit_region_note",
+            "midi.export_track_midi", "midi.read_track_notes", "midi.read_selected_region_events", "midi.get_region_notes", "midi.edit_region_note", "midi.edit_region_expression",
             "midi.create_virtual_port", "midi.step_input", "midi.mmc_play", "midi.mmc_stop",
             "midi.mmc_record", "midi.mmc_locate",
         ],
@@ -451,7 +452,7 @@ enum OperationRegistry {
         ToolID.logicMidi.rawValue: [
             "send_note", "send_chord", "send_cc", "send_program_change", "send_pitch_bend",
             "send_aftertouch", "send_sysex", "play_sequence", "import_file", "list_ports",
-            "export_track_midi", "read_track_notes", "read_selected_region_events", "get_region_notes", "edit_region_note",
+            "export_track_midi", "read_track_notes", "read_selected_region_events", "get_region_notes", "edit_region_note", "edit_region_expression",
             "create_virtual_port", "step_input", "mmc_play", "mmc_stop", "mmc_record",
             "mmc_locate",
         ],
@@ -1046,6 +1047,8 @@ enum OperationRegistry {
         (.midiExportTrackMIDI, "export_track_midi", Mutability.`mutating`, DeadlineClass.long, VerificationPolicy.readbackRequired, ["project_ref", "target_ref", "path", "allow_temporary_track_rename"]),
         (.midiReadTrackNotes, "read_track_notes", Mutability.`mutating`, DeadlineClass.long, VerificationPolicy.readbackRequired, ["project_ref", "target_ref", "allow_temporary_track_rename"]),
         (.midiGetRegionNotes, "get_region_notes", Mutability.readOnly, DeadlineClass.medium, VerificationPolicy.readbackRequired, ["target_ref"]),
+        (.midiEditRegionExpression, "edit_region_expression", Mutability.`mutating`, DeadlineClass.long,
+         VerificationPolicy.readbackRequired, ["target_ref", "position", "channel", "expected_current", "value"]),
         (.midiEditRegionNote, "edit_region_note", Mutability.`mutating`, DeadlineClass.long, VerificationPolicy.readbackRequired,
          ["target_ref", "expected_channel", "expected_pitch", "expected_velocity", "expected_position", "expected_length", "pitch", "velocity", "position", "length"]),
         (.midiReadSelectedRegionEvents, "read_selected_region_events", Mutability.readOnly, DeadlineClass.medium, VerificationPolicy.none, []),

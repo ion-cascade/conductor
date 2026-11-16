@@ -205,6 +205,7 @@ extension ChannelRouter {
         // MIDI file import — AX menu path only (AppleScript path abandoned:
         // NSWorkspace.open on .mid creates new project instead of importing)
         "midi.get_region_notes":      [.accessibility],
+        "midi.edit_region_expression": [.accessibility],
         "midi.edit_region_note":      [.accessibility],
         "midi.import_file":           [.accessibility],
 

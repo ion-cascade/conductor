@@ -328,6 +328,13 @@ extension OperationRegistry {
             "midi.get_region_notes": .init(params: [
                 "target_ref": .enforced(.string, .string("reg_lpm_reference")),
             ], required: [["target_ref"]]),
+            "midi.edit_region_expression": .init(params: [
+                "target_ref": .enforced(.string, .string("reg_lpm_reference")),
+                "position": .enforced(.string, .string("1.1.1.1")),
+                "channel": .enforced(.integer, .int(1)),
+                "expected_current": .enforced(.integer, .int(100)),
+                "value": .enforced(.integer, .int(20)),
+            ], required: [["target_ref"], ["position"], ["channel"], ["expected_current"], ["value"]]),
             "midi.edit_region_note": .init(params: [
                 "target_ref": .enforced(.string, .string("reg_lpm_reference")),
                 "expected_channel": .enforced(.integer, .int(1)),

@@ -372,6 +372,12 @@ For `logic_midi.edit_region_note`, pass the region reference, the note's complet
 
 The adapter verifies the exact row before editing and checks peer events after every action. It refuses ambiguous note identities, locked notes, a selection of other Event List rows, unavailable event columns, and a request that requires more than 48 native actions. The initial supported Event List has at most 24 materialized events, with notes, controller events and program changes. Re-scan after a write attempt. Save the project to keep the verified note change.
 
+### Edit MIDI region Expression
+
+In desktop Logic Pro 13, stop the transport and select one uniquely named ordinary MIDI region in Arrange. Open its unfiltered Event List with absolute musical positions. Scan regions for a current `target_ref`, then call `get_region_notes` to read identified Expression events in `expression_events`.
+
+`edit_region_expression` takes that reference, `position`, `channel`, `expected_current` and `value`. It adjusts an existing MIDI CC11 value in ten-unit steps within 0–127. Conductor checks the exact Event List row, its other fields, every peer event and the region binding after each step. Reacquire the region reference after a write or after reopening.
+
 ### `logic_edit`
 
 Common commands: `undo`, `redo`, `cut`, `copy`, `paste`, `delete`, `select_all`, `split`, `join`, `quantize`, `bounce_in_place`, `normalize`, `duplicate`, `toggle_step_input`.
