@@ -56,7 +56,7 @@
       "launcher": "conductor",
       "command": ".build/release/LogicProMCP",
       "args": [],
-      "release_url": "https://github.com/ion-cascade/conductor/releases/tag/v1.11.0"
+      "release_url": "https://github.com/ion-cascade/conductor/releases/tag/v1.11.1"
     }
   },
   "permissions": [

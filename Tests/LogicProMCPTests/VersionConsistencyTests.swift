@@ -133,9 +133,11 @@ private func latestChangelogReleaseHeading() throws -> ChangelogReleaseHeading? 
 
 @Test func testReadmeAndAPIDocsMatchPublicSurfaceAndRouting() throws {
     let readme = try readRepoFile("README.md")
-    #expect(readme.contains("git clone https://github.com/ion-cascade/conductor.git"))
+    let latestReleaseURL = "https://github.com/ion-cascade/conductor/releases/latest"
+    #expect(readme.contains("href=\"\(latestReleaseURL)\">Download latest release</a>"))
+    #expect(readme.contains("`SHA256SUMS`"))
+    #expect(readme.contains("`./Scripts/install.sh`"))
     #expect(readme.contains("swift build -c release"))
-    #expect(readme.contains(".build/release/LogicProMCP"))
 
     let api = try readRepoFile("docs/API.md")
     // #983: the page's opening sentence carried a release summary nothing read, and it named
