@@ -38,7 +38,9 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | Command | Parameters | Required | Unknown parameters | Mutability | Confirmation | Target | Verification | Retry | Availability |
 |---|---|---|---|---|---|---|---|---|---|
 | `create_virtual_port` | `name` | none | closed | mutating | none | none | none | never_automatic | default_install |
+| `edit_region_note` | `expected_channel`: integer, `expected_length`: string, `expected_pitch`: integer, `expected_position`: string, `expected_velocity`: integer, `length`: string, `pitch`: integer, `position`: string, `target_ref`: string, `velocity`: integer | `target_ref`; `expected_channel`; `expected_pitch`; `expected_velocity`; `expected_position`; `expected_length`; `pitch` or `velocity` or `position` or `length` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `export_track_midi` | `allow_temporary_track_rename`: boolean, `path`: string, `project_ref`: string, `target_ref`: string | `project_ref`; `target_ref`; `path` | closed | mutating | none | accepts_stable_target | readback_required | never_automatic | default_install |
+| `get_region_notes` | `target_ref`: string | `target_ref` | closed | read_only | none | none | readback_required | never_automatic | default_install |
 | `import_file` | `path`: string | `path` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `list_ports` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `mmc_locate` | `bar`: integer, `time` | `bar` or `time` | closed | mutating | none | none | best_effort | never_automatic | default_install |

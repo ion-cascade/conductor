@@ -325,6 +325,22 @@ extension OperationRegistry {
             ], required: [["value", "grid"]]),
 
             // logic_midi
+            "midi.get_region_notes": .init(params: [
+                "target_ref": .enforced(.string, .string("reg_lpm_reference")),
+            ], required: [["target_ref"]]),
+            "midi.edit_region_note": .init(params: [
+                "target_ref": .enforced(.string, .string("reg_lpm_reference")),
+                "expected_channel": .enforced(.integer, .int(1)),
+                "expected_pitch": .enforced(.integer, .int(60)),
+                "expected_velocity": .enforced(.integer, .int(94)),
+                "expected_position": .enforced(.string, .string("1.1.1.1")),
+                "expected_length": .enforced(.string, .string("0.0.3.0")),
+                "pitch": .enforced(.integer, .int(65)),
+                "velocity": .enforced(.integer, .int(88)),
+                "position": .enforced(.string, .string("1.1.1.7")),
+                "length": .enforced(.string, .string("0.0.3.6")),
+            ], required: [["target_ref"], ["expected_channel"], ["expected_pitch"], ["expected_velocity"],
+                          ["expected_position"], ["expected_length"], ["pitch", "velocity", "position", "length"]]),
             "midi.send_note": .init(params: [
                 "note": index(60), "velocity": index(100), "duration_ms": index(200), "channel": channel, "port": port,
             ], required: [["note"]]),

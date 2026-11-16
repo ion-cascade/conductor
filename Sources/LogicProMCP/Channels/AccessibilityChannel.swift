@@ -2369,6 +2369,9 @@ actor AccessibilityChannel: Channel {
         // unreachable — a reader who grepped the operation found a refusal that is not what it does.
 
         // MARK: - MIDI file import (AX menu navigation)
+        case "midi.get_region_notes", "midi.edit_region_note":
+            return await logic13MIDINoteOperation(parameters: params, writing: operation == "midi.edit_region_note",
+                                                  runtime: runtime.logicRuntime)
         case "midi.import_file":
             guard let path = params["path"] else {
                 return .error("midi.import_file requires 'path'")

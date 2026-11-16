@@ -64,7 +64,7 @@ enum SemanticOracleTable {
     /// entire typed `HealthResult` against the independent readback — a
     /// stronger check than any constraint list, and the only op whose readback
     /// resource returns the identical payload by construction.
-    static let bespokeOperationIDs: Set<OperationID> = [.systemHealth]
+    static let bespokeOperationIDs: Set<OperationID> = [.systemHealth, .midiGetRegionNotes]
 
     /// The read-only surface this table must FULLY cover, derived from the
     /// registry (the registry is truth — never a hand-maintained name list).
@@ -302,6 +302,7 @@ enum SemanticOracleTable {
         .pluginsSetSidechainVerified: "sidechain",
         .projectSetRegionGain: "region_parameters",
         .projectSetRegionFade: "region_parameters",
+        .midiEditRegionNote: "midi_note",
     ]
 
     /// Every operation the table may legitimately carry an oracle for: the FULLY

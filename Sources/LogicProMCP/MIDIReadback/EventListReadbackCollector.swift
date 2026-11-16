@@ -1286,6 +1286,24 @@ enum EventListReadbackCollector {
         return paneViewMenus(under: acquisition.opener, runtime: runtime)?.isEmpty == true
     }
 
+    /// The Logic 13 note adapter requires absolute starts and elapsed musical durations.
+    /// Do not change or borrow an already open menu to obtain these settings.
+    static func requireLogic13NoteDisplay(in pane: AXUIElement, runtime: AXHelpers.Runtime) -> Bool {
+        guard case .acquired(let acquisition) = paneViewMenu(in: pane, runtime: runtime),
+              acquisition.openedByCollector else { return false }
+        let requiredOff = ["Link", "Relative Position", "Event Position and Length as Time", "Length as Absolute Position"]
+        let items = AXHelpers.findAllDescendants(of: acquisition.menu,
+            role: kAXMenuItemRole, maxDepth: 4, runtime: runtime)
+        let matches = requiredOff.allSatisfy { label in
+            let matching = items.filter { AXHelpers.getTitle($0, runtime: runtime) == label }
+            guard matching.count == 1, let item = matching.first else { return false }
+            let mark: String? = AXHelpers.getAttribute(item, kAXMenuItemMarkCharAttribute, runtime: runtime)
+            return mark?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        }
+        let closed = cancelOwnedPaneViewMenu(acquisition, runtime: runtime)
+        return matches && closed
+    }
+
     private static func refuseTimeDisplayIfNeeded(
         pane: AXUIElement,
         runtime: AXLogicProElements.Runtime,
