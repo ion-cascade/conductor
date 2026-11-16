@@ -2346,6 +2346,13 @@ extension AccessibilityChannel {
         case let .failure(error):
             return .error(error)
         case let .success(target):
+            if target.metadata.writeMethod == Logic13GainControlWrite.method {
+                guard Logic13GainControlWrite.rawValue(for: value) != nil,
+                      params["expected_slot_read_status"] == "ok",
+                      let pid = runtime.logicProPID(), runtime.observeHost(pid)?.logicVersion?.hasPrefix("13.") == true else {
+                    return .error(invalidParamsStateC(operation, "Gain requires an occupied insert reference on Logic 13 and a value from -6.0 through 0.0 dB in 0.1 dB steps"))
+                }
+            }
             return await performVerifiedParameterAccess(
                 operation: operation,
                 referenceParams: params,
@@ -3302,7 +3309,8 @@ extension AccessibilityChannel {
         // Read metadata selects its plane without borrowing write qualification.
         let controlsViewCheckbox = access.isRead ? readsControlsCheckbox
             : writeMethod == "ax_controls_view_checkbox_press"
-        let usesControlsView = controlsViewCheckbox
+        let gainControlWrite = !access.isRead && writeMethod == Logic13GainControlWrite.method
+        let usesControlsView = controlsViewCheckbox || gainControlWrite
             || (access.isRead && controlsReadKind != nil)
             || access.isManifestRead
         // An unqualified manifest read may bind the exact display identity
@@ -4439,6 +4447,52 @@ extension AccessibilityChannel {
                     return pluginRollbackOperationIsCurrent()
                 }
             )
+        }
+
+        if gainControlWrite, case let .write(requested, _, _, _) = access {
+            func gainContextIsCurrent() -> Bool {
+                guard pluginRollbackOperationIsCurrent(), let pid = runtime.logicProPID(),
+                      runtime.focusedApplicationPID() == pid, let app = AXLogicProElements.appRoot(runtime: runtime),
+                      let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: runtime.ax),
+                      CFEqual(focus, window),
+                      let expectedPath = referenceParams["project_expected_path"],
+                      case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(
+                        target.window, runtime: runtime),
+                      let url = URL(string: document), url.isFileURL,
+                      AppleScriptChannel.projectPathsMatch(expectedPath, url.path),
+                      let transport = try? AXLogicProElements.observedTransportActivity(
+                        in: target.window, runtime: runtime, checking: {}),
+                      !transport.isPlaying, !transport.isRecording,
+                      targetPluginIdentityIsStable(target: target, insert: insert, pluginID: pluginID,
+                        originalSlot: slots[insert].element, runtime: runtime) else { return false }
+                return controlsViewAcquiredPluginWindowFailureStateC(acquiredWindow: window, operation: operation,
+                    identity: identity, pluginID: pluginID, trackName: trackName, runtime: runtime) == nil
+            }
+            var extras: [String: Any] = ["operation": operation, "target_identity": identity, "param": paramAlias,
+                "requested_db": requested, "verify_source": "ax_gain_controls_view", "write_attempted": false]
+            switch await Logic13GainControlWrite.apply(
+                requested: requested, in: window, runtime: runtime.ax, contextIsCurrent: gainContextIsCurrent
+            ) {
+            case .unavailable:
+                return .error(stateCWithPluginViewRestoration(error: .readbackUnavailable, extras: extras))
+            case let .verified(before, observed, steps):
+                extras["before_raw"] = before
+                extras["observed_raw"] = observed
+                extras["observed_db"] = Double(observed - 960) / 10
+                extras["observed_display"] = Logic13GainControlWrite.display(raw: observed)
+                extras["raw_unit"] = "raw_ax_value"
+                extras["verified_steps"] = steps
+                extras["write_attempted"] = steps > 0
+                return .success(verifiedParameterEnvelope(extras: extras))
+            case let .uncertain(lastVerified):
+                extras["last_verified_raw"] = lastVerified
+                extras["effect_unknown"] = true
+                extras["safe_to_retry"] = false
+                extras["write_attempted"] = true
+                appendPluginViewRestoration(to: &extras)
+                appendOwnedEditorCleanup(to: &extras)
+                return .success(HonestContract.encodeV2StateB(reason: .readbackMismatch, extras: extras))
+            }
         }
 
         // Step 9 — slider match by AXDescription (the only stable identifier).
