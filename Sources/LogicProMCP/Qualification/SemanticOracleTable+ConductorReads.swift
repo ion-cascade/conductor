@@ -3,6 +3,7 @@ extension SemanticOracleTable {
         .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep,
         .projectScanRegions, .projectGetRegionSmartTempo, .projectGetRegionGain, .projectGetRegionFade, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
         .midiGetRegionNotes, .pluginsGetGainAutomation,
+        .projectCapturePatternGrid, .projectGetChordTrack, .projectGetSessionPlayer, .projectSearchBrowserPatches,
     ]
 
     static let pluginsGetPresetVerified = receiptOnlyRead(
@@ -85,6 +86,69 @@ extension SemanticOracleTable {
             ]),
         ],
         reason: "Project info cannot independently identify the selected pattern cell or verify its enabled state and velocity."
+    )
+
+    static let projectCapturePatternGrid = receiptOnlyRead(
+        .projectCapturePatternGrid, operation: "project.capture_pattern_grid",
+        constraints: [
+            .typedField(key: "address.project_path", type: .string),
+            .typedField(key: "address.track", type: .string),
+            .typedField(key: "address.region_name", type: .string),
+            .typedField(key: "address.region_location", type: .string),
+            .typedField(key: "grid_snapshot", type: .string),
+            .nonEmptyArray(key: "cells"),
+            .arrayElements(key: "cells", constraints: [
+                .typedField(key: "row", type: .string),
+                .integerMinimum(key: "step", min: 1),
+                .numericRange(key: "step", min: 1, max: 16),
+                .typedField(key: "enabled", type: .bool),
+                .integerMinimum(key: "velocity", min: 1),
+                .numericRange(key: "velocity", min: 1, max: 127),
+            ]),
+        ],
+        reason: "The generic harness has no independent native drum-grid observation or selection-restoration witness."
+    )
+
+    static let projectGetChordTrack = receiptOnlyRead(
+        .projectGetChordTrack, operation: "project.get_chord_track",
+        constraints: [
+            .typedField(key: "project_path", type: .string),
+            .arrayElements(key: "events", constraints: [
+                .typedField(key: "chord", type: .string),
+                .integerMinimum(key: "start_bar", min: 1),
+                .integerMinimum(key: "end_bar", min: 2),
+                .integerMinimum(key: "duration_bars", min: 1),
+            ]),
+        ],
+        reason: "The generic harness cannot independently inspect the Chord Track progression or musical boundaries."
+    )
+
+    static let projectGetSessionPlayer = receiptOnlyRead(
+        .projectGetSessionPlayer, operation: "project.get_session_player",
+        constraints: [
+            .typedField(key: "address.project_path", type: .string),
+            .typedField(key: "address.region_name", type: .string),
+            .typedField(key: "address.region_location", type: .string),
+            .typedField(key: "address.track", type: .string),
+            .valueEquals(key: "player", expected: .string("Keyboard Player")),
+            .enumMember(key: "chord_source", allowed: ["global", "region"]),
+            .numericRange(key: "complexity", min: 0, max: 100),
+            .numericRange(key: "intensity", min: 0, max: 100),
+            .nonEmptyArray(key: "complexity_range"),
+        ],
+        reason: "The generic harness has no separate native observation of this selected region and its Pitch Source."
+    )
+
+    static let projectSearchBrowserPatches = receiptOnlyRead(
+        .projectSearchBrowserPatches, operation: "project.search_browser_patches",
+        constraints: [
+            .typedField(key: "project_path", type: .string),
+            .typedField(key: "track_name", type: .string),
+            .integerMinimum(key: "track_index", min: 0),
+            .typedField(key: "query", type: .string),
+            .typedField(key: "visible_patches", type: .array),
+        ],
+        reason: "An independent observation of the active search filter and visible native Browser results is required."
     )
 
     static let projectGetRegionSmartTempo = receiptOnlyRead(

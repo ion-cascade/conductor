@@ -109,7 +109,14 @@ struct OperationRegistryCoverageTests {
 
         // Exact target membership below covers additions without a redundant global count.
         #expect(targetBearingIDs == expectedTargetBearingIDs)
-        #expect(targetless.count == 86)   // #971 internally binds a retained project approval
+        // The native project writes bind their own document and selected surface.
+        let nativeProjectWrites: Set<OperationID> = [
+            .projectSetPatternStepsEnabled, .projectSetChordQuality,
+            .projectSetSessionPlayerChordSource, .projectLoadBrowserPatch,
+        ]
+        let targetlessIDs = Set(targetless.map(\.id))
+        #expect(nativeProjectWrites.isSubset(of: targetlessIDs))
+        #expect(targetlessIDs.subtracting(nativeProjectWrites).count == 86)
         #expect(targetBearingIDs.count + targetless.count == mutating.count)
         #expect(readOnly.count + mutating.count == OperationRegistry.specs.count)
         #expect(readOnly.contains { $0.id == .pluginsGetParamVerified })

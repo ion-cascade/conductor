@@ -9,6 +9,7 @@ extension SemanticOracleFixtures {
         .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified, .pluginsGetGainAutomation,
         .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep, .projectScanRegions,
         .tracksGetPanAutomation, .tracksGetVolumeAutomation, .projectGetRegionSmartTempo, .projectGetRegionGain, .projectGetRegionFade,
+        .projectCapturePatternGrid, .projectGetChordTrack, .projectGetSessionPlayer, .projectSearchBrowserPatches,
     ]
 
     static let conductorReads: [OperationID: SemanticOracleFixture] = [
@@ -30,6 +31,22 @@ extension SemanticOracleFixtures {
         ),
         .projectGetPatternStep: .init(
             response: #"{"operation":"project.get_pattern_step","state":"A","success":true,"verified":true,"write_attempted":false,"address":{"project_path":"/tmp/Pattern.logicx","region_name":"Pattern","region_location":"1.1.1.1","track":"Drums","row":"Kick","step":2},"enabled":true,"velocity":64,"visible_grid":[{"row":"Kick","steps":[1,2]}]}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
+        .projectCapturePatternGrid: .init(
+            response: #"{"operation":"project.capture_pattern_grid","state":"A","success":true,"verified":true,"write_attempted":false,"address":{"project_path":"/tmp/Pattern.logicx","track":"Drums","region_name":"Pattern","region_location":"1.1.1.1"},"grid_snapshot":"grid_fixture","cells":[{"row":"Kick","step":2,"enabled":true,"velocity":64}]}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
+        .projectGetChordTrack: .init(
+            response: #"{"operation":"project.get_chord_track","state":"A","success":true,"verified":true,"write_attempted":false,"project_path":"/tmp/Chords.logicx","events":[{"chord":"c major","start_bar":1,"end_bar":2,"duration_bars":1}]}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
+        .projectGetSessionPlayer: .init(
+            response: #"{"operation":"project.get_session_player","state":"A","success":true,"verified":true,"write_attempted":false,"address":{"project_path":"/tmp/Chords.logicx","track":"Piano","region_name":"Freely","region_location":"Region starts at 1 bar and ends at 9 bars"},"player":"Keyboard Player","chord_source":"global","complexity":42,"intensity":71,"complexity_range":[1,100]}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
+        .projectSearchBrowserPatches: .init(
+            response: #"{"operation":"project.search_browser_patches","state":"A","success":true,"verified":true,"write_attempted":false,"project_path":"/tmp/Patches.logicx","track_name":"Inst 2","track_index":1,"query":"Topaz","visible_patches":["Hi-Hat Open 2 - Topaz"]}"#,
             readback: #"{"independent_readback":false}"#
         ),
         .projectGetRegionSmartTempo: .init(

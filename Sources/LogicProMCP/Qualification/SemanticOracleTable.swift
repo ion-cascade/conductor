@@ -326,6 +326,14 @@ enum SemanticOracleTable {
     /// mutating spec, is DISJOINT from the covered set, and carries a reason —
     /// and remains separate from `conductorWriteQualificationCases`.
     static let structurallyUnverifiedMutatingOperationIDs: [OperationID: String] = [
+        .projectSetPatternStepsEnabled:
+            "The release fixture compares the complete native grid with its reopened render. The generic sweep has no independent Step Sequencer reader.",
+        .projectSetChordQuality:
+            "The release fixture checks the reopened progression and follower render. The generic sweep has no independent Chord Track observation.",
+        .projectSetSessionPlayerChordSource:
+            "The release fixture checks the reopened Pitch Source and controlled bounces. The generic sweep cannot independently observe that region.",
+        .projectLoadBrowserPatch:
+            "The release fixture checks the native Inspector and project layout after reopening. The generic sweep has no independent Browser and selected track witness.",
         .systemSetupMIDIKeyCommands:
             "the public surface is check-only and drives Logic's Key Commands UI, but its exact-row "
             + "inspection is the operation's own evidence; no independent logic:// resource publishes "
@@ -565,6 +573,10 @@ enum SemanticOracleTable {
         projectIsRunning,
         projectGetRegions,
         projectGetPatternStep,
+        projectCapturePatternGrid,
+        projectGetChordTrack,
+        projectGetSessionPlayer,
+        projectSearchBrowserPatches,
         projectScanRegions,
         projectGetRegionSmartTempo,
         projectGetRegionGain,

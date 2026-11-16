@@ -676,9 +676,13 @@ extension OperationTraceTests {
             eligible.count >= 40,
             Comment(rawValue: "presence census only saw \(eligible.count) channel-dispatching ops: \(eligible.sorted())")
         )
+        // These project commands use direct native access outside ChannelRouter.
+        let directNativeWrites: Set<OperationID> = [
+            .projectSetPatternStepEnabled, .projectSetPatternStepsEnabled, .projectSetChordQuality,
+            .projectSetSessionPlayerChordSource, .projectLoadBrowserPatch,
+        ]
         let newRoutedWrites = Set(additionalWriteCensusRoutes.compactMap { id, _ in
-            // The pattern edit uses a direct AX action, outside ChannelRouter.
-            id == .projectSetPatternStepEnabled ? nil : id.rawValue
+            directNativeWrites.contains(id) ? nil : id.rawValue
         })
         let notExercised = newRoutedWrites.subtracting(eligible).sorted()
         #expect(notExercised.isEmpty, "Write fixtures that never reached a channel: \(notExercised)")
@@ -1029,6 +1033,8 @@ let additionalWriteCensusRoutes: [(OperationID, String)] = [
     (.pluginsSetGainAutomationPoint, "plugin.set_gain_automation_point"),
     (.projectSetRegionGain, "region.set_gain"), (.projectSetRegionFade, "region.set_fade"),
     (.projectEditRegion, "region.edit_by_reference"), (.projectSetPatternStepEnabled, "project.set_pattern_step_enabled"),
+    (.projectSetPatternStepsEnabled, "project.set_pattern_steps_enabled"), (.projectSetChordQuality, "project.set_chord_quality"),
+    (.projectSetSessionPlayerChordSource, "project.set_session_player_chord_source"), (.projectLoadBrowserPatch, "project.load_browser_patch"),
     (.midiEditRegionExpression, "midi.edit_region_expression"), (.midiEditRegionNote, "midi.edit_region_note"),
     (.tracksSplitSelectedAudio, "track.split_selected_audio"),
     (.tracksCreatePanAutomation, "track.create_pan_automation_point"),
