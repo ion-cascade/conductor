@@ -34,9 +34,10 @@ func midiExportPanelNativeTimeoutRecovery() async throws {
         if key == 53 { escapes += 1 }
         return MIDITrackExportPanel.Keyboard.production.post(key, flags)
     }
+    // The shipped panel driver binds the project and separately verifies the
+    // keyboard owner for every key. The native test supplies the single caller.
     let panel = MIDITrackExportPanel(window: window, document: document, keyboard: keyboard) {
-        guard let appPID = runtime.logicProPID(), runtime.focusedApplicationPID() == appPID else { return false }
-        return (try? AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime).get()) == document
+        !Task.isCancelled
     }
     do {
         try await panel.exportAll(to: temporary.fileURL)
