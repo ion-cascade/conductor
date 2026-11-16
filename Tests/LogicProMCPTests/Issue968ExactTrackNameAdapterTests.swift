@@ -19,6 +19,7 @@ private final class ExactNameFixture: @unchecked Sendable {
     var additionalNameFields: [AXUIElement] = []
     private(set) var actedNameFields: [AXUIElement] = []
     var routedOperations: [String] = []
+    var routedMuteIndices: [Int] = []
     var editOnPress: String?
     var hideReadbackAfterSet = false
     var acknowledgementOnly = false
@@ -384,7 +385,8 @@ private final class ExactNameFixture: @unchecked Sendable {
     }
 
     func mute(_ params: [String: String]) -> ChannelResult {
-        AccessibilityChannel.defaultSetTrackToggle(params: params, button: "Mute", runtime: runtime,
+        if let index = params["index"].flatMap(Int.init) { routedMuteIndices.append(index) }
+        return AccessibilityChannel.defaultSetTrackToggle(params: params, button: "Mute", runtime: runtime,
             keyRuntime: .init(postMouseEvent: { _, _, _ in Issue.record("Unexpected mute mouse"); return false },
                 postKeyEvent: { _ in Issue.record("Unexpected mute key"); return false },
                 postUnicodeScalar: { _ in Issue.record("Unexpected mute typing"); return false }, sleepMicros: { _ in },
@@ -3152,7 +3154,7 @@ struct Issue968ExactTrackNameAdapterTests {
     }
 
     @Test(arguments: ["unchanged", "reordered", "duplicate"])
-    func typedTrackReferenceRetainsOriginalNonRenameGuards(shape: String) async throws {
+    func typedMuteReferenceFollowsTheOriginalPhysicalTrack(shape: String) async throws {
         try await FeatureFlags.withAdr002TargetRefForTests(true) {
             let f = ExactNameFixture()
             let (other, _) = f.appendTrack(name: shape == "duplicate" ? "A" : "B", selected: false)
@@ -3171,14 +3173,10 @@ struct Issue968ExactTrackNameAdapterTests {
                 liveTrackName: { AXLogicProElements.trackName(at: $0, runtime: runtime) },
                 liveTrackNames: { AXLogicProElements.trackNames(runtime: runtime) })
             let body = try #require(sharedJSONObject(sharedToolText(result)))
-            if shape == "unchanged" {
-                #expect(body["state"] as? String == "A")
-                #expect(f.routedOperations == ["track.set_mute"])
-                #expect(body["action"] as? String == "no-op")
-            } else {
-                #expect(body["state"] as? String == "C")
-                #expect(f.routedOperations.isEmpty)
-            }
+            #expect(body["state"] as? String == "A")
+            #expect(body["action"] as? String == "no-op")
+            #expect(f.routedOperations == ["track.set_mute"])
+            #expect(f.routedMuteIndices == [shape == "reordered" ? 1 : 0])
             #expect(f.writes.isEmpty)
             #expect(f.events.isEmpty)
         }
@@ -3318,7 +3316,7 @@ struct Issue968ExactTrackNameAdapterTests {
         }
     }
 
-    @Test func freshResourceReferenceAfterExternalReorderKeepsOldRefConservativeAndNewRefUsable() async throws {
+    @Test func oldAndFreshReferencesFollowTheSameTrackAfterExternalReorder() async throws {
         try await FeatureFlags.withAdr002TargetRefForTests(true) {
             let f = ExactNameFixture()
             let (other, _) = f.appendTrack(name: "B", selected: false)
@@ -3339,16 +3337,19 @@ struct Issue968ExactTrackNameAdapterTests {
             let binding = try #require(await f.registry.resolve(freshRef))
             #expect(binding.descriptor.trackIndex == 1)
             let runtime = f.runtime
-            for (reference, expectedState) in [(oldRef, "C"), (freshRef, "A")] {
+            for (reference, staleIndex) in [(oldRef, true), (oldRef, false), (freshRef, false)] {
+                var params: [String: Value] = ["target_ref": .string(reference.rawValue), "enabled": .bool(false)]
+                if staleIndex { params["index"] = .int(0) }
                 let result = await TrackDispatcher.handle(command: "mute",
-                    params: ["target_ref": .string(reference.rawValue), "enabled": .bool(false)],
-                    router: f.router, cache: f.cache, targetRegistry: f.registry,
+                    params: params, router: f.router, cache: f.cache, targetRegistry: f.registry,
                     liveTrackName: { AXLogicProElements.trackName(at: $0, runtime: runtime) },
                     liveTrackNames: { AXLogicProElements.trackNames(runtime: runtime) })
                 let body = try #require(sharedJSONObject(sharedToolText(result)))
-                #expect(body["state"] as? String == expectedState)
+                #expect(body["state"] as? String == (staleIndex ? "C" : "A"))
+                if staleIndex { #expect(body["error"] as? String == "stale_target_reference") }
             }
-            #expect(f.routedOperations == ["track.set_mute"])
+            #expect(f.routedOperations == ["track.set_mute", "track.set_mute"])
+            #expect(f.routedMuteIndices == [1, 1])
             #expect(f.writes.isEmpty)
             #expect(f.events.isEmpty)
         }
@@ -3902,5 +3903,26 @@ struct Issue968ExactTrackNameAdapterTests {
         #expect(!decoded.liveIdentityBacked)
         #expect(f.writes.isEmpty)
         #expect(f.events.isEmpty)
+    }
+}
+
+
+func dispatchWithPhysicalTrackFixture(
+    command: String, params: [String: Value], router: ChannelRouter
+) async throws -> CallTool.Result {
+    let fixture = ExactNameFixture()
+    let (project, track) = try await fixture.prepare(typedProducer: true)
+    var request = params
+    if request["project_ref"] != nil { request["project_ref"] = .string(project.rawValue) }
+    if request["target_ref"] != nil { request["target_ref"] = .string(track.rawValue) }
+    let runtime = fixture.runtime
+    let boundRequest = request
+    return await FeatureFlags.withAdr002TargetRefForTests(true) {
+        await TrackDispatcher.handle(
+            command: command, params: boundRequest, router: router, cache: fixture.cache,
+            targetRegistry: fixture.registry, dialogPresent: { false },
+            liveTrackName: { AXLogicProElements.trackName(at: $0, runtime: runtime) },
+            liveTrackNames: { AXLogicProElements.trackNames(runtime: runtime) }
+        )
     }
 }

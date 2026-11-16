@@ -147,6 +147,9 @@ extension OperationRegistry {
 
     private static let targetRef = ParamRule.unconstrained(
         "a stable target reference is resolved against the target registry; a stale or ill-formed one answers stale_target_reference")
+    private static let trackReference = ParamRule.enforced(.string, .string("trk_lpm_reference"))
+    private static let stripReference = ParamRule.enforced(.string, .string("mix_lpm_reference"))
+    private static let insertReference = ParamRule.enforced(.string, .string("ins_lpm_reference"))
     private static let projectRef = ParamRule.unconstrained(
         "the project reference is compared with the open project; a mismatch answers its own refusal")
     private static func index(_ sample: Int = 0) -> ParamRule { .enforced(.integer, .int(sample)) }
@@ -221,10 +224,10 @@ extension OperationRegistry {
                 "value": .enforced(.number, .int(0)), "pan": .enforced(.number, .int(0)),
             ], required: [indexGroup, ["value", "pan"]]),
             "mixer.set_mute": .init(params: [
-                "target_ref": targetRef, "project_ref": projectRef, "enabled": .enforced(.boolean, .bool(true)),
+                "target_ref": stripReference, "project_ref": projectRef, "enabled": .enforced(.booleanLike, .bool(true)),
             ], required: [["target_ref"], ["enabled"]]),
             "mixer.set_solo": .init(params: [
-                "target_ref": targetRef, "project_ref": projectRef, "enabled": .enforced(.boolean, .bool(true)),
+                "target_ref": stripReference, "project_ref": projectRef, "enabled": .enforced(.booleanLike, .bool(true)),
             ], required: [["target_ref"], ["enabled"]]),
             "mixer.set_master_volume": .init(params: ["value": .enforced(.number, .double(0.5)), "volume": .enforced(.number, .double(0.5))],
                                              required: [["value", "volume"]]),
@@ -425,15 +428,27 @@ extension OperationRegistry {
             "tracks.resolve_path": .init(params: ["path": .enforced(.scalar, .string("Bass/Electric Bass"))], required: [["path"]]),
             "tracks.scan_library": .init(params: ["mode": .unconstrained("read as text; an empty mode leaves the channel's default")],
                                         required: []),
-            "tracks.get_pan_automation": .init(params: ["target_ref": targetRef, "project_ref": projectRef],
+            "tracks.get_pan_automation": .init(params: ["target_ref": trackReference, "project_ref": projectRef],
                 required: [["target_ref"]]),
             "tracks.set_pan_automation_point": .init(params: [
-                "target_ref": targetRef, "project_ref": projectRef,
+                "target_ref": trackReference, "project_ref": projectRef,
                 "position": .enforced(.string, "1.1.1.1"),
                 "expected_current": .enforced(.integer, .int(64)), "value": .enforced(.integer, .int(74)),
                 "linked_position": .enforced(.string, "1.4.4.240"),
             ], required: [["target_ref"], ["position"], ["expected_current"], ["value"]]),
+            "tracks.create_volume_automation_at_region_borders": .init(params: [
+                "target_ref": trackReference, "project_ref": projectRef,
+                "start": .enforced(.string, "1.1.1.1"), "end": .enforced(.string, "2.1.1.1"),
+            ], required: [["target_ref"], ["start"], ["end"]]),
+            "tracks.get_volume_automation": .init(params: ["target_ref": trackReference, "project_ref": projectRef],
+                required: [["target_ref"]]),
+            "tracks.set_volume_automation_point": .init(params: [
+                "target_ref": trackReference, "project_ref": projectRef,
+                "position": .enforced(.string, "1.1.1.1"), "linked_position": .enforced(.string, "1.4.4.240"),
+                "expected_current": .enforced(.integer, .int(90)), "value": .enforced(.integer, .int(80)),
+            ], required: [["target_ref"], ["position"], ["expected_current"], ["value"]]),
             "tracks.insert_volume_automation_point": .init(params: [
+                "project_ref": projectRef,
                 "target_ref": .enforced(.string, .string("trk_lpm_reference")),
                 "position": .enforced(.string, .string("1.3.1.1")),
                 "previous_position": .enforced(.string, .string("1.1.1.121")),
@@ -441,7 +456,7 @@ extension OperationRegistry {
                 "expected_current": .enforced(.integer, .int(80)),
             ], required: [["target_ref"], ["position"], ["previous_position"], ["next_position"], ["expected_current"]]),
             "tracks.move_volume_automation_point": .init(params: [
-                "target_ref": targetRef, "project_ref": projectRef,
+                "target_ref": trackReference, "project_ref": projectRef,
                 "position": .enforced(.string, "1.1.1.1"), "new_position": .enforced(.string, "1.1.1.121"),
                 "expected_current": .enforced(.integer, .int(80)),
                 "previous_position": .enforced(.string, "0.4.4.240"), "previous_value": .enforced(.integer, .int(90)),
@@ -449,7 +464,7 @@ extension OperationRegistry {
             ], required: [["target_ref"], ["position"], ["new_position"], ["expected_current"],
                           ["previous_position"], ["previous_value"], ["next_position"], ["next_value"]]),
             "tracks.create_pan_automation_point": .init(params: [
-                "target_ref": targetRef, "project_ref": projectRef,
+                "target_ref": trackReference, "project_ref": projectRef,
                 "position": .enforced(.string, "2.1.1.1"), "initial_position": .enforced(.string, "1.1.1.1"),
             ], required: [["target_ref"], ["position"], ["initial_position"]]),
             "tracks.scan_plugin_presets": .init(params: ["submenuOpenDelayMs": index(250)], required: []),
@@ -529,16 +544,23 @@ extension OperationRegistry {
 
             // logic_plugins: the dispatcher omits a value that does not read, and the channel's own
             // schema step refuses the request, so those refusals come after a channel ran.
-            "plugins.get_sidechain_verified": .init(params: ["target_ref": targetRef], required: [["target_ref"]]),
+            "plugins.get_sidechain_verified": .init(params: ["target_ref": insertReference, "project_ref": projectRef], required: [["target_ref"]]),
             "plugins.set_sidechain_verified": .init(params: [
-                "target_ref": targetRef,
+                "target_ref": insertReference, "project_ref": projectRef,
                 "source": .enforced(.string, .string("Bus 2 ← Audio 1")),
                 "expected_current": .enforced(.string, .string("Internal")),
             ], required: [["target_ref"], ["source"], ["expected_current"]]),
             "plugins.set_bypass_verified": .init(params: [
-                "target_ref": targetRef, "project_ref": projectRef,
+                "target_ref": insertReference, "project_ref": projectRef,
                 "bypassed": .enforced(.boolean, .bool(true)), "expected_current": .enforced(.boolean, .bool(false)),
             ], required: [["target_ref"], ["bypassed"], ["expected_current"]]),
+            "plugins.get_preset_verified": .init(params: ["target_ref": insertReference, "project_ref": projectRef],
+                required: [["target_ref"]]),
+            "plugins.set_preset_verified": .init(params: [
+                "target_ref": insertReference, "project_ref": projectRef,
+                "path": .enforced(.string, "02 Keyboards/Piano"),
+                "expected_current": .enforced(.string, "Factory Default"),
+            ], required: [["target_ref"], ["path"], ["expected_current"]]),
             "plugins.get_inventory": .init(params: Dictionary(uniqueKeysWithValues: ["index", "track", "track_index"].map {
                 ($0, ParamRule.unconstrained("omitted when it does not read as an integer; the channel then refuses the request",
                                              sample: .int(0)))
@@ -554,9 +576,11 @@ extension OperationRegistry {
                 "insert": .enforced(.integer, .int(6)),
             ], required: [["target_ref"], ["expected_build_fingerprint"]]),
             "plugins.get_gain_automation": .init(params: [
+                "project_ref": projectRef,
                 "target_ref": .enforced(.string, .string("ins_lpm_reference")),
             ], required: [["target_ref"]]),
             "plugins.set_gain_automation_point": .init(params: [
+                "project_ref": projectRef,
                 "target_ref": .enforced(.string, .string("ins_lpm_reference")),
                 "position": .enforced(.string, .string("1.1.1.1")),
                 "expected_current": .enforced(.integer, .int(101)),
@@ -609,13 +633,14 @@ extension OperationRegistry {
                            ["value"], ["mode"], ["project_expected_path"]]),
 
             "tracks.split_selected_audio": .init(params: [
-                "project_ref": projectRef, "target_ref": targetRef,
+                "project_ref": .unconstrained("the project reference must be current",
+                    sample: .string("prj_lpm_reference")), "target_ref": trackReference,
                 "region_name": .enforced(.string, .string("Audio Region")),
                 "start": .enforced(.string, .string("1.1.1.1")),
                 "end": .enforced(.string, .string("2.1.1.1")),
                 "preset": .enforced(.string, .string(ProjectLogic13StemSplitter.Preset.allStems.rawValue),
                     allowed: ProjectLogic13StemSplitter.Preset.allCases.map(\.rawValue)),
-                "confirmed": .enforced(.boolean, .bool(false)),
+                "confirmed": .enforced(.boolean, .bool(true)),
             ], required: [["project_ref"], ["target_ref"], ["region_name"], ["start"], ["end"], ["confirmed"]]),
 
             // logic_project

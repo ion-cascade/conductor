@@ -516,6 +516,9 @@ enum WorkflowSkillCatalog {
             "mute", "solo", "arm", "arm_only", "record_sequence", "sort_verified",
             "set_automation", "set_instrument",
             "resolve_path", "list_library", "scan_library", "scan_plugin_presets",
+            "create_pan_automation_point", "create_volume_automation_at_region_borders", "get_pan_automation",
+            "get_volume_automation", "insert_volume_automation_point", "move_volume_automation_point",
+            "set_pan_automation_point", "set_volume_automation_point", "split_selected_audio",
         ],
         "logic_mixer": [
             "set_volume", "set_pan", "set_mute", "set_solo", "set_master_volume",
@@ -523,6 +526,9 @@ enum WorkflowSkillCatalog {
         ],
         "logic_plugins": [
             "get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
+            "get_gain_automation", "get_preset_verified", "get_sidechain_verified",
+            "set_bypass_verified", "set_gain_automation_point", "set_preset_verified",
+            "set_sidechain_verified",
         ],
         "logic_midi": [
             "send_note", "send_chord", "play_sequence", "send_cc",
@@ -530,6 +536,7 @@ enum WorkflowSkillCatalog {
             "send_sysex", "import_file", "list_ports", "create_virtual_port",
             "export_track_midi", "read_track_notes", "read_selected_region_events",
             "mmc_play", "mmc_stop", "mmc_record", "mmc_locate", "step_input",
+            "edit_region_expression", "edit_region_note", "get_region_notes",
         ],
         "logic_edit": [
             "undo", "redo", "cut", "copy", "paste", "delete", "select_all",
@@ -545,6 +552,10 @@ enum WorkflowSkillCatalog {
             "is_running", "get_regions",
             "export_plan", "export_run", "export_resume",
             "audit", "cleanup_plan", "inspect_session", "plan_session_repair", "apply_session_repair", "cleanup_apply", "launch", "quit",
+            "edit_region", "export_status", "get_pattern_step",
+            "get_region_fade", "get_region_gain", "get_region_smart_tempo",
+            "scan_regions", "set_pattern_step_enabled", "set_region_fade",
+            "set_region_gain",
         ],
         "logic_system": [
             "health", "permissions", "refresh_cache", "export_support_bundle", "help",

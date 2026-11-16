@@ -231,7 +231,7 @@ private let operationTraceCensusReadRoutes: Set<String> = [
 /// Router operations that write but have no registry spec, so `Mutability` cannot say they write:
 /// the ones the census context routes (measured), plus `transport.resume`, which only play's
 /// paused-transport path reaches.
-private let operationTraceCensusInternalWriteRoutes: Set<String> = [
+private let operationTraceCensusInternalWriteRoutes = Set([
     "mmc.play", "mmc.record_strobe", "mmc.stop",
     "nav.capture_markers", "nav.delete_marker", "nav.open_marker_list", "nav.rename_marker", "nav.zoom_to_fit",
     "plugin.insert", "plugin.insert_verified", "plugin.set_eq_band_verified", "plugin.set_param_verified",
@@ -241,7 +241,7 @@ private let operationTraceCensusInternalWriteRoutes: Set<String> = [
     "track.set_mute", "track.set_solo", "track.sort_verified",
     "transport.resume",
     "view.toggle_mixer",
-]
+]).union(additionalWriteCensusRoutes.map { $0.1 })
 
 /// Writes: every registry spec marked mutating, under its own id, plus the internal writes.
 private let operationTraceCensusWriteRoutes: Set<String> = Set(
@@ -839,7 +839,7 @@ private let operationTraceCoverageLiveTrackNames: @Sendable () -> [Int: String]?
     [0: operationTraceCoverageTrackName]
 }
 
-private func dispatchOperationTraceCoverageSpec(
+func dispatchOperationTraceCoverageSpec(
     _ spec: OperationSpec,
     params: [String: Value],
     router: ChannelRouter,
@@ -870,7 +870,8 @@ private func dispatchOperationTraceCoverageSpec(
                 return toolInvalidParamsResult("Retained Send mode trace fixture unavailable")
             }
         }
-        if [.mixerSetInputBusVerified, .mixerSetSendOutputVerified, .mixerSetSendBypassVerified, .mixerSetSendLevelVerified].contains(spec.id) {
+        if [.mixerSetInputBusVerified, .mixerSetSendOutputVerified, .mixerSetSendBypassVerified,
+            .mixerSetSendLevelVerified, .mixerSetMute, .mixerSetSolo].contains(spec.id) {
             // Issue an actual physical reference from the injected host census,
             // not a track/index stand-in. Keep this snapshot separate from the
             // generic track fixture and route through the census's refusing channel.
@@ -932,6 +933,22 @@ private func dispatchOperationTraceCoverageSpec(
             }
         )
     case .logicPlugins:
+        if [.pluginsSetSidechainVerified, .pluginsSetBypassVerified, .pluginsSetPresetVerified,
+            .pluginsSetGainAutomationPoint].contains(spec.id) {
+            let registry = TargetRegistry(), insertCache = StateCache()
+            let project = ProjectInfo(name: "Trace Coverage", filePath: "/tmp/Trace Coverage.logicx")
+            let snapshot = await registry.currentSnapshot
+            _ = await ProjectReferenceIssuance.issue(cached: project, registry: registry, snapshot: snapshot)
+            let descriptor = TargetDescriptor(trackIndex: 0, trackName: "Trace Insert")
+            let plugin = spec.id == .pluginsSetGainAutomationPoint ? "gain" : "compressor"
+            let insert = await registry.bind(kind: .pluginInsert, descriptor: descriptor,
+                fingerprint: "\(descriptor.fingerprint)|insert=3|plugin=logic.stock.effect.\(plugin)")
+            let request = params.merging(["target_ref": .string(insert.rawValue)]) { _, issued in issued }
+            return await FeatureFlags.withAdr002TargetRefForTests(true) {
+                await PluginsDispatcher.handle(verifiedGate: VerifiedOpGate(), command: spec.command,
+                    params: request, router: router, cache: insertCache, targetRegistry: registry)
+            }
+        }
         return await PluginsDispatcher.handle(verifiedGate: VerifiedOpGate(),
             command: spec.command,
             params: params,
@@ -973,6 +990,14 @@ private func dispatchOperationTraceCoverageSpec(
             cache: cache
         )
     case .logicTracks:
+        if physicalTrackCensusWrites.contains(spec.id) {
+            do {
+                return try await dispatchWithPhysicalTrackFixture(command: spec.command, params: params, router: router)
+            } catch {
+                Issue.record("Physical track fixture failed: \(error)")
+                return toolInvalidParamsResult("Physical track fixture unavailable")
+            }
+        }
         return await TrackDispatcher.handle(
             command: spec.command,
             params: params,
@@ -984,10 +1009,53 @@ private func dispatchOperationTraceCoverageSpec(
     }
 }
 
+private let physicalTrackCensusWrites: Set<OperationID> = [
+    .tracksSplitSelectedAudio, .tracksCreatePanAutomation, .tracksSetPanAutomationPoint,
+    .tracksCreateVolumeAutomation, .tracksSetVolumeAutomationPoint, .tracksInsertVolumeAutomationPoint,
+    .tracksMoveVolumeAutomationPoint,
+]
+
+let additionalWriteCensusRoutes: [(OperationID, String)] = [
+    (.mixerSetMute, "mixer.set_mute"), (.mixerSetSolo, "mixer.set_solo"),
+    (.pluginsSetSidechainVerified, "plugin.set_sidechain_verified"),
+    (.pluginsSetBypassVerified, "plugin.set_bypass_verified"),
+    (.pluginsSetPresetVerified, "plugin.set_preset_verified"),
+    (.pluginsSetGainAutomationPoint, "plugin.set_gain_automation_point"),
+    (.projectSetRegionGain, "region.set_gain"), (.projectSetRegionFade, "region.set_fade"),
+    (.projectEditRegion, "region.edit_by_reference"), (.projectSetPatternStepEnabled, "project.set_pattern_step_enabled"),
+    (.midiEditRegionExpression, "midi.edit_region_expression"), (.midiEditRegionNote, "midi.edit_region_note"),
+    (.tracksSplitSelectedAudio, "track.split_selected_audio"),
+    (.tracksCreatePanAutomation, "track.create_pan_automation_point"),
+    (.tracksSetPanAutomationPoint, "track.set_pan_automation_point"),
+    (.tracksCreateVolumeAutomation, "track.create_volume_automation_at_region_borders"),
+    (.tracksSetVolumeAutomationPoint, "track.set_volume_automation_point"),
+    (.tracksInsertVolumeAutomationPoint, "track.insert_volume_automation_point"),
+    (.tracksMoveVolumeAutomationPoint, "track.move_volume_automation_point"),
+]
+
+func additionalWriteCensusParams(_ id: OperationID) -> [String: Value] {
+    guard let contract = OperationRegistry.parameterContracts[id] else {
+        Issue.record("No parameter contract for \(id.rawValue)")
+        return [:]
+    }
+    var params: [String: Value] = [:]
+    for group in contract.required {
+        guard let key = group.first, let sample = contract.params[key]?.sample else {
+            Issue.record("No required parameter sample for \(id.rawValue): \(group)")
+            continue
+        }
+        params[key] = sample
+    }
+    return params
+}
+
 private func operationTraceCoverageParams(
     for operationID: OperationID,
     fixtures: OperationTraceCoverageFixtures
 ) -> [String: Value] {
+    if additionalWriteCensusRoutes.contains(where: { $0.0 == operationID }) {
+        return additionalWriteCensusParams(operationID)
+    }
     switch operationID {
     case .systemExportSupportBundle:
         return ["dir": .string(URL(fileURLWithPath: fixtures.outputRoot)

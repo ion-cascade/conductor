@@ -199,14 +199,17 @@ struct OperationCatalogTests {
         .projectClose: ["confirmed", "saving"],
         .projectQuit: ["confirmed"],
         .projectExportPlan: [
+            "bounce_settings", "stem_settings",
             "artifact", "artifacts", "collision_policy", "kind", "naming_policy",
             "outputRoot", "output_root", "path", "project", "projects",
         ],
         .projectExportRun: [
+            "bounce_settings", "stem_settings",
             "artifact", "artifacts", "collision_policy", "confirmed", "kind", "naming_policy",
             "outputRoot", "output_root", "path", "project", "projects",
         ],
         .projectExportResume: [
+            "bounce_settings", "stem_settings",
             "artifact", "artifacts", "collision_policy", "confirmed", "kind", "naming_policy",
             "outputRoot", "output_root", "path", "project", "projects",
         ],
@@ -240,11 +243,38 @@ struct OperationCatalogTests {
         .tracksScanLibrary: ["mode"],
         .tracksResolvePath: ["path"],
         .tracksScanPluginPresets: ["submenuOpenDelayMs"],
+        .mixerSetMute: ["enabled"],
+        .mixerSetSolo: ["enabled"],
+        .pluginsSetSidechainVerified: ["expected_current", "source"],
+        .pluginsSetBypassVerified: ["bypassed", "expected_current"],
+        .pluginsSetPresetVerified: ["expected_current", "path"],
+        .pluginsSetGainAutomationPoint: ["expected_current", "position", "value"],
+        .projectExportStatus: ["delivery_id", "expected_settings", "output_root"],
+        .projectSetPatternStepEnabled: ["address", "enabled", "expected_enabled"],
+        .projectSetRegionGain: ["expected_gain_db", "gain_db"],
+        .projectGetRegionFade: ["edge"],
+        .projectSetRegionFade: ["edge", "expected_time_ms", "time_ms"],
+        .projectEditRegion: ["end", "expected_end", "expected_start", "mode", "start"],
+        .midiEditRegionExpression: ["channel", "expected_current", "position", "value"],
+        .midiEditRegionNote: ["expected_channel", "expected_length", "expected_pitch", "expected_position", "expected_velocity", "length", "pitch", "position", "velocity"],
+        .tracksSplitSelectedAudio: ["confirmed", "end", "preset", "region_name", "start"],
+        .tracksCreatePanAutomation: ["initial_position", "position"],
+        .tracksSetPanAutomationPoint: ["expected_current", "linked_position", "position", "value"],
+        .tracksCreateVolumeAutomation: ["end", "start"],
+        .tracksSetVolumeAutomationPoint: ["expected_current", "linked_position", "position", "value"],
+        .tracksInsertVolumeAutomationPoint: ["expected_current", "next_position", "position", "previous_position"],
+        .tracksMoveVolumeAutomationPoint: ["expected_current", "new_position", "next_position", "next_value", "position", "previous_position", "previous_value"],
+    ]
+
+    private static let regionReferenceOperations: Set<OperationID> = [
+        .projectGetRegionSmartTempo, .projectGetRegionGain, .projectGetRegionFade,
+        .projectSetRegionGain, .projectSetRegionFade, .projectEditRegion,
+        .midiGetRegionNotes, .midiEditRegionNote, .midiEditRegionExpression,
     ]
 
     private static func expectedAllowedParams(for spec: OperationSpec) -> Set<String> {
         var expected = spec.allowedParams.intersection(["index", "project_ref", "track"])
-        if spec.target == .acceptsStableTarget {
+        if spec.target == .acceptsStableTarget || regionReferenceOperations.contains(spec.id) {
             expected.insert("target_ref")
         }
         // PRD-007: the corroboration param rides exactly the `.corroborated`
@@ -715,7 +745,7 @@ struct OperationCatalogTests {
         let handlers = await LogicProServer().makeHandlers()
 
         for spec in OperationRegistry.specs {
-            let requiresTarget = spec.target == .acceptsStableTarget
+            let requiresTarget = spec.target == .acceptsStableTarget || Self.regionReferenceOperations.contains(spec.id)
             let hasTargetRef = spec.allowedParams.contains("target_ref")
             #expect(requiresTarget ? hasTargetRef : !hasTargetRef, "\(spec.id.rawValue)")
 
@@ -724,7 +754,7 @@ struct OperationCatalogTests {
                     LogicProServer.strictParamValidationResult(
                         tool: spec.tool.rawValue,
                         command: spec.command,
-                        params: ["target_ref": .string("trk_probe")]
+                        params: ["target_ref": .string(Self.regionReferenceOperations.contains(spec.id) ? "reg_probe" : "trk_probe")]
                     ) == nil,
                     "\(spec.id.rawValue)"
                 )
@@ -834,7 +864,7 @@ struct OperationCatalogTests {
         let targetBearing = Set(OperationRegistry.specs.filter {
             $0.target == .acceptsStableTarget
         }.map(\.id))
-        #expect(actualTargetRef == targetBearing)
+        #expect(actualTargetRef == targetBearing.union(Self.regionReferenceOperations))
         for spec in OperationRegistry.specs {
             #expect(
                 spec.allowedParams.isDisjoint(
@@ -956,7 +986,8 @@ struct OperationCatalogTests {
             #expect(row["allowedParams"] as? [String] == spec.allowedParams.sorted())
             let targetRefPresence = ((row["allowedParams"] as? [String])?.contains("target_ref"))
                 .map { $0 ? "present" : "absent" } ?? "missing"
-            let expectedTargetRefPresence = spec.target == .acceptsStableTarget ? "present" : "absent"
+            let acceptsReference = spec.target == .acceptsStableTarget || Self.regionReferenceOperations.contains(spec.id)
+            let expectedTargetRefPresence = acceptsReference ? "present" : "absent"
             #expect(targetRefPresence == expectedTargetRefPresence)
             #expect(row["capability"] as? String == spec.capability.rawValue)
             #expect(

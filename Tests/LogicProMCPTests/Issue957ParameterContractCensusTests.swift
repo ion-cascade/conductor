@@ -54,6 +54,11 @@ struct Issue957ParameterContractCensusTests {
                 params[key] = .string(FileManager.default.temporaryDirectory
                     .appendingPathComponent("lpm-957-out-\(UUID().uuidString)").path)
             }
+        case "project.export_status":
+            let sample = OperationRegistry.parameterContracts[spec.id]?.params["output_root"]?.sample
+            if params["output_root"] == sample {
+                params["output_root"] = .string(FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path)
+            }
         case "midi.import_file":
             if params["path"] == placeholder, let file = try? SMFWriter.temporaryMIDIFile() {
                 try? Data([0x4D, 0x54, 0x68, 0x64]).write(to: file.fileURL)

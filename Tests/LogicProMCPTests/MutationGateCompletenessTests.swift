@@ -34,15 +34,15 @@ struct MutationGateCompletenessTests {
     /// changes no project state, so it stays OUT of the mutation gate on purpose.
     private static let readOnlyAllowlist: [String: Set<String>] = [
         "logic_mixer": ["get_output_verified", "get_input_bus_verified", "get_send_destination_verified", "get_send_bypass_verified"],
-        "logic_tracks": ["list_library", "resolve_path", "scan_library", "scan_plugin_presets"],
-        "logic_midi": ["list_ports", "read_selected_region_events"],
-        "logic_project": ["audit", "cleanup_plan", "export_plan", "get_regions", "inspect_session", "plan_session_repair", "is_running"],
+        "logic_tracks": ["list_library", "resolve_path", "scan_library", "scan_plugin_presets", "get_volume_automation"],
+        "logic_midi": ["list_ports", "read_selected_region_events", "get_region_notes"],
+        "logic_project": ["audit", "cleanup_plan", "export_plan", "get_regions", "inspect_session", "plan_session_repair", "is_running", "export_status", "get_pattern_step", "get_region_fade", "get_region_gain", "get_region_smart_tempo", "scan_regions"],
         "logic_system": [
             "clear_traces", "get_trace", "health", "help", "list_recent_traces", "permissions",
             "refresh_cache", "saga_preflight", "saga_status",
         ],
         "logic_audio": ["analyze_file", "analyze_spectrum", "compare_spectra", "recommend_eq"],
-        "logic_plugins": ["get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes"],
+        "logic_plugins": ["get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "get_gain_automation"],
     ]
 
     /// Error-only labels that exist as switch cases but return a "not exposed in

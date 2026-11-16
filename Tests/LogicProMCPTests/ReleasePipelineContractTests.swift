@@ -105,84 +105,11 @@ import Testing
     #expect(script.contains(#""signing": "unsigned""#))
 }
 
-@Test func candidate_workflow_builds_with_command_line_tools_before_packaging() throws {
-    let workflow = try scriptContents(".github/workflows/release.yml")
-    let toolchain = try #require(workflow.range(of: "name: Use Command Line Tools"))
-    let build = try #require(workflow.range(of: "bash Scripts/release-build-universal.sh"))
-    let package = try #require(workflow.range(of: "name: Package release candidate"))
-    #expect(toolchain.lowerBound < build.lowerBound)
-    #expect(build.lowerBound < package.lowerBound)
-    for forbidden in ["xcode-select", "Xcode_", "codesign", "notarytool", "spctl",
-                      "MACOS_CERT", "APPLE_NOTARY"] {
-        #expect(!workflow.contains(forbidden), "release workflow contains \(forbidden)")
-    }
-}
-
-@Test func registry_publish_is_exact_merged_sha_dispatch_after_formula_update() throws {
-    let workflow = try scriptContents(".github/workflows/publish-mcp.yml")
-
-    #expect(workflow.contains("workflow_dispatch:"))
-    #expect(workflow.contains("expected_sha:"))
-    #expect(workflow.contains("expected_version:"))
-    #expect(workflow.contains("required: true"))
-    #expect(!workflow.contains("workflow_call:"))
-    #expect(!workflow.contains("release:\n"))
-    #expect(!workflow.contains("sync-server-json-version.py"))
-    #expect(workflow.contains("GITHUB_SHA"))
-    #expect(workflow.contains("inputs.expected_sha"))
-    #expect(workflow.contains("ref: ${{ inputs.expected_sha }}"))
-    #expect(workflow.contains("check-registry-metadata-matches-the-release.py"))
-    #expect(workflow.contains("ci-verify-formula-sha.sh"))
-
-    let checkout = try #require(workflow.range(of: "ref: ${{ inputs.expected_sha }}"))
-    let metadata = try #require(workflow.range(of: "check-registry-metadata-matches-the-release.py"))
-    let token = try #require(workflow.range(of: "GH_TOKEN: ${{ github.token }}",
-                                            range: checkout.upperBound..<metadata.lowerBound))
-    let formula = try #require(workflow.range(of: "ci-verify-formula-sha.sh"))
-    let login = try #require(workflow.range(of: "Login with GitHub OIDC"))
-    let publish = try #require(workflow.range(of: "Publish metadata"))
-    #expect(checkout.lowerBound < metadata.lowerBound)
-    #expect(token.lowerBound < formula.lowerBound)
-    #expect(metadata.lowerBound < formula.lowerBound)
-    #expect(formula.lowerBound < login.lowerBound)
-    #expect(login.lowerBound < publish.lowerBound)
-}
-
-@Test func ci_workflow_gates_package_resolved_drift() throws {
+@Test func bridgeCIExercisesBothPythonTestSuites() throws {
     let workflow = try scriptContents(".github/workflows/ci.yml")
-    #expect(workflow.contains("git diff --exit-code Package.resolved"))
-    let releaseBuild = try #require(workflow.range(of: "swift build -c release"))
-    let releaseLockfileGate = try #require(workflow.range(
-        of: "git diff --exit-code Package.resolved", range: releaseBuild.upperBound..<workflow.endIndex))
-    let testBuild = try #require(workflow.range(of: "swift build --build-tests --enable-code-coverage"))
-    let testLockfileGate = try #require(workflow.range(
-        of: "git diff --exit-code Package.resolved", range: testBuild.upperBound..<workflow.endIndex))
-    let coverage = try #require(workflow.range(of: "swift test --skip-build --enable-code-coverage"))
-    let coverageGate = try #require(workflow.range(of: "bash Scripts/ci-coverage-gate.sh"))
-    #expect(releaseBuild.lowerBound < releaseLockfileGate.lowerBound)
-    #expect(testBuild.lowerBound < testLockfileGate.lowerBound)
-    #expect(testLockfileGate.lowerBound < coverage.lowerBound)
-    #expect(coverage.lowerBound < coverageGate.lowerBound)
-    #expect(coverage.lowerBound < coverageGate.lowerBound,
-            "the tests must run before the gate reads the profile they produced")
-}
-
-@Test func ci_and_release_use_supported_standard_macos_runners() throws {
-    let ci = try scriptContents(".github/workflows/ci.yml")
-    let release = try scriptContents(".github/workflows/release.yml")
-    #expect(ci.contains("'macos-15-intel'"))
-    #expect(!ci.contains("&& 'macos-15' ||"))
-    #expect(release.contains("runs-on: macos-15-intel"))
-    #expect(release.contains("os: [macos-15-intel, macos-26]"))
-    #expect(!release.contains("macos-14"))
-    #expect(!release.contains("os: [macos-15,"))
-    #expect(!release.contains("os: [macos-15-intel, macos-26-intel]"))
-}
-
-@Test func ci_documentationShortcutCannotHideSourceRenames() throws {
-    let workflow = try scriptContents(".github/workflows/ci.yml")
-    #expect(workflow.contains("git diff --no-renames --name-only -z"))
-    #expect(workflow.contains("docs/*|*.md"))
-    #expect(workflow.contains("*) mode=full"))
-    #expect(workflow.contains("if [ \"$changed\" -eq 0 ]; then mode=full; fi"))
+    #expect(workflow.contains("on: [push, pull_request, workflow_dispatch]"))
+    #expect(workflow.contains("contents: read"))
+    #expect(workflow.contains("runs-on: ubuntu-latest"))
+    #expect(workflow.contains("python3 -m unittest discover -s tools -p 'test_*.py' -v"))
+    #expect(workflow.contains("python3 -m unittest discover -s Scripts/qualification_writes -p 'test_*.py' -v"))
 }

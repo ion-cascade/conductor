@@ -219,11 +219,18 @@ struct TrackDispatcher: OperationTraceDispatching {
                 guard let binding = resolved.binding, let physical = binding.physicalTrack else {
                     return TargetRefResolver.staleTargetReferenceResult(params["target_ref"]?.stringValue, operation: operation)
                 }
+                let arguments = automationParams
+                let traceID = await startTraceIfEnabled(command: command)
                 let result = await AXTrackBinding.$current.withValue(physical) {
-                    await router.route(operation: operation, params: automationParams)
+                    if command.hasPrefix("get_") {
+                        return await router.route(operation: operation, params: arguments)
+                    }
+                    return await withWriteBoundaryArmed(traceID) {
+                        await router.route(operation: operation, params: arguments)
+                    }
                 }
-                return TargetRefResolver.addEvidence(resolved.reference,
-                    fingerprint: binding.observedFingerprint, to: toolTextResult(result))
+                return await finalizeTrace(TargetRefResolver.addEvidence(resolved.reference,
+                    fingerprint: binding.observedFingerprint, to: toolTextResult(result)), traceID: traceID)
             }
         case "select":
             // Prefer index (accepts int/double/string), else match by name. If

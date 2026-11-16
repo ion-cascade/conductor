@@ -1306,9 +1306,13 @@ struct OperationRegistryTests {
     @Test("tracks deadlines preserve short medium long and read-only long tiers")
     func tracksDeadlineParity() {
         #expect(Self.trackCommands.filter { $0.deadline == .short }.count == 14)
-        #expect(Self.trackCommands.filter { $0.deadline == .medium }.map(\.command) == ["sort_verified", "set_instrument"])
+        #expect(Set(Self.trackCommands.filter { $0.deadline == .medium }.map(\.command)) == Set([
+            "sort_verified", "set_instrument", "create_pan_automation_point", "get_pan_automation",
+            "set_pan_automation_point", "create_volume_automation_at_region_borders", "get_volume_automation",
+            "set_volume_automation_point", "insert_volume_automation_point", "move_volume_automation_point",
+        ]))
         #expect(Set(Self.trackCommands.filter { $0.deadline == .long }.map(\.command)) == Set([
-            "record_sequence", "list_library", "scan_library", "scan_plugin_presets",
+            "record_sequence", "list_library", "scan_library", "scan_plugin_presets", "split_selected_audio",
         ]))
         #expect(Set(Self.trackCommands
             .filter { $0.mutability == .readOnly && $0.deadline == .long }

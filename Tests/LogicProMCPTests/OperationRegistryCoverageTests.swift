@@ -92,11 +92,24 @@ struct OperationRegistryCoverageTests {
             .tracksSetInstrument,
             .midiExportTrackMIDI,
             .midiReadTrackNotes,
+            .mixerSetMute,
+            .mixerSetSolo,
+            .pluginsSetBypassVerified,
+            .pluginsSetGainAutomationPoint,
+            .pluginsSetPresetVerified,
+            .pluginsSetSidechainVerified,
+            .tracksCreatePanAutomation,
+            .tracksCreateVolumeAutomation,
+            .tracksInsertVolumeAutomationPoint,
+            .tracksMoveVolumeAutomationPoint,
+            .tracksSetPanAutomationPoint,
+            .tracksSetVolumeAutomationPoint,
+            .tracksSplitSelectedAudio,
         ]
 
         // Exact target membership below covers additions without a redundant global count.
         #expect(targetBearingIDs == expectedTargetBearingIDs)
-        #expect(targetless.count == 80)   // #971 internally binds a retained project approval
+        #expect(targetless.count == 86)   // #971 internally binds a retained project approval
         #expect(targetBearingIDs.count + targetless.count == mutating.count)
         #expect(readOnly.count + mutating.count == OperationRegistry.specs.count)
         #expect(readOnly.contains { $0.id == .pluginsGetParamVerified })
@@ -104,7 +117,9 @@ struct OperationRegistryCoverageTests {
             [.pluginsGetHostParameterManifest, .pluginsGetParamVerified,
              .pluginsGetChannelEQStateVerified, .pluginsPlanParameterChanges,
              .mixerGetOutputVerified, .mixerGetInputBusVerified,
-             .mixerGetSendDestinationVerified, .mixerGetSendBypassVerified].contains($0.id)
+             .mixerGetSendDestinationVerified, .mixerGetSendBypassVerified,
+             .pluginsGetSidechainVerified, .pluginsGetPresetVerified, .pluginsGetGainAutomation,
+             .tracksGetPanAutomation, .tracksGetVolumeAutomation].contains($0.id)
                 ? $0.target == .acceptsStableTarget : $0.target == .none
         })
     }

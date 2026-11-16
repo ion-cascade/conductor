@@ -400,7 +400,8 @@ struct MixerDispatcher: OperationTraceDispatching {
             }
         case "set_mute", "set_solo":
             let operation = "mixer.\(command)"
-            guard params["target_ref"] != nil, let enabled = boolParamOrNil(params, "enabled") else {
+            guard let reference = params["target_ref"]?.stringValue, !reference.isEmpty,
+                  let enabled = boolParamOrNil(params, "enabled") else {
                 return toolInvalidParamsResult("\(command) requires an issued Mixer strip target_ref and an enabled Boolean")
             }
             let resolved: TargetRefResolver.Resolved

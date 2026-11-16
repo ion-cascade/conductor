@@ -615,5 +615,5 @@ func managedInstallerForwardsItsSourceOptionsAndExitStatus(expectedStatus: Int) 
 
     #expect(result.exitCode == Int32(expectedStatus))
     let forwarded = try JSONDecoder().decode([String].self, from: Data(result.stdout.utf8))
-    #expect(forwarded == ["install", "--source", source.path, "--prefix", prefix])
+    #expect(forwarded == ["install", "--source", source.resolvingSymlinksInPath().path, "--prefix", prefix])
 }

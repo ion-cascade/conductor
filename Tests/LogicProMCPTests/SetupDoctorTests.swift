@@ -89,27 +89,22 @@ private func issue26RepositoryRootURL() -> URL {
         .deletingLastPathComponent()
 }
 
-@Test func testReadmeDoctorSchemaMatchesProductContract() throws {
-    let readme = try String(
-        contentsOf: issue26RepositoryRootURL().appendingPathComponent("README.md"),
+@Test func testSetupDoctorSchemaMatchesProductContract() throws {
+    let setup = try String(
+        contentsOf: issue26RepositoryRootURL().appendingPathComponent("docs/SETUP.md"),
         encoding: .utf8
     )
 
-    #expect(readme.contains("schema \(SetupDoctor.schema)"))
-    #expect(readme.contains("\"schema\": \"\(SetupDoctor.schema)\""))
-    #expect(!readme.contains("logic_pro_mcp_doctor.v4"))
+    #expect(setup.contains("## Doctor (`\(SetupDoctor.schema)`)"))
+    #expect(setup.contains("LogicProMCP doctor [--json]"))
 }
 
 @Test func testDoctorDocsDescribeOnlyActionableFixPlanEntries() throws {
     let root = issue26RepositoryRootURL()
-    let readme = try String(contentsOf: root.appendingPathComponent("README.md"), encoding: .utf8)
     let setup = try String(contentsOf: root.appendingPathComponent("docs/SETUP.md"), encoding: .utf8)
 
-    #expect(readme.contains("Only non-pass checks with a concrete remediation are ordered into `fix_plan`"))
-    #expect(readme.contains("\"headline\": \"Terminal outcome [permissions.accessibility]: Accessibility permission is not granted.\""))
-    #expect(readme.contains("\"fix_plan\": [\"install.binary_inventory\"]"))
-    #expect(!readme.contains("\"fix_plan\": [\"permissions.accessibility\""))
     #expect(setup.contains("an outcome headline"))
+    #expect(setup.contains("`fix_plan` contains only non-pass checks that have a concrete remediation."))
     #expect(setup.contains("Terminal and unresolved checks without a concrete remediation are excluded"))
 
     let permissionStart = try #require(setup.range(of: "<a id=\"doctor-permissionsaccessibility\"></a>"))

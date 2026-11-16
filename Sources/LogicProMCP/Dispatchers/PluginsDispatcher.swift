@@ -306,7 +306,9 @@ struct PluginsDispatcher: OperationTraceDispatching {
                 }
                 return toolInvalidParamsResult(bypassWrite ? "set_bypass_verified requires an occupied insert target_ref and Boolean bypassed and expected_current." : "\(command) requires an occupied insert target_ref; scalar reads also require a named param. No value, mode or confirmation is accepted")
             }
-            return await runVerified(operation: "plugin.\(command)", gate: verifiedGate) {
+            let writing = presetWrite || bypassWrite || sidechainWrite
+            let traceID = await startTraceIfEnabled(command: command)
+            let response = await runVerified(operation: "plugin.\(command)", gate: verifiedGate) {
                 switch await TargetRefResolver.resolveMutationIndex(
                     params, targetRegistry: targetRegistry, cache: cache, operation: operation,
                     indexKeys: ["track"],
@@ -367,10 +369,17 @@ struct PluginsDispatcher: OperationTraceDispatching {
                                       await targetRegistry.currentProjectIdentity == project else { return false }
                                 return true
                             })
-                    } else { result = await router.route(operation: "plugin.\(command)", params: readParams) }
+                    } else if writing {
+                        let arguments = readParams
+                        result = await withWriteBoundaryArmed(traceID) {
+                            await router.route(operation: "plugin.\(command)", params: arguments)
+                        }
+                    } else {
+                        result = await router.route(operation: "plugin.\(command)", params: readParams)
+                    }
                     guard !Task.isCancelled, await targetRegistry.resolve(binding.reference) != nil,
                           await targetRegistry.currentProjectIdentity == project else {
-                        if presetWrite || bypassWrite || sidechainWrite {
+                        if writing {
                             return toolTextResult(.success(HonestContract.encodeStateB(reason: .readbackUnavailable,
                                 extras: ["operation": operation, "safe_to_retry": false, "effect_unknown": true])))
                         }
@@ -384,6 +393,7 @@ struct PluginsDispatcher: OperationTraceDispatching {
                     )
                 }
             }
+            return await finalizeTrace(response, traceID: traceID)
 
         case "get_inventory":
             // Non-mutating read — not gated by the verified-op serializer. The
