@@ -15,6 +15,18 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
 
+## 1.12.1 Native Flex and take-comp qualification
+
+These checks use disposable Logic Pro 13.0 build 7801 projects and compare the saved project with a fresh native read and an independent stem render after reopening.
+
+| Workflow | Verified on the Mac mini |
+| --- | --- |
+| Flex Time | In Automatic (Polyphonic) mode, the marker for source sample 44,113 moved from 1,920 to 2,880 ticks relative to the region start. The first onset moved from 1.00 to 1.49 seconds and the two later onsets stayed within 10 ms of the control. The source WAV checksum and the other regions’ identities and bounds matched. |
+| Flex Pitch | Logic's MIDI projection identified three notes. The selected note at exported tick 1,440 (480 PPQ) moved from MIDI 57 to 60. The other notes and event timing matched. The rendered note changed from 220 Hz to approximately 261.6 Hz and the source WAV checksum matched the control. |
+| Take comp | Switched a saved 0.5–1.0 second section from the 731 Hz take to the 967 Hz take. Saved readback retained the other four segment ranges and take assignments, and the reopened stem matched those assignments. The qualification refused a changed saved snapshot, a different project identity and an ambiguous take in a synthetic negative case. |
+
+The marker and comp snapshot checks use build-specific saved data. The Flex Pitch check uses Logic's native MIDI projection. These are qualification procedures for disposable projects. General live Flex and take-comp editing through MCP remains outside the qualified command set.
+
 ## 1.12 Smart Tempo analysis readback
 
 On the qualified desktop Logic 13 host, analyze an ordinary audio region in Logic, close the Smart Tempo Editor, then select only that region in Arrange. Use a fresh region reference with `logic_project.get_region_smart_tempo`. Conductor briefly opens the bound editor, reads the tempo in BPM and the first downbeat in source samples, then verifies that the editor closed and the original selection is intact.
