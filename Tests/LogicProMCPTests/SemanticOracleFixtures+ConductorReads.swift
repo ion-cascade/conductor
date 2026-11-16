@@ -8,7 +8,7 @@ extension SemanticOracleFixtures {
         .mixerGetSendBypassVerified, .pluginsPlanParameterChanges, .pluginsGetHostParameterManifest,
         .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified, .pluginsGetGainAutomation,
         .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep, .projectScanRegions,
-        .tracksGetPanAutomation, .tracksGetVolumeAutomation, .projectGetRegionGain, .projectGetRegionFade,
+        .tracksGetPanAutomation, .tracksGetVolumeAutomation, .projectGetRegionSmartTempo, .projectGetRegionGain, .projectGetRegionFade,
     ]
 
     static let conductorReads: [OperationID: SemanticOracleFixture] = [
@@ -30,6 +30,10 @@ extension SemanticOracleFixtures {
         ),
         .projectGetPatternStep: .init(
             response: #"{"operation":"project.get_pattern_step","state":"A","success":true,"verified":true,"write_attempted":false,"address":{"project_path":"/tmp/Pattern.logicx","region_name":"Pattern","region_location":"1.1.1.1","track":"Drums","row":"Kick","step":2},"enabled":true,"velocity":64,"visible_grid":[{"row":"Kick","steps":[1,2]}]}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
+        .projectGetRegionSmartTempo: .init(
+            response: #"{"operation":"project.get_region_smart_tempo","state":"A","success":true,"verified":true,"write_attempted":false,"target_ref":"reg_fixture","region":"Pulse","tempo_bpm":120.0,"first_downbeat_source_sample":8820,"verify_source":"logic13_smart_tempo_editor","editor_close_observed":true}"#,
             readback: #"{"independent_readback":false}"#
         ),
         .projectGetRegionGain: .init(

@@ -652,6 +652,9 @@ extension OperationRegistry {
                 "expected_enabled": .enforced(.boolean, .bool(false)),
                 "enabled": .enforced(.boolean, .bool(true)),
             ], required: [["address"], ["expected_enabled"], ["enabled"]]),
+            "project.get_region_smart_tempo": .init(params: [
+                "target_ref": .enforced(.string, .string("reg_test")),
+            ], required: [["target_ref"]]),
             "project.get_region_gain": .init(params: [
                 "target_ref": .enforced(.string, .string("reg_test")),
             ], required: [["target_ref"]]),

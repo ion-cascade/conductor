@@ -482,6 +482,10 @@ Use `logic_project.edit_region` with the reference and the region's exact curren
 
 A move keeps the region length. For `mode:"trim"`, give exactly one new `start` or `end` inside the original bounds. This route is for ordinary audio and MIDI regions on the 4/4, 1/16 Arrange grid. Use a zoom and snap setting that can represent the requested movement. The region and destination must fit in a sampled viewport. Deselect other regions before editing. A native edit can select its target track and region. The receipt reports whether Conductor restored the original viewport. References expire after three minutes and a new scan replaces them. After an edit attempt or a project reopen, scan again before using a reference. If a receipt reports a write attempt with unverified readback, inspect the observed region before retrying.
 
+#### Read a region's Smart Tempo analysis
+
+Analyze one ordinary audio region in Logic and close the Smart Tempo Editor. Select just that region in Arrange, call `scan_regions`, then pass its current `target_ref` to `get_region_smart_tempo`. The command reads `tempo_bpm` and `first_downbeat_source_sample` from Logic's Smart Tempo Editor and closes the editor before returning. The downbeat is an offset in source samples. The command leaves analysis and correction to Logic.
+
 #### Set audio-region gain and fades
 
 In a saved, stopped English Logic 13 project, select exactly one ordinary audio region in foreground Arrange. Open the Region Inspector and expand **General** for gain or **Fades** for a fade. Run `scan_regions` and use the selected region's current `target_ref`. These commands edit the region settings in Logic. The project must be saved separately to persist the edit.

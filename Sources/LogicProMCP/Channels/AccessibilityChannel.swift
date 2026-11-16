@@ -2453,6 +2453,8 @@ actor AccessibilityChannel: Channel {
             return await inspectArrangeRegions(runtime: runtime.logicRuntime)
         case "region.edit_by_reference":
             return await editArrangeRegion(parameters: params, runtime: runtime.logicRuntime)
+        case "region.get_smart_tempo":
+            return await readRegionSmartTempo(reference: params["target_ref"] ?? "", runtime: runtime.logicRuntime)
         case "region.get_gain", "region.set_gain", "region.get_fade", "region.set_fade":
             let parameter: AudioRegionParameter
             if operation.hasSuffix("_fade") {

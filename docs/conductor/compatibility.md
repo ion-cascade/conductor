@@ -1,4 +1,4 @@
-# Conductor 1.11 compatibility
+# Conductor compatibility
 
 The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.11 and the checks from earlier releases.
 
@@ -14,6 +14,12 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
+
+## 1.12 Smart Tempo analysis readback
+
+On the qualified desktop Logic 13 host, analyze an ordinary audio region in Logic, close the Smart Tempo Editor, then select only that region in Arrange. Use a fresh region reference with `logic_project.get_region_smart_tempo`. Conductor briefly opens the bound editor, reads the tempo in BPM and the first downbeat in source samples, then verifies that the editor closed and the original selection is intact.
+
+The read requires the first downbeat to be exposed in the native editor. Tempo analysis, corrections and time-map changes remain manual.
 
 ## 1.11.1 Airwindows PurestGain
 

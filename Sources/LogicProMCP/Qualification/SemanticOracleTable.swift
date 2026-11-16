@@ -566,6 +566,7 @@ enum SemanticOracleTable {
         projectGetRegions,
         projectGetPatternStep,
         projectScanRegions,
+        projectGetRegionSmartTempo,
         projectGetRegionGain,
         projectGetRegionFade,
         projectExportStatus,

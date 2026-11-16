@@ -322,6 +322,7 @@ extension ChannelRouter {
         // when there is something behind them.
         "region.scan":                [.accessibility],
         "region.edit_by_reference":   [.accessibility],
+        "region.get_smart_tempo":     [.accessibility],
         "region.get_gain":            [.accessibility],
         "region.set_gain":            [.accessibility],
         "region.get_fade":            [.accessibility],

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.12.0] — 2026-11-16
+
+- Read the analyzed tempo and first downbeat of a referenced audio region through Logic's Smart Tempo Editor. ([#49](https://github.com/ion-cascade/conductor/issues/49))
+
 ## [1.11.1] — 2026-11-16
 
 - Read Airwindows PurestGain Gain and Slow Fade values when Logic's formatted slider and its bare counterpart agree. Parameter writes remain unsupported for this plug-in. ([#46](https://github.com/ion-cascade/conductor/issues/46))

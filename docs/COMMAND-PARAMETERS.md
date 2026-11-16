@@ -135,6 +135,7 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `get_pattern_step` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `get_region_fade` | `edge`: string (in, out), `target_ref`: string | `target_ref`; `edge` | closed | read_only | none | none | none | never_automatic | default_install |
 | `get_region_gain` | `target_ref`: string | `target_ref` | closed | read_only | none | none | none | never_automatic | default_install |
+| `get_region_smart_tempo` | `target_ref`: string | `target_ref` | closed | read_only | none | none | readback_required | never_automatic | default_install |
 | `get_regions` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `inspect_session` | `allow_ui_navigation`: boolean, `domains`, `project_ref`, `scope`, `snapshot_id` | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `is_running` | none | none | closed | read_only | none | none | none | never_automatic | default_install |

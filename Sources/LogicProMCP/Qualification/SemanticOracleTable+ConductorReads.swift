@@ -1,7 +1,7 @@
 extension SemanticOracleTable {
     static let conductorReceiptOnlyReadIDs: Set<OperationID> = [
         .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep,
-        .projectScanRegions, .projectGetRegionGain, .projectGetRegionFade, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
+        .projectScanRegions, .projectGetRegionSmartTempo, .projectGetRegionGain, .projectGetRegionFade, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
         .midiGetRegionNotes, .pluginsGetGainAutomation,
     ]
 
@@ -85,6 +85,19 @@ extension SemanticOracleTable {
             ]),
         ],
         reason: "Project info cannot independently identify the selected pattern cell or verify its enabled state and velocity."
+    )
+
+    static let projectGetRegionSmartTempo = receiptOnlyRead(
+        .projectGetRegionSmartTempo, operation: "project.get_region_smart_tempo",
+        constraints: [
+            .typedField(key: "target_ref", type: .string),
+            .typedField(key: "region", type: .string),
+            .typedField(key: "tempo_bpm", type: .number),
+            .integerMinimum(key: "first_downbeat_source_sample", min: 0),
+            .valueEquals(key: "verify_source", expected: .string("logic13_smart_tempo_editor")),
+            .valueEquals(key: "editor_close_observed", expected: .bool(true)),
+        ],
+        reason: "The automated harness has no separate native Smart Tempo Editor observation for this region."
     )
 
     static let projectGetRegionGain = receiptOnlyRead(
