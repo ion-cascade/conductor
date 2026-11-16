@@ -27,6 +27,7 @@ enum AXLogicProElements {
         /// read the live system: a test runtime that does not set it must not depend on whichever
         /// application the machine running the test has focused. `.production` sets it.
         let focusedApplicationPID: @Sendable () -> pid_t?
+        let activateLogicPro: @Sendable () -> Bool
         /// #1084: nil in ordinary fake runtimes; production explicitly supplies its live probe.
         let observeFrontmost: (@Sendable () -> ProcessUtils.KeyboardOwnershipObservation)?
         /// Capture metadata for the exact observed PID; fake runtimes remain unknown by default.
@@ -42,6 +43,7 @@ enum AXLogicProElements {
             onScreenWindowList: @escaping @Sendable () -> [[String: Any]]? = Runtime.liveOnScreenWindowList,
             postPopupMenuEscape: @escaping @Sendable () -> Void = Runtime.livePostPopupMenuEscape,
             focusedApplicationPID: @escaping @Sendable () -> pid_t? = { nil },
+            activateLogicPro: @escaping @Sendable () -> Bool = { false },
             observeFrontmost: (@Sendable () -> ProcessUtils.KeyboardOwnershipObservation)? = nil,
             observeHost: @escaping @Sendable (pid_t) -> ProcessUtils.LogicHostObservation? = { _ in nil }
         ) {
@@ -54,6 +56,7 @@ enum AXLogicProElements {
             self.onScreenWindowList = onScreenWindowList
             self.postPopupMenuEscape = postPopupMenuEscape
             self.focusedApplicationPID = focusedApplicationPID
+            self.activateLogicPro = activateLogicPro
             self.observeFrontmost = observeFrontmost
             self.observeHost = observeHost
         }
@@ -80,6 +83,7 @@ enum AXLogicProElements {
                 await AppleScriptChannel.executeAppleScript(script, timeout: timeout)
             },
             focusedApplicationPID: { ProcessUtils.focusedApplicationPID() },
+            activateLogicPro: { ProcessUtils.activateLogicPro() },
             observeFrontmost: { ProcessUtils.keyboardOwnershipObservation() },
             observeHost: { ProcessUtils.logicHostObservation(pid: $0) }
         )

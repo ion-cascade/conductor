@@ -261,7 +261,7 @@ extension AccessibilityChannel {
     /// This AX probe is preserved for `{mode:"ax"}` (legacy clients and diff
     /// mode) and still carries its 2-level limitation.
     static func buildLiveTreeProbe(runtime: AXLogicProElements.Runtime) -> TreeProbe {
-        let logicPID = LogicProTarget.runningApplication()?.processIdentifier
+        let logicPID = runtime.logicProPID()
         let detector = MutationDetector(runtime: runtime)
         return TreeProbe(
             childrenAt: { path in
@@ -279,18 +279,8 @@ extension AccessibilityChannel {
                 return []
             },
             focusOK: {
-                guard let pid = logicPID else { return true }
-                let sysWide = AXUIElementCreateSystemWide()
-                var focusedApp: AnyObject?
-                let r = AXUIElementCopyAttributeValue(
-                    sysWide, kAXFocusedApplicationAttribute as CFString, &focusedApp
-                )
-                guard r == .success, let app = focusedApp,
-                      CFGetTypeID(app) == AXUIElementGetTypeID() else { return true }
-                let focusedElement = app as! AXUIElement
-                var appPID: pid_t = 0
-                AXUIElementGetPid(focusedElement, &appPID)
-                return appPID == pid
+                guard let logicPID, let focusedPID = runtime.focusedApplicationPID() else { return true }
+                return focusedPID == logicPID
             },
             mutationSinceLastCheck: { detector.check() },
             sleep: { ms in
@@ -651,7 +641,7 @@ extension AccessibilityChannel {
     static func openLibraryPanelViaKeyCommand(
         runtime: AXLogicProElements.Runtime = .production
     ) async {
-        _ = ProcessUtils.activateLogicPro()
+        _ = runtime.activateLogicPro()
         try? await Task.sleep(nanoseconds: 150_000_000)
         _ = await clickLibraryMenuItem(runtime: runtime)
     }

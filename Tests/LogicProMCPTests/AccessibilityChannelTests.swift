@@ -5065,6 +5065,18 @@ private func makeLibraryPanelLogicRuntime(
     )
 }
 
+@Test("the Library scan follows the focus of its own runtime", arguments: [nil, 4242, 4243] as [Int32?])
+func testLibraryScanFocusUsesItsRuntime(focusedPID: Int32?) async {
+    let builder = FakeAXRuntimeBuilder()
+    let runtime = AXLogicProElements.Runtime(
+        logicProPID: { 4242 }, ax: builder.makeAXRuntime(),
+        focusedApplicationPID: { focusedPID }
+    )
+    let probe = AccessibilityChannel.buildLiveTreeProbe(runtime: runtime)
+    let focused = await probe.focusOK()
+    #expect(focused == (focusedPID == nil || focusedPID == 4242))
+}
+
 @Test("library.scan_all automatically opens a closed Library panel")
 func testLibraryScanAutomaticallyOpensClosedPanel() async {
     let inventoryURL = URL(
