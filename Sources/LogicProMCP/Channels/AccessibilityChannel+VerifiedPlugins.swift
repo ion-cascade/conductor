@@ -3310,7 +3310,7 @@ extension AccessibilityChannel {
         let controlsViewCheckbox = access.isRead ? readsControlsCheckbox
             : writeMethod == "ax_controls_view_checkbox_press"
         let gainControlWrite = !access.isRead && writeMethod == Logic13GainControlWrite.method
-        let usesControlsView = controlsViewCheckbox || gainControlWrite
+        let usesControlsView = controlsViewCheckbox
             || (access.isRead && controlsReadKind != nil)
             || access.isManifestRead
         // An unqualified manifest read may bind the exact display identity
@@ -3327,7 +3327,7 @@ extension AccessibilityChannel {
             : nil
         let controlsViewEditorAnchor: String?
         let axDescription: String
-        if usesControlsView {
+        if usesControlsView || gainControlWrite {
             // An editor-view description can corroborate the header-bound
             // window when it happens to be present. It is not an acquisition
             // precondition: an editor may already be in Controls view, where
@@ -3404,7 +3404,7 @@ extension AccessibilityChannel {
         // Step 6 — track verified select. Drive the AX-native selection ladder,
         // then confirm the target header reads back as selected (a write that the
         // AX API accepted vacuously must not be trusted — v3.0.9 lesson).
-        if !access.isRead {
+        if !access.isRead && !gainControlWrite {
         guard AXLogicProElements.selectTrackViaAX(at: track, runtime: runtime) else {
             return .error(trackSelectionFailedStateC(operation, identity, "AX track selection write failed for track \(track)"))
         }
@@ -3428,7 +3428,7 @@ extension AccessibilityChannel {
             ))
         }
         } else if !AXPluginTrackBinding.isStable(target, runtime: runtime) {
-            return .error(incompleteInventoryStateC(operation, identity, "the acquired Arrange/Mixer target changed before the read"))
+            return .error(incompleteInventoryStateC(operation, identity, "the acquired Arrange/Mixer binding changed"))
         }
 
         // Step 7 — inventory complete + slot occupied at `insert` (reuse the
@@ -3514,6 +3514,60 @@ extension AccessibilityChannel {
         }
         let duplicatedPluginInstance = conflictingInsertIndices.count > 1
         let trackName = target.trackName
+        if gainControlWrite, case let .write(requested, _, _, _) = access {
+            guard conflictingInsertIndices == [insert],
+                  case .success(let editors) = AXLogicProElements.matchingPluginEditorWindows(
+                    forTrackName: trackName, matchingPluginID: pluginID, runtime: runtime),
+                  editors.count == 1, let window = editors.first else {
+                return .error(windowIdentityUnresolvedStateC(operation, identity,
+                    "Open Controls view for the only Gain insert on the selected track."))
+            }
+            func gainContextIsCurrent() -> Bool {
+                guard pluginRollbackOperationIsCurrent(), runtime.onScreenWindowList() != nil,
+                      AXValueExtractors.extractSelectedState(target.header, runtime: runtime.ax) == true,
+                      let pid = runtime.logicProPID(),
+                      runtime.focusedApplicationPID() == pid, let app = AXLogicProElements.appRoot(runtime: runtime),
+                      let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: runtime.ax),
+                      CFEqual(focus, window),
+                      let expectedPath = referenceParams["project_expected_path"],
+                      case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(
+                        target.window, runtime: runtime),
+                      let url = URL(string: document), url.isFileURL,
+                      AppleScriptChannel.projectPathsMatch(expectedPath, url.path),
+                      let transport = try? AXLogicProElements.observedTransportActivity(
+                        in: target.window, runtime: runtime, checking: {}),
+                      !transport.isPlaying, !transport.isRecording,
+                      targetPluginIdentityIsStable(target: target, insert: insert, pluginID: pluginID,
+                        originalSlot: slots[insert].element, runtime: runtime) else { return false }
+                return controlsViewAcquiredPluginWindowFailureStateC(acquiredWindow: window, operation: operation,
+                    identity: identity, pluginID: pluginID, trackName: trackName, runtime: runtime) == nil
+            }
+            var extras: [String: Any] = ["operation": operation, "target_identity": identity, "param": paramAlias,
+                "requested_db": requested, "verify_source": "ax_gain_controls_view", "write_attempted": false]
+            switch await Logic13GainControlWrite.apply(
+                requested: requested, in: window, runtime: runtime.ax, contextIsCurrent: gainContextIsCurrent
+            ) {
+            case .unavailable:
+                extras["hint"] = "Keep the exact Gain editor frontmost in Controls view, with the Mixer visible and transport stopped."
+                return .error(HonestContract.encodeV2StateC(error: .readbackUnavailable, extras: extras))
+            case let .verified(before, observed, steps):
+                extras["before_raw"] = before
+                extras["observed_raw"] = observed
+                extras["observed_db"] = Double(observed - 960) / 10
+                extras["observed_display"] = Logic13GainControlWrite.display(raw: observed)
+                extras["raw_unit"] = "raw_ax_value"
+                extras["verified_steps"] = steps
+                extras["write_attempted"] = steps > 0
+                return .success(HonestContract.encodeV2StateA(extras: extras))
+            case let .uncertain(lastVerified):
+                extras["last_verified_raw"] = lastVerified
+                extras["effect_unknown"] = true
+                extras["safe_to_retry"] = false
+                extras["write_attempted"] = true
+                return .success(HonestContract.encodeV2StateB(reason: .readbackMismatch, extras: extras))
+            }
+        }
+
         var constructedWindow: AXUIElementSendable?
         // Set immediately after the target-slot press observes windows. It is
         // deliberately outside the success-only branch: a hidden sibling can
@@ -4165,7 +4219,7 @@ extension AccessibilityChannel {
             viewSession = session
         }
         restorePluginViewOnExit = { viewSession.restore(allowingChanges: viewChangesAllowed) }
-        let resultAfterViewPreparation: ChannelResult = await {
+        let resultAfterViewPreparation: ChannelResult = {
         if case let .readManifest(buildFingerprint, contextIsCurrent, _) = access {
             func currentInstance() -> Bool {
                 contextIsCurrent() && targetPluginIdentityIsStable(
@@ -4447,52 +4501,6 @@ extension AccessibilityChannel {
                     return pluginRollbackOperationIsCurrent()
                 }
             )
-        }
-
-        if gainControlWrite, case let .write(requested, _, _, _) = access {
-            func gainContextIsCurrent() -> Bool {
-                guard pluginRollbackOperationIsCurrent(), let pid = runtime.logicProPID(),
-                      runtime.focusedApplicationPID() == pid, let app = AXLogicProElements.appRoot(runtime: runtime),
-                      let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: runtime.ax),
-                      CFEqual(focus, window),
-                      let expectedPath = referenceParams["project_expected_path"],
-                      case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(
-                        target.window, runtime: runtime),
-                      let url = URL(string: document), url.isFileURL,
-                      AppleScriptChannel.projectPathsMatch(expectedPath, url.path),
-                      let transport = try? AXLogicProElements.observedTransportActivity(
-                        in: target.window, runtime: runtime, checking: {}),
-                      !transport.isPlaying, !transport.isRecording,
-                      targetPluginIdentityIsStable(target: target, insert: insert, pluginID: pluginID,
-                        originalSlot: slots[insert].element, runtime: runtime) else { return false }
-                return controlsViewAcquiredPluginWindowFailureStateC(acquiredWindow: window, operation: operation,
-                    identity: identity, pluginID: pluginID, trackName: trackName, runtime: runtime) == nil
-            }
-            var extras: [String: Any] = ["operation": operation, "target_identity": identity, "param": paramAlias,
-                "requested_db": requested, "verify_source": "ax_gain_controls_view", "write_attempted": false]
-            switch await Logic13GainControlWrite.apply(
-                requested: requested, in: window, runtime: runtime.ax, contextIsCurrent: gainContextIsCurrent
-            ) {
-            case .unavailable:
-                return .error(stateCWithPluginViewRestoration(error: .readbackUnavailable, extras: extras))
-            case let .verified(before, observed, steps):
-                extras["before_raw"] = before
-                extras["observed_raw"] = observed
-                extras["observed_db"] = Double(observed - 960) / 10
-                extras["observed_display"] = Logic13GainControlWrite.display(raw: observed)
-                extras["raw_unit"] = "raw_ax_value"
-                extras["verified_steps"] = steps
-                extras["write_attempted"] = steps > 0
-                return .success(verifiedParameterEnvelope(extras: extras))
-            case let .uncertain(lastVerified):
-                extras["last_verified_raw"] = lastVerified
-                extras["effect_unknown"] = true
-                extras["safe_to_retry"] = false
-                extras["write_attempted"] = true
-                appendPluginViewRestoration(to: &extras)
-                appendOwnedEditorCleanup(to: &extras)
-                return .success(HonestContract.encodeV2StateB(reason: .readbackMismatch, extras: extras))
-            }
         }
 
         // Step 9 — slider match by AXDescription (the only stable identifier).
