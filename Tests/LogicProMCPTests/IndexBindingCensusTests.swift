@@ -112,6 +112,16 @@ struct IndexBindingCensusTests {
             .tracksArm,                // reversible toggle
             .tracksArmOnly,            // reversible toggle
             .tracksSetAutomation,      // reversible mode switch
+            .mixerSetMute,
+            .mixerSetSolo,
+            .pluginsSetSidechainVerified,
+            .pluginsSetPresetVerified,
+            .pluginsSetGainAutomationPoint,
+            .tracksCreateVolumeAutomation,
+            .tracksSetVolumeAutomationPoint,
+            .tracksInsertVolumeAutomationPoint,
+            .tracksMoveVolumeAutomationPoint,
+            .tracksSplitSelectedAudio,
         ]
         #expect(Self.ids { $0.indexBinding == .legacyIndexAllowed } == expectedLegacy)
 

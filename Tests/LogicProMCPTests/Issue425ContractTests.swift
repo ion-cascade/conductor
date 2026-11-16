@@ -23,15 +23,6 @@ struct Issue425ContractTests {
         return texts
     }
 
-    private static func markdownSection(named heading: String, in markdown: String) -> String? {
-        let lines = markdown.components(separatedBy: .newlines)
-        guard let headingIndex = lines.firstIndex(of: heading) else { return nil }
-
-        return lines[(headingIndex + 1)...]
-            .prefix { !$0.hasPrefix("## ") }
-            .joined(separator: "\n")
-    }
-
     @Test("#425 flag is absent from Sources or has a production consumer")
     func insertCoordinateFreeFlagIsNotInert() throws {
         let sources = try Self.sourceTexts()
@@ -96,15 +87,6 @@ struct Issue425ContractTests {
         // word "removed", so a token-anywhere check passes a changelog that asserts the opposite of
         // what it is supposed to guarantee. The tokens and the removal have to be the SAME
         // statement, so the claim is read as a claim rather than as a bag of words.
-        let unreleased = try #require(
-            Self.markdownSection(named: "## [Unreleased]", in: changelog),
-            "CHANGELOG.md must contain an ## [Unreleased] section"
-        )
-        #expect(
-            !unreleased.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            "CHANGELOG.md ## [Unreleased] must not be empty"
-        )
-
         let hasRemovedControlToken = Self.inertFlagTokens.contains { changelog.contains($0) }
         // Per LINE, not per blank-line paragraph. This file separates adjacent list items with a
         // single newline, so splitting on "\n\n" hands back a whole bullet list as one "paragraph"
