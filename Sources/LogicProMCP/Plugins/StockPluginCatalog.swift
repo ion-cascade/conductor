@@ -1264,14 +1264,16 @@ enum StockPluginCatalog {
             displayName: "Gain",
             unit: "dB",
             valueRange: StockPluginValueRange(min: -96, max: 24, defaultValue: 0),
-            writeMethod: nil,
+            writeMethod: Logic13GainControlWrite.method,
             readbackMethod: "ax_controls_view_slider_display",
             readbackUnit: "raw_ax_value",
             controlsViewRowLabel: "Gain:",
             controlsViewControlRole: "AXSlider",
             availabilityState: .observed,
-            provenance: gainReadObservation([
-                "Gain: AXSlider raw=959; AXValueDescription=-0.1 dB",
+            provenance: .observed(method: "logic13_native_controls_gain_walk",
+                observedAt: "2026-11-16T06:03:31.827Z", logicVersion: "13.0 (7801)", locale: "en-US", evidence: [
+                "Gain: AXSlider raw 960 at 0.0 dB and raw 900 at -6.0 dB after save and reopen",
+                "Observed reciprocal 1.0 dB and 0.1 dB steps with Phase Invert preserved",
                 "one display-bearing slider, one raw-only slider and its value indicator",
             ])
         ),
