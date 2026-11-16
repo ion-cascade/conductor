@@ -29,16 +29,8 @@ enum Logic13GainControlWrite {
         runtime: AXHelpers.Runtime, contextIsCurrent: () -> Bool
     ) async -> Outcome {
         guard let destination = rawValue(for: requested), contextIsCurrent() else { return .unavailable }
-        func phaseInverted() -> Bool? {
-            guard case let .read(value, _) = ControlsViewParameterReader.observe(
-                kind: .radioPair(off: "Norm", on: "Inv"), label: "Phase Invert:", in: window, runtime: runtime
-            ) else { return nil }
-            return value as? Bool
-        }
-        guard let phase = phaseInverted() else { return .unavailable }
         func reading() -> (control: AXUIElement, raw: Int)? {
-            guard phaseInverted() == phase,
-                case let .read(value, shown) = ControlsViewParameterReader.observe(
+            guard case let .read(value, shown) = ControlsViewParameterReader.observe(
                 kind: .numericDisplay, label: "Gain:", in: window, runtime: runtime),
                 let number = value as? Double, let raw = Int(exactly: number), (900...960).contains(raw),
                 shown == display(raw: raw),

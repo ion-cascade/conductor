@@ -3524,9 +3524,6 @@ extension AccessibilityChannel {
         var readContextEnded = false
         var acquisitionActionAttempted = false
         func acquisitionAllowed() -> Bool {
-            if gainControlWrite {
-                return gainContextIsCurrent()
-            }
             guard let contextIsCurrent = access.readContextIsCurrent else { return true }
             guard !readContextEnded, contextIsCurrent(),
                   targetPluginIdentityIsStable(target: target, insert: insert, pluginID: pluginID,
@@ -4098,24 +4095,6 @@ extension AccessibilityChannel {
                 return nil
             }
         }
-        func gainContextIsCurrent() -> Bool {
-            guard pluginRollbackOperationIsCurrent(), let pid = runtime.logicProPID(),
-                  runtime.focusedApplicationPID() == pid, let app = AXLogicProElements.appRoot(runtime: runtime),
-                  let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: runtime.ax),
-                  CFEqual(focus, window),
-                  let expectedPath = referenceParams["project_expected_path"],
-                  case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(
-                    target.window, runtime: runtime),
-                  let url = URL(string: document), url.isFileURL,
-                  AppleScriptChannel.projectPathsMatch(expectedPath, url.path),
-                  let transport = try? AXLogicProElements.observedTransportActivity(
-                    in: target.window, runtime: runtime, checking: {}),
-                  !transport.isPlaying, !transport.isRecording,
-                  targetPluginIdentityIsStable(target: target, insert: insert, pluginID: pluginID,
-                    originalSlot: slots[insert].element, runtime: runtime) else { return false }
-            return controlsViewAcquiredPluginWindowFailureStateC(acquiredWindow: window, operation: operation,
-                identity: identity, pluginID: pluginID, trackName: trackName, runtime: runtime) == nil
-        }
         let viewSession: ControlsViewBooleanParameterWriter.ViewSession
         func viewChangesAllowed() -> Bool {
             guard let contextIsCurrent = access.readContextIsCurrent else { return true }
@@ -4158,7 +4137,6 @@ extension AccessibilityChannel {
             windowRefresher: refreshPluginWindowForViewSelection,
             allowingChanges: viewChangesAllowed,
             headerBoundUndescribedView: usesControlsView ? readViewIsBound : nil,
-            waitForBoundViewToSettle: gainControlWrite,
             runtime: runtime.ax
         ) {
         case let .refused(failure, restoration):
@@ -4472,6 +4450,24 @@ extension AccessibilityChannel {
         }
 
         if gainControlWrite, case let .write(requested, _, _, _) = access {
+            func gainContextIsCurrent() -> Bool {
+                guard pluginRollbackOperationIsCurrent(), let pid = runtime.logicProPID(),
+                      runtime.focusedApplicationPID() == pid, let app = AXLogicProElements.appRoot(runtime: runtime),
+                      let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: runtime.ax),
+                      CFEqual(focus, window),
+                      let expectedPath = referenceParams["project_expected_path"],
+                      case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(
+                        target.window, runtime: runtime),
+                      let url = URL(string: document), url.isFileURL,
+                      AppleScriptChannel.projectPathsMatch(expectedPath, url.path),
+                      let transport = try? AXLogicProElements.observedTransportActivity(
+                        in: target.window, runtime: runtime, checking: {}),
+                      !transport.isPlaying, !transport.isRecording,
+                      targetPluginIdentityIsStable(target: target, insert: insert, pluginID: pluginID,
+                        originalSlot: slots[insert].element, runtime: runtime) else { return false }
+                return controlsViewAcquiredPluginWindowFailureStateC(acquiredWindow: window, operation: operation,
+                    identity: identity, pluginID: pluginID, trackName: trackName, runtime: runtime) == nil
+            }
             var extras: [String: Any] = ["operation": operation, "target_identity": identity, "param": paramAlias,
                 "requested_db": requested, "verify_source": "ax_gain_controls_view", "write_attempted": false]
             switch await Logic13GainControlWrite.apply(
