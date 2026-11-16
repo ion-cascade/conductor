@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.12.2] — 2026-11-16
+
+- Observe the MIDI Save panel’s attached Go to Folder sheet directly and verify the selected destination after navigation.
+- Recover a stalled MIDI note read by closing the operation’s own sheet and Save panel when both still belong to the original project.
+
 ## [1.12.1] — 2026-11-16
 
 - Keep the Tracks and Plug-ins command lists in MCP discovery aligned with the operation registry.

@@ -115,8 +115,20 @@ private struct MIDIExportPanelFixture {
         keyboard = .init(post: { key, _ in
             let extras = fault == "unreadable_identifier" ? [b.element(18)] : []
             if key == 5 { b.setChildren(panel, [name, save, cancel, browser, go] + extras) }
+            if key == 53 {
+                b.setAttribute(app, "escapes", (b.attributeValue(app, "escapes") as? Int ?? 0) + 1)
+                b.setChildren(panel, [name, save, cancel, browser])
+            }
             if key == 36 {
                 b.setAttribute(app, "returns", (b.attributeValue(app, "returns") as? Int ?? 0) + 1)
+                if fault == "stalled_go" { return true }
+                if fault == "foreign_sheet" {
+                    let foreign = b.element(26)
+                    b.setRole(foreign, "AXSheet")
+                    b.setAttribute(foreign, kAXIdentifierAttribute as String, "GoToWindow")
+                    b.setChildren(panel, [name, save, cancel, browser, foreign])
+                    return true
+                }
                 b.setChildren(panel, [name, save, cancel, browser] + extras)
                 if fault == "retiring_go" || fault == "persistent_retiring_go" { b.setChildren(panel, [name, save, cancel, browser, go]) }
                 if fault == "replaced_panel" { b.setAttribute(app, kAXWindowsAttribute as String, [window, b.element(20)]) }
@@ -154,7 +166,7 @@ private struct MIDIExportPanelFixture {
     let driver = f.driver()
     try await driver.exportAll(to: temporary.fileURL)
     #expect(f.savePresses == 1 && f.cancelPresses == 0)
-    #expect(f.builder.attributeValue(f.builder.element(17), kAXValueAttribute as String) as? String == temporary.directoryURL.path)
+    #expect(f.builder.attributeValue(f.builder.element(17), kAXValueAttribute as String) as? String == temporary.directoryURL.path + "/")
     #expect(f.builder.attributeValue(f.builder.element(9), kAXValueAttribute as String) as? String == temporary.fileURL.lastPathComponent)
     do { try await driver.exportAll(to: temporary.fileURL); Issue.record("Repeated export was admitted") } catch { }
     #expect(f.savePresses == 1)
@@ -198,4 +210,29 @@ func midiExportPanelRefusesWrongOwnershipAndDestination(fault: String) async thr
     f.builder.setAttribute(ancestorField, kAXURLAttribute as String, URL(fileURLWithPath: "/private", isDirectory: true) as NSURL)
     try await f.driver().exportAll(to: temporary.fileURL)
     #expect(f.savePresses == 1)
+}
+
+@MainActor @Test(arguments: ["stalled_go", "foreign_sheet"])
+func midiExportPanelRecoversOnlyTheSheetItOpened(fault: String) async throws {
+    let temporary = try ExportTemporaryFiles.temporaryExportFile()
+    defer { ExportTemporaryFiles.cleanupTemporaryExportFile(temporary) }
+    let fixture = MIDIExportPanelFixture(destination: temporary.fileURL, fault: fault)
+    do {
+        try await fixture.driver().exportAll(to: temporary.fileURL)
+        Issue.record("The unresolved navigation was accepted")
+    } catch {
+        if fault == "stalled_go" {
+            #expect(error as? MIDITrackExportPanel.Failure
+                == .recovered("directory_navigation:panel_transition_not_observed:directory_navigation"))
+            #expect(fixture.cancelPresses == 1)
+            #expect(fixture.builder.attributeValue(fixture.app, "escapes") as? Int == 1)
+        } else {
+            #expect(error as? MIDITrackExportPanel.Failure == .unavailable("directory_navigation:unexpected_sheet"))
+            #expect(fixture.cancelPresses == 0)
+            #expect(fixture.builder.attributeValue(fixture.app, "escapes") == nil)
+        }
+    }
+    #expect(fixture.savePresses == 0)
+    #expect(fixture.builder.attributeValue(fixture.app, "returns") as? Int == 1)
+    #expect(!FileManager.default.fileExists(atPath: temporary.fileURL.path))
 }

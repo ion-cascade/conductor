@@ -125,6 +125,10 @@ extension MIDIDispatcher {
             case MIDITrackFileExport.Failure.unreadableArtifact, is SMFReaderError: code = "unreadable_midi_artifact"
             case SMFReader.TrackExtractionError.instrumentNotFound: code = "track_midi_not_exported"
             case SMFReader.TrackExtractionError.unsupportedFileLayout: code = "unsupported_midi_export_layout"
+            case MIDITrackExportPanel.Failure.recovered:
+                code = "native_export_unverified"
+                uiEffects["export_panel"] = "closed"
+                uiEffects.removeValue(forKey: "restoration")
             case is MIDITrackExportPanel.Failure: code = "native_export_unverified"
             default: code = "midi_export_failed"
             }

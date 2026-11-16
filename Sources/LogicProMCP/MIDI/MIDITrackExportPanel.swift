@@ -48,6 +48,7 @@ final class MIDITrackExportPanel {
 
     enum Failure: Error, Equatable {
         case unavailable(String)
+        case recovered(String)
     }
 
     private struct AttributeReadError: Error {
@@ -62,6 +63,7 @@ final class MIDITrackExportPanel {
     private let permittingAction: @MainActor () -> Bool
     private let sleep: @MainActor (UInt64) async throws -> Void
     private var started = false
+    private var ownedGoToSheet: AXUIElement?
 
     init(window: AXUIElement, document: String, runtime: AXLogicProElements.Runtime = .production,
          keyboard: Keyboard = .production, permittingAction: @escaping @MainActor () -> Bool,
@@ -115,20 +117,21 @@ final class MIDITrackExportPanel {
             // Panel disappearance is not artifact evidence. The shared file
             // flow separately opens, validates and binds the resulting SMF.
         } catch {
-            // Never dismiss a pre-existing or replacement dialog, a new choice
-            // sheet, or a panel after project custody has been lost.
-            if let panel = ownedPanel, (try? currentApp()) != nil,
-               (try? assertOwned(panel, app: app)) != nil,
-               let nodes = try? descendants(panel),
-               !nodes.contains(where: { AXHelpers.getRole($0, runtime: runtime.ax) == kAXSheetRole as String }),
-               let cancel = try? required(identifier: "CancelButton", role: kAXButtonRole as String, in: panel) {
-                _ = AXHelpers.performAction(cancel, kAXPressAction as String, runtime: runtime.ax)
+            let panelClosed: Bool
+            if let panel = ownedPanel {
+                panelClosed = await recoverOwnedPanel(panel, app: app, originalWindows: originalWindows)
+            } else {
+                panelClosed = false
             }
             if let read = error as? AttributeReadError {
                 throw Failure.unavailable("\(stage):panel_attribute_unreadable:\(read.attribute):\(read.status)")
             }
             if case Failure.unavailable(let detail) = error {
-                throw Failure.unavailable("\(stage):\(detail)")
+                let reason = "\(stage):\(detail)"
+                if panelClosed && (stage == "directory_navigation" || stage == "destination_selection") {
+                    throw Failure.recovered(reason)
+                }
+                throw Failure.unavailable(reason)
             }
             throw error
         }
@@ -143,25 +146,33 @@ final class MIDITrackExportPanel {
         let app = try currentApp()
         stage = "save_panel_ready"
         try assertOwned(panel, app: app)
-        guard try descendants(panel).allSatisfy({ try string(kAXRoleAttribute as String, of: $0) != kAXSheetRole as String }) else {
+        guard try attachedSheet(on: panel) == nil else {
             throw Failure.unavailable("unexpected_sheet")
         }
         try assertKeyboardFocus(panel, app: app)
         guard keyboard.post(5, [.maskCommand, .maskShift]) else { throw Failure.unavailable("go_to_folder_key_refused") }
         stage = "go_to_folder"
-        let go = try await wait("go_to_folder") { try self.unique(identifier: "GoToWindow", role: kAXSheetRole as String, in: panel, optional: true) }
+        let go = try await wait("go_to_folder") {
+            guard let sheet = try self.attachedSheet(on: panel) else { return nil }
+            guard try self.string(kAXIdentifierAttribute as String, of: sheet) == "GoToWindow" else {
+                throw Failure.unavailable("unexpected_sheet")
+            }
+            return sheet
+        }
+        ownedGoToSheet = go
         try assertOwned(panel, app: app)
         let path = try required(identifier: "PathTextField", role: kAXTextFieldRole as String, in: go)
         let directory = destination.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
-        try setValue(directory, on: path)
-        guard let currentGo = try unique(identifier: "GoToWindow", role: kAXSheetRole as String, in: panel),
-              CFEqual(currentGo, go) else { throw Failure.unavailable("owned_go_to_folder_lost") }
+        try setValue(directory.hasSuffix("/") ? directory : directory + "/", on: path)
+        guard try attachedSheet(on: panel).map({ CFEqual($0, go) }) == true else {
+            throw Failure.unavailable("owned_go_to_folder_lost")
+        }
         try assertKeyboardFocus(panel, app: app, sheet: go)
         guard keyboard.post(36, []) else { throw Failure.unavailable("go_to_folder_return_refused") }
         stage = "directory_navigation"
-        _ = try await wait("directory_navigation", allowingRetiringElement: true) { () throws -> AXUIElement? in
+        _ = try await wait("directory_navigation", allowingRetiringElement: true) {
             try self.assertOwned(panel, app: app)
-            return try self.unique(identifier: "GoToWindow", role: kAXSheetRole as String, in: panel, optional: true) == nil ? panel : nil
+            return try self.ownedSheetIsGone(go, on: panel) ? panel : nil
         }
         try assertOwned(panel, app: app)
         stage = "destination_selection"
@@ -196,6 +207,73 @@ final class MIDITrackExportPanel {
             return current.contains(where: { CFEqual($0, panel) }) ? nil : self.window
         }
         _ = try currentApp()
+    }
+
+    /// AppKit attaches modal sheets directly to the Save window. Reading
+    /// its sheet state should never walk the file browser or sidebar.
+    private func attachedSheet(on panel: AXUIElement) throws -> AXUIElement? {
+        guard case .success(let children) = AXHelpers.childrenResult(panel, runtime: runtime.ax) else {
+            throw Failure.unavailable("save_panel_children_unreadable")
+        }
+        let sheets = try children.filter { try string(kAXRoleAttribute as String, of: $0) == kAXSheetRole as String }
+        guard sheets.count <= 1 else { throw Failure.unavailable("ambiguous_save_panel_sheets") }
+        return sheets.first
+    }
+
+    private func ownedSheetIsGone(_ sheet: AXUIElement, on panel: AXUIElement) throws -> Bool {
+        guard let current = try attachedSheet(on: panel) else { return true }
+        guard CFEqual(current, sheet),
+              try string(kAXIdentifierAttribute as String, of: current) == "GoToWindow" else {
+            throw Failure.unavailable("unexpected_sheet")
+        }
+        return false
+    }
+
+    private func recoverOwnedPanel(
+        _ panel: AXUIElement, app: AXUIElement, originalWindows: [AXUIElement]
+    ) async -> Bool {
+        func onlyOwnedWindowWasAdded() throws -> Bool {
+            let current = try windows(app)
+            return current.count == originalWindows.count + 1 &&
+                originalWindows.allSatisfy { original in current.contains { CFEqual($0, original) } } &&
+                current.contains { CFEqual($0, panel) }
+        }
+        do {
+            try assertOwned(panel, app: app)
+            guard try onlyOwnedWindowWasAdded() else { return false }
+            if let sheet = try attachedSheet(on: panel) {
+                guard let ownedGoToSheet, CFEqual(sheet, ownedGoToSheet),
+                      try string(kAXIdentifierAttribute as String, of: sheet) == "GoToWindow" else { return false }
+                try assertKeyboardFocus(panel, app: app, sheet: sheet)
+                guard try onlyOwnedWindowWasAdded(),
+                      try attachedSheet(on: panel).map({ CFEqual($0, sheet) }) == true,
+                      keyboard.post(53, []) else { return false }
+                _ = try await wait("cancel_go_to_folder", allowingRetiringElement: true) {
+                    try self.assertOwned(panel, app: app)
+                    guard try onlyOwnedWindowWasAdded() else { throw Failure.unavailable("unexpected_new_window") }
+                    return try self.ownedSheetIsGone(sheet, on: panel) ? panel : nil
+                }
+            }
+            let cancel = try required(identifier: "CancelButton", role: kAXButtonRole as String, in: panel)
+            try act(cancel, action: kAXPressAction as String, panel: panel, app: app) {
+                guard try onlyOwnedWindowWasAdded(), try self.attachedSheet(on: panel) == nil else {
+                    throw Failure.unavailable("save_panel_cleanup_scope_changed")
+                }
+                try self.assertKeyboardFocus(panel, app: app)
+            }
+            _ = try await wait("cancel_save_panel") {
+                let current = try self.windows(app)
+                if current.contains(where: { CFEqual($0, panel) }) { return nil }
+                guard current.count == originalWindows.count,
+                      originalWindows.allSatisfy({ original in current.contains { CFEqual($0, original) } }) else {
+                    throw Failure.unavailable("save_panel_cleanup_scope_changed")
+                }
+                return self.window
+            }
+            return AXLogicProElements.dialogPresenceReason(runtime: runtime) == .noBlockingWindow
+        } catch {
+            return false
+        }
     }
 
     private func currentApp() throws -> AXUIElement {
