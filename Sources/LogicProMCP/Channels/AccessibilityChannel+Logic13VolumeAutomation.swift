@@ -156,14 +156,8 @@ extension AccessibilityChannel {
                       AXValueExtractors.extractSelectedState(header, runtime: ax) == (offset == index) else { return nil }
                 if candidate == name { matches += 1 }
             }
-            guard matches == 1, automationLaneIsReady(lane, header: binding.header, runtime: ax) else { return nil }
-            if insertMidpoint {
-                let scope = AXHelpers.getChildren(binding.header, runtime: ax).filter {
-                    AXHelpers.getRole($0, runtime: ax) == kAXButtonRole as String
-                        && AXHelpers.getDescription($0, runtime: ax) == "Track"
-                }
-                guard scope.count == 1 else { return nil }
-            }
+            guard matches == 1, automationLaneIsReady(lane, header: binding.header,
+                runtime: ax, requireTrackMode: insertMidpoint) else { return nil }
             if insertMidpoint || lane == .pan {
                 guard let controlBar = AXLogicProElements.logic13ControlBarContainer(in: binding.window, runtime: ax),
                       TransportDispatcher.completeObservedMusicalPosition(
@@ -292,7 +286,7 @@ extension AccessibilityChannel {
     }
 
     static func automationLaneIsReady(
-        _ lane: Logic13AutomationLane, header: AXUIElement, runtime: AXHelpers.Runtime
+        _ lane: Logic13AutomationLane, header: AXUIElement, runtime: AXHelpers.Runtime, requireTrackMode: Bool = false
     ) -> Bool {
         guard case .success(let controls) = AXHelpers.childrenResult(header, runtime: runtime) else { return false }
         func value<T>(_ label: String, role: String) -> T? {
@@ -310,14 +304,14 @@ extension AccessibilityChannel {
             AXHelpers.getRole($0, runtime: runtime) == kAXCheckBoxRole
                 && AXHelpers.getDescription($0, runtime: runtime) == "Enable Automation"
         }
-        if lane == .pan || lane == .gain {
-            // The native header has a Track/Region button. An empty absolute Pan
-            // lane can lack a separate Enable Automation checkbox.
+        if lane == .pan || lane == .gain || requireTrackMode {
+            // Logic shows the Track/Region button when the pointer is away
+            // from the parameter popup. Enable Automation can be absent.
             guard controls.filter({
                 AXHelpers.getRole($0, runtime: runtime) == kAXButtonRole
                     && AXHelpers.getDescription($0, runtime: runtime) == "Track"
             }).count == 1 else { return false }
-            if lane == .pan && enableControls.isEmpty { return true }
+            if enableControls.isEmpty { return true }
         }
         guard enableControls.count == 1 else { return false }
         return (AXHelpers.getAttribute(enableControls[0], kAXValueAttribute, runtime: runtime) as Int?) == 1

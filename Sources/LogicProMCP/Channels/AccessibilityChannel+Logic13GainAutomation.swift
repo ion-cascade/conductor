@@ -21,16 +21,20 @@ extension AccessibilityChannel {
               let track = params["track"].flatMap(Int.init),
               let expectedPath = params["project_expected_path"],
               let pid = logic.logicProPID(), logic.observeHost(pid)?.logicVersion?.hasPrefix("13.") == true,
-              let app = AXLogicProElements.appRoot(runtime: logic),
-              case .found(let arrange) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: logic),
-              let mixer = AXLogicProElements.mixerAreaLookup(in: arrange, runtime: logic).mixer,
-              let binding = AXPluginTrackBinding.resolve(track: track, mixer: mixer, runtime: logic),
-              CFEqual(binding.window, arrange), binding.trackName == params["expected_track_name"],
+              let app = AXLogicProElements.appRoot(runtime: logic)
+        else { return refuse("gain_reference_scope") }
+        guard case .found(let arrange) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: logic),
               case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(arrange, runtime: logic),
               let url = URL(string: document), url.isFileURL, AppleScriptChannel.projectPathsMatch(expectedPath, url.path),
-              let title = AXHelpers.getTitle(arrange, runtime: ax), title.hasSuffix(" - Tracks"),
-              let editor: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: ax),
-              !CFEqual(editor, arrange) else { return refuse("gain_automation_scope") }
+              let title = AXHelpers.getTitle(arrange, runtime: ax), title.hasSuffix(" - Tracks")
+        else { return refuse("gain_arrange_document") }
+        guard let mixer = try? AXLogicProElements.shallowOwnedMixerPopulationAreaBinding(in: arrange, runtime: logic)
+        else { return refuse("gain_embedded_mixer") }
+        guard let binding = AXPluginTrackBinding.resolve(track: track, mixer: mixer.mixer, runtime: logic),
+              CFEqual(binding.window, arrange), binding.trackName == params["expected_track_name"]
+        else { return refuse("gain_track_strip_identity") }
+        guard let editor: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: ax),
+              !CFEqual(editor, arrange) else { return refuse("gain_editor_focus") }
         let list = Logic13AutomationEventList(app: app, editor: editor, arrange: arrange,
             title: String(title.dropLast(" - Tracks".count)), trackName: binding.trackName,
             runtime: ax, includesStockGain: true)
