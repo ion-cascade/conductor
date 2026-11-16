@@ -166,6 +166,12 @@ On Logic Pro 13, the absolute track Pan commands take a current `trk_…` refere
 - `get_pan_automation` takes the reference while the track’s Automation Event List is open. Each point has `position`, its native integer `value` (0–127, centre 64), and Logic’s `displayed_value`.
 - `set_pan_automation_point` takes one of those positions, `expected_current` and the desired `value` in 10-unit steps. Include `linked_position` if Logic selected two matching points together. Keep transport stopped. Read fresh references after reopening.
 
+#### Move a track Volume point
+
+In desktop Logic Pro 13, stop playback and open the referenced track’s Automation Event List. Select just the existing Volume point you want to move. Use the fresh track `target_ref` and pass `position`, `expected_current`, `new_position`, `previous_position`, `previous_value`, `next_position`, and `next_value` to `move_volume_automation_point`.
+
+The initial adapter supports an interior point between two adjacent Volume events and a destination within the same bar, beat and division. Musical positions use `bar.beat.division.tick` with ticks 1–240. Conductor checks the point and its peers after each native step. Refresh the lane after an uncertain result or after reopening.
+
 Common commands: `select`, `create_audio`, `create_instrument`, `create_drummer`, `create_external_midi`, `delete`, `duplicate`, `rename`, `mute`, `solo`, `arm`, `arm_only`, `record_sequence`, `set_automation`, `set_instrument`, `list_library`, `scan_library`, `resolve_path`, `scan_plugin_presets`.
 
 **`delete`, `duplicate`, and `set_instrument` no longer accept a bare index.** They are `corroborated` (see [Index binding](#index-binding)): pass `expected_name` (the track name you expect at that index) or `target_ref`. Without one, they fail closed with `index_binding_corroboration_required` and write nothing.

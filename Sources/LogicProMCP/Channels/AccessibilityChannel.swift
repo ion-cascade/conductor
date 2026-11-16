@@ -2111,11 +2111,12 @@ actor AccessibilityChannel: Channel {
             return runtime.tracks()
         case "track.get_selected":
             return runtime.selectedTrack()
-        case "track.get_volume_automation", "track.set_volume_automation_point",
+        case "track.get_volume_automation", "track.set_volume_automation_point", "track.move_volume_automation_point",
              "track.get_pan_automation", "track.set_pan_automation_point":
             return await Self.defaultTrackAutomation(params: params,
                 lane: operation.contains("_pan_") ? .pan : .volume,
-                edit: operation.hasPrefix("track.set_"), runtime: runtime.logicRuntime)
+                edit: operation.hasPrefix("track.set_"),
+                move: operation == "track.move_volume_automation_point", runtime: runtime.logicRuntime)
 
         // MARK: - Track mutations
         case "track.split_selected_audio":

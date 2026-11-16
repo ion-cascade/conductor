@@ -72,6 +72,7 @@ extension ChannelRouter {
         "track.create_pan_automation_point": [.accessibility],
         "track.get_volume_automation": [.accessibility],
         "track.set_volume_automation_point": [.accessibility],
+        "track.move_volume_automation_point": [.accessibility],
         "track.create_volume_automation_at_region_borders": [.accessibility],
 
         // Track mutation — MCU for mute/solo/arm/select, KeyCmd for creation

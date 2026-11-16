@@ -14,10 +14,11 @@ enum Logic13AutomationLane: String {
 extension AccessibilityChannel {
     static func defaultTrackAutomation(
         params: [String: String],
-        lane: Logic13AutomationLane, edit: Bool,
+        lane: Logic13AutomationLane, edit: Bool, move: Bool = false,
         runtime logic: AXLogicProElements.Runtime
     ) async -> ChannelResult {
-        let operation = edit ? "track.set_\(lane.rawValue)_automation_point" : "track.get_\(lane.rawValue)_automation"
+        let operation = move ? "track.move_volume_automation_point"
+            : edit ? "track.set_\(lane.rawValue)_automation_point" : "track.get_\(lane.rawValue)_automation"
         func unavailable(_ stage: String) -> ChannelResult {
             .error(HonestContract.encodeStateC(
                 error: .readbackUnavailable,
@@ -28,6 +29,7 @@ extension AccessibilityChannel {
               let index = binding.currentIndex(),
               let app = AXLogicProElements.appRoot(runtime: logic),
               let pid = logic.logicProPID(), logic.focusedApplicationPID() == pid,
+              !move || logic.observeHost(pid)?.logicVersion?.hasPrefix("13.") == true,
               case .success(.some(let trackName)) = AXValueExtractors.extractTrackNameResult(
                 from: binding.header, runtime: logic.ax),
               let arrangeTitle = AXHelpers.getTitle(binding.window, runtime: logic.ax),
@@ -58,6 +60,10 @@ extension AccessibilityChannel {
         var stage = "event_table"
         guard let points = read.points(onRefusal: { stage = $0 }) else { return unavailable(stage) }
         guard ready() else { return unavailable("editor_ownership_after_read") }
+        if move {
+            return await moveVolumeAutomationPoint(params: params, points: points,
+                editor: read, current: ready, logic: logic, operation: operation)
+        }
         if edit {
             return await changeTrackAutomationPoint(params: params, points: points, lane: lane,
                 editor: read, current: ready, logic: logic, operation: operation)
@@ -265,6 +271,106 @@ extension AccessibilityChannel {
         return (AXHelpers.getAttribute(enableControls[0], kAXValueAttribute, runtime: runtime) as Int?) == 1
     }
 
+    private static func moveVolumeAutomationPoint(
+        params: [String: String], points: [Logic13AutomationEventList.Point], editor: Logic13AutomationEventList,
+        current: () -> Bool, logic: AXLogicProElements.Runtime, operation: String
+    ) async -> ChannelResult {
+        func refuse(_ error: HonestContract.FailureError, _ hint: String) -> ChannelResult {
+            .error(HonestContract.encodeStateC(error: error, hint: hint,
+                extras: ["operation": operation, "write_attempted": false]))
+        }
+        func coordinates(_ label: String) -> [Int]? {
+            let fields = label.split(separator: ".", omittingEmptySubsequences: false)
+            let parts = fields.compactMap { Int($0) }
+            guard parts.count == 4, parts.map(String.init).joined(separator: ".") == label else { return nil }
+            return parts
+        }
+        guard let origin = params["position"], let destination = params["new_position"],
+              let start = coordinates(origin), let finish = coordinates(destination),
+              start[0] > 0, (1...4).contains(start[1]), (1...4).contains(start[2]),
+              (1...240).contains(start[3]), (1...240).contains(finish[3]),
+              start.prefix(3) == finish.prefix(3), start != finish,
+              let value = params["expected_current"].flatMap(Int.init), Logic13AutomationLane.volume.allows(value),
+              let previousValue = params["previous_value"].flatMap(Int.init),
+              let nextValue = params["next_value"].flatMap(Int.init) else {
+            return refuse(.invalidParams, "Supply the current Volume point, its neighboring positions and values, and a different tick within the same division.")
+        }
+        let candidates = points.indices.filter { points[$0].position == origin }
+        guard candidates.count == 1, let index = candidates.first, index > 0, index + 1 < points.count,
+              points[index].lane == .volume, points[index].value == value,
+              points[index].selected, points.filter(\.selected).count == 1,
+              !points.contains(where: { $0.position == destination }) else {
+            return refuse(.staleSnapshot, "Select only the unique Volume event and use its exact current value and an empty destination.")
+        }
+        let previous = points[index - 1]
+        let next = points[index + 1]
+        guard previous.lane == .volume, next.lane == .volume,
+              previous.position == params["previous_position"], previous.value == previousValue,
+              next.position == params["next_position"], next.value == nextValue,
+              let lower = coordinates(previous.position), let upper = coordinates(next.position),
+              lower.lexicographicallyPrecedes(finish), finish.lexicographicallyPrecedes(upper) else {
+            return refuse(.staleSnapshot, "The move must remain between the expected adjacent Volume points.")
+        }
+        func matches(_ fresh: [Logic13AutomationEventList.Point], _ position: String) -> Bool {
+            points.count == fresh.count && zip(points, fresh).enumerated().allSatisfy { pair in
+                let (original, observed) = pair.element
+                return observed.lane == original.lane && observed.value == original.value
+                    && observed.selected == original.selected && observed.displayed == original.displayed
+                    && observed.position == (pair.offset == index ? position : original.position)
+            }
+        }
+        let prefix = start.prefix(3).map(String.init).joined(separator: ".")
+        var tick = start[3]
+        var steps = 0
+        func uncertain(_ stage: String) -> ChannelResult {
+            .success(HonestContract.encodeStateB(reason: .readbackMismatch, extras: [
+                "operation": operation, "write_attempted": true, "effect_unknown": true,
+                "safe_to_retry": false, "last_verified_position": "\(prefix).\(tick)", "readback_stage": stage,
+            ]))
+        }
+        while tick != finish[3] {
+            guard current(),
+                  let transport = try? AXLogicProElements.observedTransportActivity(in: editor.arrange,
+                    runtime: logic, checking: {}), !transport.isPlaying, !transport.isRecording,
+                  let fresh = editor.points(), matches(fresh, "\(prefix).\(tick)"),
+                  let control = editor.tickControl(for: fresh[index], expected: tick), current() else {
+                return steps == 0 ? refuse(.staleSnapshot, "The selected point or editor changed before the move.")
+                    : uncertain("before_next_step")
+            }
+            let remaining = finish[3] - tick
+            let step = (remaining > 0 ? 1 : -1) * (abs(remaining) >= 10 ? 10 : 1)
+            let action = step > 0 ? kAXIncrementAction : kAXDecrementAction
+            let canMove = abs(step) == 10 ? AXHelpers.getActionNames(control, runtime: logic.ax).contains(action)
+                : AXHelpers.isAttributeSettable(control, kAXValueAttribute, runtime: logic.ax) == true
+            guard canMove, current(), OperationTraceContext.claimDeadlineEffect("track_volume_automation_move") else {
+                return steps == 0 ? refuse(.readbackUnavailable, "The native tick control is unavailable.")
+                    : uncertain("tick_control")
+            }
+            let wanted = tick + step
+            let accepted = abs(step) == 10
+                ? AXHelpers.performAction(control, action, runtime: logic.ax)
+                : AXHelpers.setAttribute(control, kAXValueAttribute, NSNumber(value: wanted), runtime: logic.ax)
+            for _ in 0..<5 {
+                do { try await Task.sleep(for: .milliseconds(70)) }
+                catch { return uncertain("cancelled_after_step") }
+                guard current() else { return uncertain("ownership_after_step") }
+                guard let after = editor.points() else { continue }
+                if matches(after, "\(prefix).\(wanted)"), editor.ownsEditor() {
+                    tick = wanted
+                    steps += 1
+                    break
+                }
+                if !accepted || !matches(after, "\(prefix).\(tick)") { break }
+            }
+            guard tick == wanted else { return uncertain("event_position_after_step") }
+        }
+        return .success(HonestContract.encodeStateA(extras: [
+            "operation": operation, "lane": "volume", "before_position": origin, "observed_position": destination,
+            "value": value, "verified_steps": steps, "peer_events_verified": points.count - 1,
+            "verify_source": "ax_automation_event_list", "write_attempted": true,
+        ]))
+    }
+
     private static func changeTrackAutomationPoint(
         params: [String: String], points: [Logic13AutomationEventList.Point], lane: Logic13AutomationLane,
         editor: Logic13AutomationEventList, current: () -> Bool,
@@ -389,6 +495,7 @@ private struct Logic13AutomationEventList {
         let displayed: String?
         let selected: Bool
         let slider: AXUIElement
+        let positionGroup: AXUIElement
 
         var evidence: [String: Any] {
             var fields: [String: Any] = ["position": position, "value": value]
@@ -479,9 +586,18 @@ private struct Logic13AutomationEventList {
                 displayed = text
             }
             points.append(Point(lane: lane, position: position, value: value, displayed: displayed,
-                                selected: selected, slider: slider))
+                                selected: selected, slider: slider, positionGroup: positionGroup))
         }
         return points
+    }
+
+    func tickControl(for point: Point, expected: Int) -> AXUIElement? {
+        guard ownsEditor(), case .success(let children) = AXHelpers.childrenResult(point.positionGroup, runtime: runtime),
+              let control = unique("Segment 3", role: kAXSliderRole as String, in: children),
+              let parent: AXUIElement = AXHelpers.getAttribute(control, kAXParentAttribute, runtime: runtime),
+              CFEqual(parent, point.positionGroup),
+              (AXHelpers.getAttribute(control, kAXValueAttribute, runtime: runtime) as Int?) == expected else { return nil }
+        return control
     }
 
     private func eventCount(_ text: String) -> Int? {

@@ -293,6 +293,7 @@ enum SemanticOracleTable {
         .pluginsSetPresetVerified: "preset",
         .tracksCreateVolumeAutomation: "volume",
         .tracksSetVolumeAutomationPoint: "volume",
+        .tracksMoveVolumeAutomationPoint: "volume_position",
         .tracksSplitSelectedAudio: "splitter",
         .projectEditRegion: "region_edit",
         .tracksCreatePanAutomation: "pan",

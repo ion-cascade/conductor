@@ -426,6 +426,14 @@ extension OperationRegistry {
                 "expected_current": .enforced(.integer, .int(64)), "value": .enforced(.integer, .int(74)),
                 "linked_position": .enforced(.string, "1.4.4.240"),
             ], required: [["target_ref"], ["position"], ["expected_current"], ["value"]]),
+            "tracks.move_volume_automation_point": .init(params: [
+                "target_ref": targetRef, "project_ref": projectRef,
+                "position": .enforced(.string, "1.1.1.1"), "new_position": .enforced(.string, "1.1.1.121"),
+                "expected_current": .enforced(.integer, .int(80)),
+                "previous_position": .enforced(.string, "0.4.4.240"), "previous_value": .enforced(.integer, .int(90)),
+                "next_position": .enforced(.string, "1.4.4.240"), "next_value": .enforced(.integer, .int(80)),
+            ], required: [["target_ref"], ["position"], ["new_position"], ["expected_current"],
+                          ["previous_position"], ["previous_value"], ["next_position"], ["next_value"]]),
             "tracks.create_pan_automation_point": .init(params: [
                 "target_ref": targetRef, "project_ref": projectRef,
                 "position": .enforced(.string, "2.1.1.1"), "initial_position": .enforced(.string, "1.1.1.1"),
