@@ -377,7 +377,7 @@ enum OperationRegistry {
             "system.setup_arm_key", "system.setup_midi_key_commands", "system.setup_control_surface",
         ],
         ToolID.logicPlugins.rawValue: [
-            "plugins.get_inventory", "plugins.get_host_parameter_manifest", "plugins.get_param_verified", "plugins.get_sidechain_verified", "plugins.set_sidechain_verified", "plugins.get_preset_verified", "plugins.set_preset_verified", "plugins.set_bypass_verified", "plugins.get_channel_eq_state_verified", "plugins.plan_parameter_changes", "plugins.set_param_verified", "plugins.set_eq_band_verified", "plugins.insert_verified",
+            "plugins.get_inventory", "plugins.get_gain_automation", "plugins.set_gain_automation_point", "plugins.get_host_parameter_manifest", "plugins.get_param_verified", "plugins.get_sidechain_verified", "plugins.set_sidechain_verified", "plugins.get_preset_verified", "plugins.set_preset_verified", "plugins.set_bypass_verified", "plugins.get_channel_eq_state_verified", "plugins.plan_parameter_changes", "plugins.set_param_verified", "plugins.set_eq_band_verified", "plugins.insert_verified",
         ],
         ToolID.logicEdit.rawValue: [
             "edit.undo", "edit.redo", "edit.cut", "edit.copy", "edit.paste", "edit.delete",
@@ -440,7 +440,7 @@ enum OperationRegistry {
             "setup_arm_key", "setup_midi_key_commands", "setup_control_surface",
         ],
         ToolID.logicPlugins.rawValue: [
-            "get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_sidechain_verified", "set_sidechain_verified", "get_preset_verified", "set_preset_verified", "set_bypass_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
+            "get_inventory", "get_gain_automation", "set_gain_automation_point", "get_host_parameter_manifest", "get_param_verified", "get_sidechain_verified", "set_sidechain_verified", "get_preset_verified", "set_preset_verified", "set_bypass_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
         ],
         ToolID.logicEdit.rawValue: [
             "undo", "redo", "cut", "copy", "paste", "delete", "select_all", "split", "join",
