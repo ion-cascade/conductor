@@ -36,7 +36,7 @@ struct ResourceProvider {
     /// This exact candidate intends to publish on that UTC date. If publication slips,
     /// respin the candidate and timestamp before tagging it.
     /// Lets caching clients invalidate their local mirror on server upgrade.
-    private static let versionReleaseTimestamp: String = "2026-11-15T00:00:00Z"
+    private static let versionReleaseTimestamp: String = "2026-11-16T00:00:00Z"
 
     private static let baseResources: [Resource] = [
         Resource(
