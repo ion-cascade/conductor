@@ -146,6 +146,7 @@ For the Compressor threshold, `get_param_verified` and `set_param_verified` use 
 2. Take the track reference from `logic://tracks` and read the selected region’s exact start and end with `logic_project.get_regions`. Call `logic_tracks.create_volume_automation_at_region_borders` with the reference, `start`, and `end`. Creation requires an empty track automation event list.
 3. Open Logic’s Track Automation Event List for the track. Call `get_volume_automation` with the same track reference and verify its `points` and `selected_positions`.
 4. Call `set_volume_automation_point` with a reported `position`, `expected_current` and the target `value`. If Logic selected two points together, send the other position as `linked_position`. The adapter changes values in 10-unit steps in Logic’s 0–127 fader scale.
+5. To move a point, select only its row and call `move_volume_automation_point` with its exact position, current value and two neighbors. The destination must be inside the same division. See the [Volume move parameters](docs/API.md#move-a-track-volume-point).
 
 ### Automate track pan and bypass inserts
 

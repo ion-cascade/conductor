@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.10.0] — 2026-11-16
+
+- Move one selected track Volume point within its current division using its exact position, value and adjacent points. Conductor checks native readback after each step. ([#44](https://github.com/ion-cascade/conductor/issues/44))
+- Record the native curve, region automation and plug-in automation qualification limits. ([#44](https://github.com/ion-cascade/conductor/issues/44), [#45](https://github.com/ion-cascade/conductor/issues/45))
+
 ## [1.9.0] — 2026-11-16
 
 - Expose Logic 13's native individual drum kit-piece separation, with exact preset, output and arrangement readback. Separate All Stems remains the default. ([#41](https://github.com/ion-cascade/conductor/issues/41))

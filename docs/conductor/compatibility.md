@@ -1,6 +1,6 @@
-# Conductor 1.9 compatibility
+# Conductor 1.10 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.9 and the checks from earlier releases.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.10 and the checks from earlier releases.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -14,6 +14,18 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
+
+## 1.10 Track automation and stock plug-ins
+
+| Workflow | Mac mini qualification |
+| --- | --- |
+| Move one Volume point | An exact 120-tick move preserved the point value and three other Volume points. The new position survived save, close and reopen with a fresh MCP connection. Stale references and stale neighbor values refused. |
+| Volume envelope | The 48 kHz stereo control and edited renders differed by about +2.05 dB at the beginning. They were sample-identical from frame 3360 onward. The edited render used the owned native Save panel after Conductor's bounce guard refused submission. |
+| Curve shapes and region automation | The tested curve canvas exposed a single Accessibility control. The region Event List exposed converted points as generic Fader events. Both need independent readback before edits can be supported. |
+| Plug-in parameter automation | Logic exposed the specific Gain lane in the automation menu and showed two new Gain events after native creation. Verification of a sweep, exact insert binding at write time and saved readback remains open. |
+| Third-party Audio Units | The Mac mini's registered Audio Unit catalogue contained Apple manufacturers only. Third-party read or write compatibility requires qualification against a specific installed unit. |
+
+[Track automation commands](../API.md#move-a-track-volume-point)
 
 ## 1.9 Drum kit pieces and MIDI note editing
 
