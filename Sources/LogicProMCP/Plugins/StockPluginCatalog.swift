@@ -1947,7 +1947,8 @@ enum StockPluginCatalog {
     /// the three roots on Logic 12.3 (6674); each unit or variant key is read from
     /// `DefaultPluginMapping.plist` in MAContentTagging.framework.
     static let factorySettingsFolderExclusions: [String: String] = [
-        "Feedback Detector": "Observed as a factory settings folder in Logic Pro 13; no public insert identity has been qualified.",
+        // Empty folder under the shared factory settings root on Logic 13.
+        "Feedback Detector": unmeasuredUnit(nil),
         "Auto-Funk": stompbox("0007"),
         "Blue Echo": stompbox("0008"),
         "Candy Fuzz": stompbox("0015"),

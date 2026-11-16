@@ -277,7 +277,8 @@ private func waitForFeedbackEvents(
 
 @Test(coreMIDIUnavailableInSandbox)
 func testProductionKeyCmdTransportDefaultPacketSinkSmoke() async throws {
-    let manager = MIDIPortManager()
+    let (manager, lockDirectory) = try makeProductionMIDISmokeManager()
+    defer { try? FileManager.default.removeItem(at: lockDirectory) }
     let transport = ProductionKeyCmdTransport(
         portManager: manager,
         portName: "LogicProMCP-KeyCmd-Smoke-\(UUID().uuidString)"

@@ -802,9 +802,21 @@ final class MIDIPortRuntimeHarness: @unchecked Sendable {
     #expect(isDirectionSpecific)
 }
 
+/// A separate lock directory keeps uniquely named smoke ports usable while a
+/// release or a user's Conductor process owns the shared production port group.
+func makeProductionMIDISmokeManager() throws -> (MIDIPortManager, URL) {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("Conductor MIDI Smoke \(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+    let group = VirtualMIDIEndpointOwnershipLock.fileGroup(in: directory)
+    let runtime = MIDIPortManager.Runtime.coreMIDIRuntime(acquireOwnershipLock: group.acquire)
+    return (MIDIPortManager(runtime: runtime), directory)
+}
+
 @Test(coreMIDIUnavailableInSandbox)
 func testMIDIPortManagerProductionRuntimeSmokeCreatesAndStopsPorts() async throws {
-    let manager = MIDIPortManager()
+    let (manager, lockDirectory) = try makeProductionMIDISmokeManager()
+    defer { try? FileManager.default.removeItem(at: lockDirectory) }
     let sendOnlyName = "LogicProMCP-Smoke-\(UUID().uuidString)"
     let bidirectionalName = "LogicProMCP-Smoke-Bidi-\(UUID().uuidString)"
 

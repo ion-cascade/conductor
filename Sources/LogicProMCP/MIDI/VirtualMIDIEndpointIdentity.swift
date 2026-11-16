@@ -322,10 +322,14 @@ final class VirtualMIDIEndpointOwnershipLock: @unchecked Sendable {
         }
     }
 
-    private static let processGroup = ProcessGroup(
-        acquireGroup: { acquireFile(named: "logic-pro-mcp-virtual-midi-group-ownership.lock") },
-        acquireCreation: { acquireFile(named: "logic-pro-mcp-virtual-midi-ownership.lock") }
-    )
+    private static let processGroup = fileGroup(in: FileManager.default.temporaryDirectory)
+
+    static func fileGroup(in directory: URL) -> ProcessGroup {
+        ProcessGroup(
+            acquireGroup: { acquireFile(directory.appendingPathComponent("logic-pro-mcp-virtual-midi-group-ownership.lock")) },
+            acquireCreation: { acquireFile(directory.appendingPathComponent("logic-pro-mcp-virtual-midi-ownership.lock")) }
+        )
+    }
 
     private let stateLock = NSLock()
     private var releaseAction: (@Sendable () -> Void)?
@@ -342,11 +346,8 @@ final class VirtualMIDIEndpointOwnershipLock: @unchecked Sendable {
         processGroup.acquire()
     }
 
-    private static func acquireFile(named name: String) -> Acquisition {
-        let path = FileManager.default.temporaryDirectory
-            .appendingPathComponent(name)
-            .path
-        let descriptor = open(path, O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR)
+    private static func acquireFile(_ file: URL) -> Acquisition {
+        let descriptor = open(file.path, O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR)
         guard descriptor >= 0 else {
             // Without a lock file there is no safe cross-process exclusion, so
             // callers degrade and refuse creation rather than risk a twin.

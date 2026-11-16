@@ -65,29 +65,36 @@ actor MIDIPortManager: VirtualPortManaging {
             self.acquireOwnershipLock = acquireOwnershipLock
         }
 
-        static let production = Runtime(
-            createClient: { name, client in
-                MIDIClientCreateWithBlock(name as CFString, &client) { notification in
-                    Log.debug(
-                        "MIDIPortManager notification: \(notification.pointee.messageID.rawValue)",
-                        subsystem: "midi"
-                    )
-                }
-            },
-            createSource: { client, name, source in
-                MIDISourceCreateWithProtocol(client, name as CFString, ._1_0, &source)
-            },
-            createDestination: { client, name, destination, onReceive in
-                MIDIDestinationCreateWithProtocol(client, name as CFString, ._1_0, &destination, onReceive)
-            },
-            disposeEndpoint: { endpoint in
-                MIDIEndpointDispose(endpoint)
-            },
-            disposeClient: { client in
-                MIDIClientDispose(client)
-            },
-            endpointRuntime: .production
-        )
+        static let production = coreMIDIRuntime(acquireOwnershipLock: VirtualMIDIEndpointOwnershipLock.acquire)
+
+        static func coreMIDIRuntime(
+            acquireOwnershipLock: @escaping @Sendable () -> VirtualMIDIEndpointOwnershipLock.Acquisition
+        ) -> Runtime {
+            Runtime(
+                createClient: { name, client in
+                    MIDIClientCreateWithBlock(name as CFString, &client) { notification in
+                        Log.debug(
+                            "MIDIPortManager notification: \(notification.pointee.messageID.rawValue)",
+                            subsystem: "midi"
+                        )
+                    }
+                },
+                createSource: { client, name, source in
+                    MIDISourceCreateWithProtocol(client, name as CFString, ._1_0, &source)
+                },
+                createDestination: { client, name, destination, onReceive in
+                    MIDIDestinationCreateWithProtocol(client, name as CFString, ._1_0, &destination, onReceive)
+                },
+                disposeEndpoint: { endpoint in
+                    MIDIEndpointDispose(endpoint)
+                },
+                disposeClient: { client in
+                    MIDIClientDispose(client)
+                },
+                endpointRuntime: .production,
+                acquireOwnershipLock: acquireOwnershipLock
+            )
+        }
     }
 
     private var client: MIDIClientRef = 0
