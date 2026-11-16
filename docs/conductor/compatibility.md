@@ -1,6 +1,6 @@
-# Conductor 1.8 compatibility
+# Conductor 1.9 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.8 and the checks from earlier releases.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.9 and the checks from earlier releases.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -14,6 +14,16 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
+
+## 1.9 Drum kit pieces and MIDI note editing
+
+| Workflow | Supported desktop Logic 13 scope |
+| --- | --- |
+| Individual kit pieces | Use one selected ordinary audio region with a uniquely named source in the saved project package. The adapter selects the native kit-pieces preset and verifies six named AIFF files and their arrangement below the Drums stack. Keep the project saved for persistence. |
+| In-place MIDI notes | Use one selected visible ordinary region and its unfiltered Event List with absolute start and elapsed length. One uniquely addressed note can change pitch, onset, length and velocity. The first adapter covers 24 materialized events and a maximum of 48 verified native actions per request. |
+| Refusals | The workflows require fresh references. Expected MIDI note fields must agree, and ambiguous note identities refuse before an edit. Unsupported layouts remain explicit. |
+
+[Stem Splitter and MIDI command requirements](../API.md)
 
 ## 1.8.1 Native write qualification
 
