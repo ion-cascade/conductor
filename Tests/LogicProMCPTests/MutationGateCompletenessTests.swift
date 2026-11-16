@@ -34,7 +34,7 @@ struct MutationGateCompletenessTests {
     /// changes no project state, so it stays OUT of the mutation gate on purpose.
     private static let readOnlyAllowlist: [String: Set<String>] = [
         "logic_mixer": ["get_output_verified", "get_input_bus_verified", "get_send_destination_verified", "get_send_bypass_verified"],
-        "logic_tracks": ["list_library", "resolve_path", "scan_library", "scan_plugin_presets", "get_volume_automation"],
+        "logic_tracks": ["list_library", "resolve_path", "scan_library", "scan_plugin_presets", "get_volume_automation", "get_pan_automation"],
         "logic_midi": ["list_ports", "read_selected_region_events", "get_region_notes"],
         "logic_project": ["audit", "cleanup_plan", "export_plan", "get_regions", "inspect_session", "plan_session_repair", "is_running", "export_status", "get_pattern_step", "get_region_fade", "get_region_gain", "get_region_smart_tempo", "scan_regions"],
         "logic_system": [
@@ -42,7 +42,7 @@ struct MutationGateCompletenessTests {
             "refresh_cache", "saga_preflight", "saga_status",
         ],
         "logic_audio": ["analyze_file", "analyze_spectrum", "compare_spectra", "recommend_eq"],
-        "logic_plugins": ["get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "get_gain_automation"],
+        "logic_plugins": ["get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "get_gain_automation", "get_preset_verified", "get_sidechain_verified"],
     ]
 
     /// Error-only labels that exist as switch cases but return a "not exposed in
@@ -68,55 +68,7 @@ struct MutationGateCompletenessTests {
         let file = try #require(dispatcherFiles[tool], "no dispatcher source mapped for \(tool)")
         let url = repoRoot.appendingPathComponent("Sources/LogicProMCP/Dispatchers").appendingPathComponent(file)
         let source = try String(contentsOf: url, encoding: .utf8)
-        return switchLabels(source).union(routeTableLabels(source))
-    }
-
-    /// Labels of the top-level `switch command { … }`, isolated by indentation
-    /// (nested switches sit deeper and are excluded).
-    private static func switchLabels(_ source: String) -> Set<String> {
-        let lines = source.components(separatedBy: "\n")
-        func indent(_ l: String) -> Int { l.prefix { $0 == " " }.count }
-        guard let si = lines.firstIndex(where: { $0.contains("switch command {") }) else { return [] }
-        let swi = indent(lines[si])
-        var labels: Set<String> = []
-        var i = si + 1
-        while i < lines.count {
-            let line = lines[i]
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed == "}" && indent(line) == swi { break }
-            if indent(line) == swi && trimmed.hasPrefix("case ") {
-                var rest = Substring(trimmed)
-                while let open = rest.firstIndex(of: "\"") {
-                    let after = rest.index(after: open)
-                    guard let close = rest[after...].firstIndex(of: "\"") else { break }
-                    labels.insert(String(rest[after..<close]))
-                    rest = rest[rest.index(after: close)...]
-                }
-            }
-            i += 1
-        }
-        return labels
-    }
-
-    private static func routeTableLabels(_ source: String) -> Set<String> {
-        let lines = source.components(separatedBy: "\n")
-        func indent(_ l: String) -> Int { l.prefix { $0 == " " }.count }
-        guard let ti = lines.firstIndex(where: { $0.contains("routedCommands") && $0.contains("[") }) else { return [] }
-        let tab = indent(lines[ti])
-        var labels: Set<String> = []
-        var i = ti + 1
-        while i < lines.count {
-            let trimmed = lines[i].trimmingCharacters(in: .whitespaces)
-            if trimmed == "]" && indent(lines[i]) == tab { break }
-            if trimmed.hasPrefix("\""), let colon = trimmed.firstIndex(of: ":") {
-                let prefix = trimmed[..<colon]
-                if let close = prefix.dropFirst().firstIndex(of: "\"") {
-                    labels.insert(String(prefix[prefix.index(after: prefix.startIndex)..<close]))
-                }
-            }
-            i += 1
-        }
-        return labels
+        return try WorkflowCommandCensusTests.executableCommandLabels(in: source)
     }
 
     @Test("every accepted dispatcher command is gated, read-only-allowlisted, a stub, or an alias")

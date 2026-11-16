@@ -501,7 +501,7 @@ struct WorkflowCommandCensusTests {
     /// also has a command route table for boilerplate-free forwarding. Both
     /// forms are executable surfaces and must stay reconciled with the public
     /// workflow census.
-    private static func executableCommandLabels(in source: String) throws -> Set<String> {
+    static func executableCommandLabels(in source: String) throws -> Set<String> {
         try commandSwitchLabels(in: source).union(routeTableLabels(in: source))
     }
 
@@ -527,8 +527,14 @@ struct WorkflowCommandCensusTests {
             // The switch's own closing brace sits at the switch's column.
             if trimmed == "}" && lineIndent == switchIndent { break }
             if lineIndent == switchIndent && trimmed.hasPrefix("case ") {
-                // Pull every "literal" token from the (possibly multi-label) case.
-                var rest = Substring(trimmed)
+                var declaration = trimmed
+                while !declaration.contains(":") && i + 1 < lines.count && indent(lines[i + 1]) > switchIndent {
+                    i += 1
+                    declaration += " " + lines[i].trimmingCharacters(in: .whitespaces)
+                }
+                let colon = try #require(declaration.firstIndex(of: ":"), "unterminated command case")
+                // The header can wrap across lines. A same-line body may also contain strings.
+                var rest = declaration[..<colon]
                 while let open = rest.firstIndex(of: "\"") {
                     let afterOpen = rest.index(after: open)
                     guard let close = rest[afterOpen...].firstIndex(of: "\"") else { break }
@@ -573,6 +579,23 @@ struct WorkflowCommandCensusTests {
             .appendingPathComponent(file)
         let source = try String(contentsOf: url, encoding: .utf8)
         return try Self.executableCommandLabels(in: source)
+    }
+
+    @Test("the command scanner reads wrapped case labels and excludes case bodies")
+    func wrappedCommandCases() throws {
+        let source = """
+            switch command {
+            case "first",
+                 "second", "third": log("same_line_body")
+                switch status {
+                case "nested": break
+                default: break
+                }
+            case "fourth": break
+            default: break
+            }
+            """
+        #expect(try Self.executableCommandLabels(in: source) == ["first", "second", "third", "fourth"])
     }
 
     @Test("every MCP tool dispatcher is mapped and censused")
@@ -641,8 +664,12 @@ struct WorkflowCommandCensusTests {
     func newlyCensusedCommandsPresent() throws {
         // These were missing before #111 and let the census claim to be the
         // pinned public surface while omitting real production commands.
-        #expect(WorkflowSkillCatalog.publicCommands["logic_plugins"]
-            == ["get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified"])
+        #expect(WorkflowSkillCatalog.publicCommands["logic_plugins"] == [
+            "get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified",
+            "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
+            "get_gain_automation", "set_gain_automation_point", "get_preset_verified", "set_preset_verified",
+            "get_sidechain_verified", "set_sidechain_verified", "set_bypass_verified",
+        ])
         let transport = try #require(WorkflowSkillCatalog.publicCommands["logic_transport"])
         #expect(transport.contains("toggle_autopunch"))
         let project = WorkflowSkillCatalog.publicCommands["logic_project"] ?? []
