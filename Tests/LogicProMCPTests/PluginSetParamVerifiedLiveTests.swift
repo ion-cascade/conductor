@@ -20,7 +20,7 @@ import Testing
 //   - tolerance edge (within → A, outside → C readback_mismatch + rollback)
 //   - window not found → window_open_failed (and opener fallback → A)
 //   - slider not found → param_control_not_found
-//   - Gain without an occupied insert reference → invalid_params
+//   - other param (Gain, capability .unsupported) → unsupported_param_readback
 
 private let expectedPath = "/Users/me/Music/AcidWashBass copy.logicx"
 private let trackName = "Acid Wash Bass"
@@ -3955,16 +3955,16 @@ func testUnreadChildrenAreIncompleteInventoryForThatReason(mixerUnread: Bool, mi
     #expect(fixture.currentSliderValue == 51, "no write may occur when the slot cannot be addressed")
 }
 
-// MARK: - Gain refuses a bare index
+// MARK: - Other parameter (Gain) stays unsupported (no write)
 
-@Test func testGainBareIndexRefusedNoWrite() async {
+@Test func testGainStillUnsupportedNoWrite() async {
     let fixture = LiveFixture()
     let obj = await runLive(fixture: fixture, params: [
         "track": "0", "insert": "6", "plugin": "Gain", "param": "gain_db",
         "value": "-4", "unit": "dB", "mode": "duplicate_applyback",
         "project_expected_path": expectedPath,
     ])
-    #expect(obj["error"] as? String == "invalid_params")
+    #expect(obj["error"] as? String == "unsupported_param_readback")
     #expect(!((obj["write_attempted"] as? Bool)!))
 }
 

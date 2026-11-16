@@ -7,8 +7,8 @@ import Testing
 // AC10 (unsupported_param_readback, no write), AC11 (identity), AC17
 // (unsupported_mode), AC19 (project_path_required), AC23 (single precedence).
 //
-// The live write path (R6 steps 6+) is NOT in T3; Gain's occupied-insert gate
-// refuses requests without a bound insert before any write. These tests inject a
+// The live write path (R6 steps 6+) is NOT in T3; Gain's capability preflight
+// fail-closes every request at step 5 before any write. These tests inject a
 // deterministic front-document path so the project gate is exercised without a
 // running Logic Pro.
 
@@ -48,15 +48,26 @@ private func validGainParams(
     return p
 }
 
-// MARK: - Gain requires an occupied insert reference
+// MARK: - AC10: Gain preflight is unsupported, no write
 
-@Test(arguments: ["logic.stock.effect.gain", "Gain"])
-func testSetParamGainRefusesBareInsertIndex(_ plugin: String) async {
-    let object = await runSetParam(validGainParams(plugin: plugin))
-    #expect(object["state"] as? String == "C")
-    #expect(object["error"] as? String == "invalid_params")
-    #expect(object["hc_schema"] as? Int == 2)
-    #expect(object["write_attempted"] as? Bool == false)
+@Test func testSetParamGainReachesUnsupportedParamReadback() async {
+    let obj = await runSetParam(validGainParams())
+    #expect(obj["state"] as? String == "C")
+    #expect(obj["error"] as? String == "unsupported_param_readback")
+    #expect(!((obj["verified"] as? Bool)!))
+    #expect(obj["hc_schema"] as? Int == 2)
+    #expect(!((obj["write_attempted"] as? Bool)!), "no write may be attempted (AC10)")
+    // post-resolution identity carries canonical id.
+    let identity = obj["target_identity"] as? [String: Any]
+    #expect(identity?["plugin_id"] as? String == "logic.stock.effect.gain")
+}
+
+@Test func testSetParamDisplayNameAliasAlsoReachesPreflight() async {
+    // AC23 second clause: alias "Gain" must resolve at step 4 so it reaches the
+    // step-5 capability preflight (unsupported_param_readback), not stall at
+    // unknown_plugin_identity.
+    let obj = await runSetParam(validGainParams(plugin: "Gain"))
+    #expect(obj["error"] as? String == "unsupported_param_readback")
 }
 
 // MARK: - AC17: confirmed_live blocked (step 2)
@@ -93,8 +104,9 @@ func testSetParamGainRefusesBareInsertIndex(_ plugin: String) async {
 
 // MARK: - AC23: single precedence — path-mismatch wins over unsupported-param
 
-@Test func testSetParamPrecedencePathMismatchBeatsMissingGainBinding() async {
-    // The project path is validated before Gain's occupied-insert requirement.
+@Test func testSetParamPrecedencePathMismatchBeatsUnsupportedParam() async {
+    // Wrong path AND a Gain param that would be unsupported at step 5. Step 3
+    // (project_identity_mismatch) must be reported, NOT step 5.
     let obj = await runSetParam(validGainParams(), frontDoc: "/Users/me/Music/WRONG.logicx")
     #expect(obj["error"] as? String == "project_identity_mismatch")
 }
@@ -129,6 +141,16 @@ func testSetParamGainRefusesBareInsertIndex(_ plugin: String) async {
 @Test func testSetParamOutOfRangeIsInvalidParams() async {
     let obj = await runSetParam(validGainParams(value: "999"))
     #expect(obj["error"] as? String == "invalid_params")
+}
+
+@Test func testSetParamBoundaryValuesPassSchemaReachPreflight() async {
+    // -96 and +24 dB are the declared range edges (R8 boundary vectors); they
+    // pass schema/range and reach the step-5 preflight.
+    for edge in ["-96", "24", "0"] {
+        let obj = await runSetParam(validGainParams(value: edge))
+        #expect(obj["error"] as? String == "unsupported_param_readback",
+                "value \(edge) should pass schema and reach preflight")
+    }
 }
 
 // MARK: - ADR-011 / ADR-018 negative Controls-view evidence

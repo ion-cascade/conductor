@@ -3524,6 +3524,9 @@ extension AccessibilityChannel {
         var readContextEnded = false
         var acquisitionActionAttempted = false
         func acquisitionAllowed() -> Bool {
+            if gainControlWrite {
+                return gainContextIsCurrent()
+            }
             guard let contextIsCurrent = access.readContextIsCurrent else { return true }
             guard !readContextEnded, contextIsCurrent(),
                   targetPluginIdentityIsStable(target: target, insert: insert, pluginID: pluginID,
@@ -4115,9 +4118,6 @@ extension AccessibilityChannel {
         }
         let viewSession: ControlsViewBooleanParameterWriter.ViewSession
         func viewChangesAllowed() -> Bool {
-            if gainControlWrite {
-                return gainContextIsCurrent()
-            }
             guard let contextIsCurrent = access.readContextIsCurrent else { return true }
             guard !readContextEnded, contextIsCurrent(),
                   targetPluginIdentityIsStable(target: target, insert: insert, pluginID: pluginID,
