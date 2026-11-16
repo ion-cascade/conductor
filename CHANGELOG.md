@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Expose Logic 13's native individual drum kit-piece separation, with exact preset, output and arrangement readback. Separate All Stems remains the default. ([#41](https://github.com/ion-cascade/conductor/issues/41))
 - Read and edit one existing MIDI note's pitch, onset, length and velocity with exact native coordinates and peer-event checks. ([#42](https://github.com/ion-cascade/conductor/issues/42))
 - Allow the native MIDI export waiter to observe the Save panel after AppKit retires the Go to Folder sheet.
+- Wait for the same Compressor editor to recover focus after one native sidechain selection before reading back the chosen source.
 
 ## [1.8.1] — 2026-11-16
 

@@ -209,7 +209,16 @@ extension AccessibilityChannel {
                     else { throw SidechainUnavailable(stage: "compressor_sidechain_choice") }
                     attempted = true
                     _ = AXHelpers.performAction(leaf, kAXPressAction, runtime: ax)
-                    try await Task.sleep(for: .milliseconds(400))
+                    // Logic may keep its menu visible while it applies the pick.
+                    // Observe the same editor until it gets focus back. Do not
+                    // repeat the press or act on a replacement window.
+                    for _ in 0..<12 {
+                        try await Task.sleep(for: .milliseconds(100))
+                        guard owned(initial) else {
+                            throw SidechainUnavailable(stage: "compressor_sidechain_menu_after_pick")
+                        }
+                        if noMenu(), focused(initial) { break }
+                    }
                     guard noMenu(), owned(initial), focused(initial) else {
                         throw SidechainUnavailable(stage: "compressor_sidechain_menu_after_pick")
                     }
