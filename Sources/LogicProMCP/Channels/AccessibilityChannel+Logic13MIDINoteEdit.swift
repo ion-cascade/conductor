@@ -40,12 +40,16 @@ extension AccessibilityChannel {
         guard ownsRegion(initialRegions) else {
             return refuse(.unsupportedState, "Select only the visible MIDI region and give it a unique name.")
         }
-        guard let eventList = Logic13MIDINoteEventList.find(in: scope.window, regionName: held.info.name, ax: ax),
-              EventListReadbackCollector.requireLogic13NoteDisplay(in: eventList.pane, runtime: ax),
-              let checkedRegions = Self.regionEditCensus(scope: scope), ownsRegion(checkedRegions),
+        guard let eventList = Logic13MIDINoteEventList.find(in: scope.window, regionName: held.info.name, ax: ax) else {
+            return refuse(.readbackUnavailable, "Show the selected region's Event List with all eight editing columns.")
+        }
+        guard EventListReadbackCollector.requireLogic13NoteDisplay(in: eventList.pane, runtime: ax) else {
+            return refuse(.readbackUnavailable, "Use absolute musical positions and elapsed lengths in the Event List.")
+        }
+        guard let checkedRegions = Self.regionEditCensus(scope: scope), ownsRegion(checkedRegions),
               let before = eventList.rows(), let stable = eventList.rows(),
               before.map(\.signature) == stable.map(\.signature) else {
-            return refuse(.readbackUnavailable, "Show the unfiltered Event List for the selected region with absolute musical positions and elapsed lengths.")
+            return refuse(.readbackUnavailable, "Show every event in a stable unfiltered Event List for the selected region.")
         }
 
         let notes = stable.compactMap { $0.note }

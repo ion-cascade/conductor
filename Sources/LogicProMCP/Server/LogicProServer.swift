@@ -979,6 +979,7 @@ actor LogicProServer {
             && command == "read_selected_region_events"
         let mutatingCommand = isMutatingCommand(tool: tool, command: command)
         let ownedObservationRead = freshPopulationRead
+            || (tool == "logic_midi" && command == "get_region_notes")
             || (tool == "logic_project" && ["scan_regions", "get_pattern_step", "get_region_gain", "get_region_fade"].contains(command))
             || selectedRegionEventRead
             || (tool == "logic_plugins" && command == "get_sidechain_verified")

@@ -132,10 +132,19 @@ struct Logic13MIDINoteEventList {
         var fields: [AXUIElement?] = []
         var signature: [[String]] = []
         for (index, cell) in cells.enumerated() {
-            guard role(cell) == kAXCellRole,
-                  case .success(let children) = AXHelpers.childrenResult(cell, runtime: ax),
-                  children.count <= 1, index < 2 || children.count == 1 else { return nil }
-            let field = children.first
+            guard role(cell) == kAXCellRole else { return nil }
+            let field: AXUIElement?
+            switch AXHelpers.childrenResult(cell, runtime: ax) {
+            case .success(let children):
+                guard children.count <= 1, index < 2 || children.count == 1 else { return nil }
+                field = children.first
+            case .failure(let failure):
+                // Logic 13 returns AXError.failure for the two empty status
+                // flag cells. A data cell must still answer with its child.
+                guard index < 2, failure.raw == AXError.failure.rawValue,
+                      attribute(cell, kAXValueAttribute) as NSObject? == nil else { return nil }
+                field = nil
+            }
             fields.append(field)
             signature.append(field.map(fingerprint) ?? [])
         }
