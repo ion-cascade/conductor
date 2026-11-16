@@ -2,7 +2,7 @@ extension SemanticOracleTable {
     static let conductorReceiptOnlyReadIDs: Set<OperationID> = [
         .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep,
         .projectScanRegions, .projectGetRegionGain, .projectGetRegionFade, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
-        .midiGetRegionNotes,
+        .midiGetRegionNotes, .pluginsGetGainAutomation,
     ]
 
     static let pluginsGetPresetVerified = receiptOnlyRead(
@@ -28,6 +28,19 @@ extension SemanticOracleTable {
             .valueEquals(key: "editor_restored", expected: .bool(true)),
         ],
         reason: "The returned popup and menu observations share the operation's editor acquisition. The qualification harness has no independent readback of the referenced insert's source."
+    )
+
+    static let pluginsGetGainAutomation = receiptOnlyRead(
+        .pluginsGetGainAutomation, operation: "plugin.get_gain_automation",
+        constraints: [
+            .valueEquals(key: "verify_source", expected: .string("ax_automation_event_list")),
+            .valueEquals(key: "lane", expected: .string("gain")),
+            .arrayElements(key: "points", constraints: [
+                .typedField(key: "position", type: .string),
+                .numericRange(key: "value", min: 0, max: 127),
+            ]),
+        ],
+        reason: "An independent Automation Event List capture is required for the referenced Gain insert."
     )
 
     static let midiGetRegionNotes = receiptOnlyRead(

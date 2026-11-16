@@ -546,6 +546,15 @@ extension OperationRegistry {
                 "track": .enforced(.integer, .int(0)),
                 "insert": .enforced(.integer, .int(6)),
             ], required: [["target_ref"], ["expected_build_fingerprint"]]),
+            "plugins.get_gain_automation": .init(params: [
+                "target_ref": .enforced(.string, .string("ins_lpm_reference")),
+            ], required: [["target_ref"]]),
+            "plugins.set_gain_automation_point": .init(params: [
+                "target_ref": .enforced(.string, .string("ins_lpm_reference")),
+                "position": .enforced(.string, .string("1.1.1.1")),
+                "expected_current": .enforced(.integer, .int(101)),
+                "value": .enforced(.integer, .int(91)),
+            ], required: [["target_ref"], ["position"], ["expected_current"], ["value"]]),
             "plugins.get_param_verified": .init(params: [
                 "target_ref": .enforced(.string, .string("ins_lpm_contract_955")), "project_ref": projectRef,
                 "param": .enforced(.string, .string("threshold")),

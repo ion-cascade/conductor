@@ -164,6 +164,8 @@ extension ChannelRouter {
         "plugin.set_preset_verified": [.accessibility],
         "plugin.get_sidechain_verified": [.accessibility],
         "plugin.set_sidechain_verified": [.accessibility],
+        "plugin.get_gain_automation": [.accessibility],
+        "plugin.set_gain_automation_point": [.accessibility],
         "plugin.get_param_verified":  [.accessibility],
         "plugin.get_channel_eq_state_verified": [.accessibility],
         "plugin.set_param_verified":  [.accessibility],

@@ -2494,6 +2494,9 @@ actor AccessibilityChannel: Channel {
         case "plugin.get_preset_verified", "plugin.set_preset_verified":
             return await Self.defaultCompressorPreset(params: params,
                 writing: operation == "plugin.set_preset_verified", runtime: runtime.logicRuntime)
+        case "plugin.get_gain_automation", "plugin.set_gain_automation_point":
+            return await Self.defaultGainAutomation(params: params, edit: operation == "plugin.set_gain_automation_point",
+                logic: runtime.logicRuntime)
         case "plugin.get_param_verified":
             return await AccessibilityChannel.defaultGetParamVerified(params: params, runtime: runtime.logicRuntime)
         case "plugin.get_channel_eq_state_verified":

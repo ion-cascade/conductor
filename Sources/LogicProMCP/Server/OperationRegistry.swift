@@ -65,6 +65,8 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case pluginsSetSidechainVerified = "plugins.set_sidechain_verified"
     case pluginsGetPresetVerified = "plugins.get_preset_verified"
     case pluginsSetPresetVerified = "plugins.set_preset_verified"
+    case pluginsGetGainAutomation = "plugins.get_gain_automation"
+    case pluginsSetGainAutomationPoint = "plugins.set_gain_automation_point"
     case pluginsGetParamVerified = "plugins.get_param_verified"
     case pluginsPlanParameterChanges = "plugins.plan_parameter_changes"
     case pluginsGetChannelEQStateVerified = "plugins.get_channel_eq_state_verified"
@@ -819,6 +821,15 @@ enum OperationRegistry {
         (
             .pluginsSetPresetVerified, "set_preset_verified", Mutability.`mutating`, DeadlineClass.medium,
             VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["path", "expected_current"]
+        ),
+        (
+            .pluginsGetGainAutomation, "get_gain_automation", Mutability.readOnly, DeadlineClass.medium,
+            VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["target_ref"]
+        ),
+        (
+            .pluginsSetGainAutomationPoint, "set_gain_automation_point", Mutability.`mutating`, DeadlineClass.medium,
+            VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget,
+            ["target_ref", "position", "expected_current", "value"]
         ),
         (
             .pluginsGetParamVerified,

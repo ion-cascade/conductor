@@ -131,6 +131,54 @@ struct PluginsDispatcher: OperationTraceDispatching {
         }
 
         switch command {
+        case "get_gain_automation", "set_gain_automation_point":
+            let operation = "logic_plugins.\(command)"
+            let routed = "plugin.\(command)"
+            let writing = command == "set_gain_automation_point"
+            guard let reference = nonEmptyString(params, "target_ref") else {
+                return toolInvalidParamsResult("Use an occupied Gain insert reference from get_inventory.")
+            }
+            var arguments: [String: String] = [:]
+            if writing {
+                guard let position = nonEmptyString(params, "position"),
+                      case .int(let expected) = params["expected_current"],
+                      case .int(let value) = params["value"] else {
+                    return toolInvalidParamsResult("Supply the exact point position, expected_current and value.")
+                }
+                arguments = ["position": position, "expected_current": String(expected), "value": String(value)]
+            }
+            let automationArguments = arguments
+            let traceID = writing ? await startTraceIfEnabled(command: command) : nil
+            let result = await runVerified(operation: routed, gate: verifiedGate) {
+                switch await TargetRefResolver.resolveMutationIndex(params, targetRegistry: targetRegistry,
+                    cache: cache, operation: operation, indexKeys: ["track"],
+                    invalidIndexResult: toolInvalidParamsResult("Use a current Gain insert reference."),
+                    acceptedKinds: [.pluginInsert]) {
+                case .failure(let failure):
+                    return failure
+                case .success(let resolved):
+                    guard let registry = targetRegistry, let binding = resolved.binding,
+                          let path = await registry.currentProjectIdentity?.projectFilePath,
+                          binding.pluginInsertIndex == 3,
+                          TargetRefResolver.pluginInsertIdentity(from: binding) == "logic.stock.effect.gain" else {
+                        return TargetRefResolver.staleTargetReferenceResult(reference, operation: operation)
+                    }
+                    var bound = automationArguments
+                    bound["track"] = String(resolved.index)
+                    bound["expected_track_name"] = binding.descriptor.trackName
+                    bound["expected_plugin_identity"] = "logic.stock.effect.gain"
+                    bound["insert"] = "3"
+                    bound["project_expected_path"] = path
+                    let routeArguments = bound
+                    let response = await withWriteBoundaryArmed(traceID) {
+                        await router.route(operation: routed, params: routeArguments)
+                    }
+                    return TargetRefResolver.addEvidence(resolved.reference,
+                        fingerprint: binding.observedFingerprint, to: toolTextResult(response))
+                }
+            }
+            return await finalizeTrace(result, traceID: traceID)
+
         case "get_host_parameter_manifest":
             let operation = "logic_plugins.get_host_parameter_manifest"
             let allowed = OperationRegistry.spec(tool: "logic_plugins", command: command)?.allowedParams ?? []

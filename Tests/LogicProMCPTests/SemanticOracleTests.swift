@@ -655,7 +655,7 @@ struct SemanticOracleCensusTests {
         let fixtureWrites = Set(recipes.keys)
         #expect(covered.isDisjoint(with: excluded))
         #expect(covered.union(excluded).isDisjoint(with: fixtureWrites))
-        #expect(fixtureWrites.count == 17)
+        #expect(fixtureWrites.count == 18)
         #expect(recipes.values.allSatisfy { !$0.isEmpty })
         let accounted = covered.union(excluded).union(fixtureWrites)
         #expect(accounted == SemanticOracleTable.mutatingSpecIDs)

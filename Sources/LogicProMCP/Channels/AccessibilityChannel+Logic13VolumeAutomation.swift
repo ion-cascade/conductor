@@ -4,9 +4,16 @@ import Foundation
 enum Logic13AutomationLane: String {
     case volume
     case pan
+    case gain
 
-    var label: String { self == .volume ? "Volume" : "Pan" }
-    var unit: String { self == .volume ? "logic_fader_value" : "logic_pan_value" }
+    var label: String { rawValue.capitalized }
+    var unit: String {
+        switch self {
+        case .volume: "logic_fader_value"
+        case .pan: "logic_pan_value"
+        case .gain: "logic_plugin_automation_value"
+        }
+    }
 
     func allows(_ value: Int) -> Bool { (0...127).contains(value) }
 }
@@ -240,7 +247,7 @@ extension AccessibilityChannel {
         }
     }
 
-    private static func automationLaneIsReady(
+    static func automationLaneIsReady(
         _ lane: Logic13AutomationLane, header: AXUIElement, runtime: AXHelpers.Runtime
     ) -> Bool {
         guard case .success(let controls) = AXHelpers.childrenResult(header, runtime: runtime) else { return false }
@@ -252,20 +259,21 @@ extension AccessibilityChannel {
             guard matches.count == 1 else { return nil }
             return AXHelpers.getAttribute(matches[0], kAXValueAttribute as String, runtime: runtime)
         }
-        guard (value("Automation Parameter", role: kAXPopUpButtonRole) as String?) == lane.label,
+        let laneLabel = lane == .gain ? "5 Gain: Gain" : lane.label
+        guard (value("Automation Parameter", role: kAXPopUpButtonRole) as String?) == laneLabel,
               (value("Automation Mode", role: kAXPopUpButtonRole) as String?) == "Read" else { return false }
         let enableControls = controls.filter {
             AXHelpers.getRole($0, runtime: runtime) == kAXCheckBoxRole
                 && AXHelpers.getDescription($0, runtime: runtime) == "Enable Automation"
         }
-        if lane == .pan {
+        if lane == .pan || lane == .gain {
             // The native header has a Track/Region button. An empty absolute Pan
             // lane can lack a separate Enable Automation checkbox.
             guard controls.filter({
                 AXHelpers.getRole($0, runtime: runtime) == kAXButtonRole
                     && AXHelpers.getDescription($0, runtime: runtime) == "Track"
             }).count == 1 else { return false }
-            if enableControls.isEmpty { return true }
+            if lane == .pan && enableControls.isEmpty { return true }
         }
         guard enableControls.count == 1 else { return false }
         return (AXHelpers.getAttribute(enableControls[0], kAXValueAttribute, runtime: runtime) as Int?) == 1
@@ -371,7 +379,7 @@ extension AccessibilityChannel {
         ]))
     }
 
-    private static func changeTrackAutomationPoint(
+    static func changeTrackAutomationPoint(
         params: [String: String], points: [Logic13AutomationEventList.Point], lane: Logic13AutomationLane,
         editor: Logic13AutomationEventList, current: () -> Bool,
         logic: AXLogicProElements.Runtime, operation: String
@@ -450,7 +458,7 @@ extension AccessibilityChannel {
         while observed != requested {
             guard stopped(), current(), let fresh = editor.points(), matches(fresh, value: observed),
                   affectedIndices(fresh) == affected, editor.ownsEditor(),
-                  OperationTraceContext.claimDeadlineEffect("track_volume_automation_edit") else {
+                  OperationTraceContext.claimDeadlineEffect("track_automation_value_edit") else {
                 return attempted ? uncertain(observed, stage: "before_next_step")
                     : refusal(.staleSnapshot, "The native \(lane.label) event changed before the edit.")
             }
@@ -487,7 +495,7 @@ extension AccessibilityChannel {
     }
 }
 
-private struct Logic13AutomationEventList {
+struct Logic13AutomationEventList {
     struct Point {
         let lane: Logic13AutomationLane
         let position: String
@@ -510,6 +518,8 @@ private struct Logic13AutomationEventList {
     let title: String
     let trackName: String
     let runtime: AXHelpers.Runtime
+
+    var includesStockGain = false
 
     func ownsEditor() -> Bool {
         let path = "Track Automation Root Folder:" + trackName
@@ -567,7 +577,7 @@ private struct Logic13AutomationEventList {
                   unique("Fader", role: kAXCellRole as String, in: AXHelpers.getChildren(cells[3], runtime: runtime)) != nil
             else { onRefusal("event_identity"); return nil }
             let eventLabels = AXHelpers.getChildren(cells[7], runtime: runtime)
-            let lanes: [Logic13AutomationLane] = [.volume, .pan]
+            let lanes: [Logic13AutomationLane] = includesStockGain ? [.volume, .pan, .gain] : [.volume, .pan]
             let matches = lanes.filter { unique($0.label, role: kAXCellRole as String, in: eventLabels) != nil }
             guard matches.count == 1, let lane = matches.first else { onRefusal("event_lane"); return nil }
             guard let positionGroup = hitInCell(cells[2], column: 2, role: kAXGroupRole as String),
@@ -584,6 +594,15 @@ private struct Logic13AutomationEventList {
                       let text = AXValueExtractors.extractValueDescription(slider, runtime: runtime),
                       !text.isEmpty else { onRefusal("pan_event_value"); return nil }
                 displayed = text
+            }
+            if lane == .gain {
+                guard let channel = hitInCell(cells[4], column: 4, role: kAXSliderRole),
+                      let parameter = hitInCell(cells[5], column: 5, role: kAXSliderRole),
+                      (AXHelpers.getAttribute(channel, kAXValueAttribute, runtime: runtime) as Int?) == 6,
+                      (AXHelpers.getAttribute(parameter, kAXValueAttribute, runtime: runtime) as Int?) == 4,
+                      AXValueExtractors.extractValueDescription(slider, runtime: runtime) == String(value)
+                else { onRefusal("stock_gain_event_address"); return nil }
+                displayed = String(value)
             }
             points.append(Point(lane: lane, position: position, value: value, displayed: displayed,
                                 selected: selected, slider: slider, positionGroup: positionGroup))

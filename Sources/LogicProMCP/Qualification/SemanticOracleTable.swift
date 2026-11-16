@@ -305,6 +305,7 @@ enum SemanticOracleTable {
         .projectSetRegionFade: "region_parameters",
         .midiEditRegionNote: "midi_note",
         .midiEditRegionExpression: "midi_region_expression",
+        .pluginsSetGainAutomationPoint: "stock_gain_automation",
     ]
 
     /// Every operation the table may legitimately carry an oracle for: the FULLY
@@ -583,6 +584,7 @@ enum SemanticOracleTable {
         midiListPorts,
         midiReadSelectedRegionEvents,
         midiGetRegionNotes,
+        pluginsGetGainAutomation,
         tracksListLibrary,
         tracksScanLibrary,
         tracksResolvePath,
