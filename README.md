@@ -34,9 +34,9 @@ Use the [compatibility matrix](docs/conductor/compatibility.md) to check the tes
 | --- | --- |
 | Transport and session | Read the open project and visible tracks. Play, stop and locate an exact musical position. |
 | Arrangement | Scan Arrange viewports for offscreen audio or MIDI regions, then move or trim a bound region. Set audio-region gain and standard linear fades. |
-| Track automation | Create and edit supported Volume and absolute Pan points. Move one selected Volume point within its current division. |
-| MIDI | Import a sequence onto a supported instrument track, export track MIDI, and read or edit an existing note’s pitch, start, length and velocity. |
-| Mixer and inserts | Adjust a referenced strip. Read Channel EQ bands, apply supported Compressor presets, change a Compressor sidechain source and bypass an occupied insert. |
+| Track automation | Create and edit supported Volume and absolute Pan points, move a Volume point, or shape a flat segment by inserting one control point. |
+| MIDI | Import and export track MIDI. Edit an existing note’s pitch, start, length and velocity, or change an existing Expression (CC11) event. |
+| Mixer and inserts | Adjust a referenced strip. Read Channel EQ, apply supported Compressor presets and sidechains, bypass occupied inserts, and edit qualified mono Gain levels and Gain automation. |
 | Render and delivery | Bounce an exact stereo PCM range, export selected aligned stems, verify a delivery receipt and resume unfinished outputs after reconnecting. |
 | Stem Splitter and Step Sequencer | Separate audio into stems or individual drum kit pieces, or inspect and toggle a selected Drum Machine Designer step. |
 | Audio analysis | Read an audio file’s format, levels and spectral measurements. |
