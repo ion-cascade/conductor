@@ -632,10 +632,21 @@ private struct Logic13AutomationEventList {
               observed.location == column, observed.length == 1,
               case .success(.some(let element)) = hit(AXUIElementCreateSystemWide(), CGPoint(
                 x: origin.x + size.width / 2, y: origin.y + size.height / 2)),
-              AXHelpers.getRole(element, runtime: runtime) == role,
-              let parent: AXUIElement = AXHelpers.getAttribute(element, kAXParentAttribute as String, runtime: runtime),
-              CFEqual(parent, cell) else { return nil }
-        return element
+              let parent: AXUIElement = AXHelpers.getAttribute(element, kAXParentAttribute as String, runtime: runtime)
+        else { return nil }
+        let observedRole = AXHelpers.getRole(element, runtime: runtime)
+        if observedRole == role, CFEqual(parent, cell) { return element }
+
+        // Logic materializes the selected Position cell's sliders at its center.
+        // Accept the hit only through the exact cell's sole Position group.
+        guard role == kAXGroupRole as String, observedRole == kAXSliderRole as String,
+              let name = AXHelpers.getDescription(element, runtime: runtime),
+              ["Segment 0", "Segment 1", "Segment 2", "Segment 3"].contains(name),
+              case .success(let items) = AXHelpers.childrenResult(cell, runtime: runtime),
+              let group = uniqueRole(role, in: items), CFEqual(group, parent),
+              let container: AXUIElement = AXHelpers.getAttribute(group, kAXParentAttribute as String, runtime: runtime),
+              CFEqual(container, cell) else { return nil }
+        return group
     }
 
     private static func position(_ description: String) -> String? {
