@@ -195,7 +195,7 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `set_volume_automation_point` | `expected_current`, `linked_position`, `position`, `project_ref`, `target_ref`, `value` | none | closed | mutating | none | accepts_stable_target | readback_required | never_automatic | default_install |
 | `solo` | `enabled`: booleanLike, `index`: integer, `project_ref`, `target_ref`, `track`: integer | `index` or `track` or `target_ref` | closed | mutating | none | accepts_stable_target | readback_required | never_automatic | default_install |
 | `sort_verified` | `confirmed`, `criterion`: scalar (midi_channel, audio_channel, output_channel, instrument_name, track_name, used, creation_date), `expected_order`: array | `criterion`; `expected_order` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
-| `split_selected_audio` | `confirmed`: boolean, `end`: string, `project_ref`, `region_name`: string, `start`: string, `target_ref` | `project_ref`; `target_ref`; `region_name`; `start`; `end`; `confirmed` | closed | mutating | l2 | accepts_stable_target | readback_required | never_automatic | default_install |
+| `split_selected_audio` | `confirmed`: boolean, `end`: string, `preset`: string (all_stems, drum_kit_pieces), `project_ref`, `region_name`: string, `start`: string, `target_ref` | `project_ref`; `target_ref`; `region_name`; `start`; `end`; `confirmed` | closed | mutating | l2 | accepts_stable_target | readback_required | never_automatic | default_install |
 
 ## `logic_transport`
 

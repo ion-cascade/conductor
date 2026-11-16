@@ -277,36 +277,91 @@ struct ProjectLogic13StemSplitter {
         func popups() -> [AXUIElement] {
             descendants(panel, depth: 7).filter { role($0) == kAXPopUpButtonRole }
         }
+        func ownsSheet() -> Bool {
+            holdsProject() && sheets() == [panel] && isSplitterSheet(panel)
+        }
+        // The sheet can be visible before the SwiftUI popup accepts input.
+        try await Task.sleep(for: .milliseconds(500))
         let popup = try only(popups(), "splitter_preset_control")
         if text(popup, kAXValueAttribute) == preset.nativeTitle { return }
-        guard holdsProject(), sheets() == [panel], isSplitterSheet(panel), enabled(popup), !Task.isCancelled else {
+        guard ownsSheet(), enabled(popup), popupFrames()?.isEmpty == true else {
             throw Failure.unavailable("splitter_preset_ownership")
         }
         _ = AXHelpers.performAction(popup, kAXPressAction, runtime: runtime.ax)
         do {
-            let menu = try await wait("splitter_preset_menu", attempts: 15) {
-                let menus = children(popup).filter { role($0) == kAXMenuRole }
-                guard menus.count <= 1 else { throw Failure.unavailable("multiple_preset_menus") }
-                return menus.first
+            var menu: AXUIElement?
+            for _ in 0..<10 {
+                try await Task.sleep(for: .milliseconds(100))
+                guard ownsSheet() else { throw Failure.unavailable("splitter_preset_sheet_changed") }
+                if let ready = presetMenu(for: popup) {
+                    menu = ready
+                    break
+                }
             }
+            if menu == nil, ownsSheet(), popups() == [popup], popupFrames()?.isEmpty == true,
+               children(popup).allSatisfy({ role($0) != kAXMenuRole }), pressPresetPopupAtNativePoint(popup) {
+                menu = try await wait("splitter_preset_menu", attempts: 18) {
+                    guard ownsSheet() else { throw Failure.unavailable("splitter_preset_sheet_changed") }
+                    return presetMenu(for: popup)
+                }
+            }
+            guard let menu else { throw Failure.unavailable("splitter_preset_menu") }
             let choice = try only(children(menu).filter {
                 role($0) == kAXMenuItemRole && title($0) == preset.nativeTitle
             }, "splitter_preset_option")
-            guard holdsProject(), sheets() == [panel], children(popup).contains(menu), enabled(choice), !Task.isCancelled else {
+            guard ownsSheet(), presetMenu(for: popup).map({ CFEqual($0, menu) }) == true,
+                  enabled(choice), !Task.isCancelled else {
                 throw Failure.unavailable("splitter_preset_option_ownership")
             }
             _ = AXHelpers.performAction(choice, kAXPressAction, runtime: runtime.ax)
             _ = try await wait("splitter_preset_readback", attempts: 20) {
-                guard sheets() == [panel] else { throw Failure.unavailable("splitter_preset_sheet_changed") }
+                guard ownsSheet() else { throw Failure.unavailable("splitter_preset_sheet_changed") }
                 return popups().first(where: { text($0, kAXValueAttribute) == preset.nativeTitle })
             }
         } catch {
-            if holdsProject(), sheets() == [panel],
-               let menu = try? only(children(popup).filter({ role($0) == kAXMenuRole }), "splitter_preset_cleanup") {
+            if ownsSheet(), let menu = presetMenu(for: popup) {
                 _ = AXHelpers.performAction(menu, kAXCancelAction, runtime: runtime.ax)
             }
             throw error
         }
+    }
+
+    private func presetMenu(for popup: AXUIElement) -> AXUIElement? {
+        let attached = children(popup).filter { role($0) == kAXMenuRole }
+        guard attached.count <= 1 else { return nil }
+        if let menu = attached.first, isPresetMenu(menu) { return menu }
+        guard let frames = popupFrames(), frames.count == 1, let frame = frames.first,
+              let position = AXHelpers.getPosition(popup, runtime: runtime.ax),
+              let size = AXHelpers.getSize(popup, runtime: runtime.ax),
+              frame.intersects(CGRect(origin: position, size: size).insetBy(dx: -4, dy: -4)),
+              let hitTest = runtime.ax.elementAtPosition,
+              case .success(.some(let hit)) = hitTest(app, CGPoint(x: frame.midX, y: frame.midY)),
+              role(hit) == kAXMenuItemRole,
+              let menu: AXUIElement = AXHelpers.getAttribute(hit, kAXParentAttribute, runtime: runtime.ax),
+              children(menu).contains(hit), isPresetMenu(menu) else { return nil }
+        return menu
+    }
+
+    private func isPresetMenu(_ menu: AXUIElement) -> Bool {
+        let options = children(menu).filter { role($0) == kAXMenuItemRole }
+        return role(menu) == kAXMenuRole && Preset.allCases.allSatisfy { mode in
+            options.filter { title($0) == mode.nativeTitle }.count == 1
+        }
+    }
+
+    private func pressPresetPopupAtNativePoint(_ popup: AXUIElement) -> Bool {
+        guard !Task.isCancelled, enabled(popup), CGPreflightPostEventAccess(),
+              let position = AXHelpers.getPosition(popup, runtime: runtime.ax),
+              let size = AXHelpers.getSize(popup, runtime: runtime.ax), size.width > 4, size.height > 4,
+              let hitTest = runtime.ax.elementAtPosition else { return false }
+        let center = CGPoint(x: position.x + size.width / 2, y: position.y + size.height / 2)
+        guard case .success(.some(let hit)) = hitTest(app, center), CFEqual(hit, popup),
+              let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: center, mouseButton: .left),
+              let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: center, mouseButton: .left)
+        else { return false }
+        down.postToPid(pid)
+        up.postToPid(pid)
+        return true
     }
 
     private func verifyPresetControls(_ controls: [AXUIElement]) throws {
