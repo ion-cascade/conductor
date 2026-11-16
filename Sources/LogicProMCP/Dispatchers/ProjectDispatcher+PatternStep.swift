@@ -7,7 +7,7 @@ extension ProjectDispatcher {
         let operation = "project.\(command)"
         func refuse(_ error: HonestContract.FailureError, _ hint: String) -> CallTool.Result {
             toolTextResult(.error(HonestContract.encodeStateC(error: error, hint: hint,
-                extras: ["operation": operation, "write_attempted": false])))
+                extras: ["operation": operation, "verified": false, "write_attempted": false])))
         }
         func response(_ step: ProjectPatternStep?, state: String, attempted: Bool) -> CallTool.Result {
             var result: [String: Any] = ["operation": operation, "state": state, "verified": state == "A",
