@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 import Foundation
 
@@ -56,15 +57,20 @@ extension AccessibilityChannel {
         let editorTitle = String(title.dropLast(" - Tracks".count)) + " - Beats"
         _ = AXHelpers.performAction(command, kAXPressAction, runtime: ax)
         func owns(_ editor: AXUIElement) -> Bool {
-            guard let visible = windows(), visible.count == 2, visible.contains(where: { CFEqual($0, scope.window) }),
+            // Logic temporarily reports no system-wide AX focus when it opens the Beats window.
+            // Corroborate the application's active state with its focused window and both document paths.
+            guard OperationTraceContext.current?.ownsGate() == true,
+                  NSRunningApplication(processIdentifier: pid)?.isActive == true,
+                  let visible = windows(), visible.count == 2, visible.contains(where: { CFEqual($0, scope.window) }),
                   visible.contains(where: { CFEqual($0, editor) }),
                   AXHelpers.getTitle(editor, runtime: ax) == editorTitle,
                   AXHelpers.getRole(editor, runtime: ax) == kAXWindowRole,
                   (AXHelpers.getAttribute(editor, kAXSubroleAttribute, runtime: ax) as String?) == kAXStandardWindowSubrole,
                   let focused: AXUIElement = AXHelpers.getAttribute(scope.app, kAXFocusedWindowAttribute, runtime: ax),
-                  CFEqual(focused, editor), runtime.focusedApplicationPID() == pid,
-                  case .success(.some(let document)) = AXLogicProElements.projectPickerDocumentRead(scope.window, runtime: runtime),
-                  document == snapshot.document else { return false }
+                  CFEqual(focused, editor),
+                  AXLogicProElements.projectPickerDocumentRead(scope.window, runtime: runtime) == .success(snapshot.document),
+                  AXLogicProElements.projectPickerDocumentRead(editor, runtime: runtime) == .success(snapshot.document)
+            else { return false }
             return true
         }
         var ownedEditor: AXUIElement?

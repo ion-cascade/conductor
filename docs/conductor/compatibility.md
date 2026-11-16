@@ -1,6 +1,6 @@
 # Conductor compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.11 and the checks from earlier releases.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the qualification host and the workflows verified for each release.
 
 | Layer | Qualification target |
 | --- | --- |
