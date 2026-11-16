@@ -117,7 +117,10 @@ private struct MIDIExportPanelFixture {
             if key == 5 { b.setChildren(panel, [name, save, cancel, browser, go] + extras) }
             if key == 53 {
                 b.setAttribute(app, "escapes", (b.attributeValue(app, "escapes") as? Int ?? 0) + 1)
-                b.setChildren(panel, [name, save, cancel, browser])
+                let footer = b.element(32)
+                b.setRole(footer, kAXGroupRole as String)
+                b.setChildren(footer, [cancel])
+                b.setChildren(panel, [name, save, footer, browser])
             }
             if key == 36 {
                 b.setAttribute(app, "returns", (b.attributeValue(app, "returns") as? Int ?? 0) + 1)

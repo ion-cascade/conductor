@@ -243,7 +243,7 @@ final class MIDITrackExportPanel {
                 current.contains { CFEqual($0, panel) }
         }
         func ownCancelButton() throws -> AXUIElement? {
-            let candidates = try panelChildren(panel).filter {
+            let candidates = try descendants(panel, controlsOnly: true).filter {
                 try string(kAXRoleAttribute as String, of: $0) == kAXButtonRole as String &&
                     string(kAXIdentifierAttribute as String, of: $0) == "CancelButton"
             }
@@ -331,7 +331,9 @@ final class MIDITrackExportPanel {
         return element
     }
 
-    private func descendants(_ root: AXUIElement, stopAtLists: Bool = false, skipBrowserContents: Bool = true) throws -> [AXUIElement] {
+    private func descendants(
+        _ root: AXUIElement, stopAtLists: Bool = false, skipBrowserContents: Bool = true, controlsOnly: Bool = false
+    ) throws -> [AXUIElement] {
         var nodes: [AXUIElement] = []
         var seen: [CFHashCode: [AXUIElement]] = [:]
         let deadline = ContinuousClock.now.advanced(by: .seconds(10))
@@ -343,6 +345,8 @@ final class MIDITrackExportPanel {
             if !CFEqual(element, root) {
                 let role = try string(kAXRoleAttribute as String, of: element)
                 if stopAtLists && role == kAXListRole as String { return }
+                if controlsOnly && [kAXBrowserRole, kAXScrollAreaRole, kAXOutlineRole,
+                                    kAXListRole, kAXTableRole].contains(where: { $0 as String == role }) { return }
                 if skipBrowserContents && role == kAXBrowserRole as String,
                    try string(kAXIdentifierAttribute as String, of: element) == "ColumnView" { return }
             }
