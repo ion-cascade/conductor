@@ -1039,6 +1039,7 @@ struct OperationRegistryTests {
         ("midi.read_track_notes", "read_track_notes", .mutating, .long, .readbackRequired),
         ("midi.get_region_notes", "get_region_notes", .readOnly, .medium, .readbackRequired),
         ("midi.edit_region_note", "edit_region_note", .mutating, .long, .readbackRequired),
+        ("midi.edit_region_expression", "edit_region_expression", .mutating, .long, .readbackRequired),
         ("midi.read_selected_region_events", "read_selected_region_events", .readOnly, .medium, .none),
         ("midi.list_ports", "list_ports", .readOnly, .short, .none),
         ("midi.create_virtual_port", "create_virtual_port", .mutating, .short, .none),
@@ -1110,7 +1111,7 @@ struct OperationRegistryTests {
             "send_note", "send_chord", "send_cc", "send_program_change", "send_pitch_bend",
             "send_aftertouch", "send_sysex", "play_sequence", "import_file", "create_virtual_port",
             "step_input", "mmc_play", "mmc_stop", "mmc_record", "mmc_locate",
-            "export_track_midi", "read_track_notes", "edit_region_note",
+            "export_track_midi", "read_track_notes", "edit_region_note", "edit_region_expression",
         ]))
         #expect(OperationRegistry.mutatingCommands(tool: tool) == expected)
         #expect(!expected.contains("list_ports"))
@@ -1124,7 +1125,7 @@ struct OperationRegistryTests {
     func midiDeadlineParity() {
         #expect(Self.midiCommands.filter { $0.deadline == .short }.count == 14)
         #expect(Self.midiCommands.filter { $0.deadline == .medium }.map(\.command) == ["play_sequence", "get_region_notes", "read_selected_region_events"])
-        #expect(Self.midiCommands.filter { $0.deadline == .long }.map(\.command) == ["import_file", "export_track_midi", "read_track_notes", "edit_region_note"])
+        #expect(Self.midiCommands.filter { $0.deadline == .long }.map(\.command) == ["import_file", "export_track_midi", "read_track_notes", "edit_region_note", "edit_region_expression"])
 
         for entry in Self.midiCommands {
             #expect(OperationRegistry.deadlineSeconds(tool: "logic_midi", command: entry.command)

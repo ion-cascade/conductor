@@ -6,7 +6,7 @@ extension SemanticOracleFixtures {
         .midiListPorts, .tracksListLibrary, .midiReadSelectedRegionEvents, .midiGetRegionNotes,
         .mixerGetOutputVerified, .mixerGetSendDestinationVerified, .mixerGetInputBusVerified,
         .mixerGetSendBypassVerified, .pluginsPlanParameterChanges, .pluginsGetHostParameterManifest,
-        .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified,
+        .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified, .pluginsGetGainAutomation,
         .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep, .projectScanRegions,
         .tracksGetPanAutomation, .tracksGetVolumeAutomation, .projectGetRegionGain, .projectGetRegionFade,
     ]
@@ -18,6 +18,10 @@ extension SemanticOracleFixtures {
         ),
         .pluginsGetSidechainVerified: .init(
             response: #"{"operation":"logic_plugins.get_sidechain_verified","state":"A","success":true,"verified":true,"write_attempted":false,"source":"Internal","before":"Internal","choices":["Internal"],"changed":false,"editor_restored":true,"verify_source":"ax_compressor_popup_and_checked_menu"}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
+        .pluginsGetGainAutomation: .init(
+            response: #"{"operation":"plugin.get_gain_automation","state":"A","success":true,"verified":true,"write_attempted":false,"lane":"gain","unit":"logic_plugin_automation_value","verify_source":"ax_automation_event_list","track":0,"insert":3,"points":[{"position":"1.1.1.1","value":91}]}"#,
             readback: #"{"independent_readback":false}"#
         ),
         .midiGetRegionNotes: .init(

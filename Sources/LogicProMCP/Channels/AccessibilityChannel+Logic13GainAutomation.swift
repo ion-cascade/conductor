@@ -49,20 +49,25 @@ extension AccessibilityChannel {
             return only.element
         }
         guard let slot = gainSlot() else { return refuse("gain_insert_identity") }
+        var stage = "gain_event_table"
         func current() -> Bool {
+            stage = "gain_frontmost_editor"
             guard !Task.isCancelled, logic.onScreenWindowList() != nil, logic.focusedApplicationPID() == pid,
-                  list.ownsEditor(), AXPluginTrackBinding.isStable(binding, runtime: logic),
+                  list.ownsEditor() else { return false }
+            stage = "gain_stable_insert"
+            guard AXPluginTrackBinding.isStable(binding, runtime: logic),
                   let currentSlot = gainSlot(), CFEqual(currentSlot, slot),
                   case .success(.some(let path)) = AXLogicProElements.projectPickerDocumentRead(arrange, runtime: logic),
-                  path == document,
-                  case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: arrange, runtime: logic),
+                  path == document else { return false }
+            stage = "gain_selected_track"
+            guard case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: arrange, runtime: logic),
                   headers.indices.contains(track), CFEqual(headers[track], binding.header),
                   headers.enumerated().allSatisfy({
                       AXValueExtractors.extractSelectedState($0.element, runtime: ax) == ($0.offset == track)
-                  }), automationLaneIsReady(.gain, header: binding.header, runtime: ax) else { return false }
-            return true
+                  }) else { return false }
+            stage = "gain_track_automation_lane"
+            return automationLaneIsReady(.gain, header: binding.header, runtime: ax)
         }
-        var stage = "gain_event_table"
         guard current(), let points = list.points(onRefusal: { stage = $0 }), current() else { return refuse(stage) }
         if edit {
             return await changeTrackAutomationPoint(params: params, points: points, lane: .gain,
