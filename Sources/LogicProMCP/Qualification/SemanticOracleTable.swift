@@ -304,6 +304,7 @@ enum SemanticOracleTable {
         .projectSetRegionGain: "region_parameters",
         .projectSetRegionFade: "region_parameters",
         .midiEditRegionNote: "midi_note",
+        .midiEditRegionExpression: "midi_region_expression",
     ]
 
     /// Every operation the table may legitimately carry an oracle for: the FULLY

@@ -1269,12 +1269,15 @@ enum StockPluginCatalog {
             readbackUnit: "raw_ax_value",
             controlsViewRowLabel: "Gain:",
             controlsViewControlRole: "AXSlider",
-            availabilityState: .observed,
-            provenance: .observed(method: "logic13_native_controls_gain_walk",
-                observedAt: "2026-11-16T06:03:31.827Z", logicVersion: "13.0 (7801)", locale: "en-US", evidence: [
-                "Gain: AXSlider raw 960 at 0.0 dB and raw 900 at -6.0 dB after save and reopen",
-                "Observed reciprocal 1.0 dB and 0.1 dB steps with Phase Invert preserved",
-                "one display-bearing slider, one raw-only slider and its value indicator",
+            availabilityState: .verified,
+            provenance: .verified(source: "live_logic", method: "logic13_native_controls_gain_walk",
+                observedAt: "2026-11-16T08:01:00Z", logicVersion: "13.0 (7801)", locale: "en-US", evidence: [
+                "operation=logic_plugins.set_param_verified",
+                "write_method=ax_controls_view_gain_walk",
+                "observed_transition=0->-6",
+                "observed_transition=-6->0",
+                "one focused mono Gain Controls editor; Phase Invert preserved",
+                "raw 901 and display -5.9 dB verified after save, reopen and reconnect",
             ])
         ),
     ] + [
@@ -1867,7 +1870,7 @@ enum StockPluginCatalog {
         fx("pitch_shifter", "Pitch Shifter", "Pitch"),
         fx("vocal_transformer", "Vocal Transformer", "Pitch"),
         // Utility
-        fx("gain", "Gain", "Utility", type: .utility, write: .insertOnly, parameters: gainParameters,
+        fx("gain", "Gain", "Utility", type: .utility, write: .parameterWriteReadback, parameters: gainParameters,
            notes: ["insert path is a hint unless live Logic evidence upgrades this entry"]),
         fx("io", "I/O", "Utility", type: .utility, notes: ["external hardware insert utility"]),
         fx("test_oscillator", "Test Oscillator", "Utility", type: .utility),
