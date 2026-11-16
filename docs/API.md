@@ -343,6 +343,29 @@ Send-only success responses return an Honest Contract State B JSON envelope beca
 
 Selection-note reading (`read_selection_notes`) and `record_sequence verify_notes` remain deferred; `read_track_notes` observes a bound track through the exported artifact instead.
 
+#### Edit one existing MIDI note
+
+In saved desktop Logic Pro 13, select one visible ordinary MIDI region in stopped Arrange and open its Event List. Show all event types and all eight columns. Use absolute musical position and elapsed musical length. Run `logic_project.scan_regions` and pass the region's fresh `target_ref` to `logic_midi.get_region_notes`. It reports channels and pitches as MIDI integers, velocities from 1 to 127, one-based `position` in bar.beat.division.tick and zero-based `length` with the same components.
+
+For `logic_midi.edit_region_note`, pass the region reference, the note's complete current values in the five `expected_*` fields, and one or more desired fields. For example:
+
+```json
+{
+  "target_ref": "reg_…",
+  "expected_channel": 1,
+  "expected_pitch": 60,
+  "expected_velocity": 94,
+  "expected_position": "1.1.1.1",
+  "expected_length": "0.0.3.0",
+  "pitch": 65,
+  "velocity": 88,
+  "position": "1.1.1.7",
+  "length": "0.0.3.6"
+}
+```
+
+The adapter verifies the exact row before editing and checks peer events after every action. It refuses ambiguous note identities, locked notes, a selection of other Event List rows, unavailable event columns, and a request that requires more than 48 native actions. The initial supported Event List has at most 24 materialized events, with notes, controller events and program changes. Re-scan after a write attempt. Save the project to keep the verified note change.
+
 ### `logic_edit`
 
 Common commands: `undo`, `redo`, `cut`, `copy`, `paste`, `delete`, `select_all`, `split`, `join`, `quantize`, `bounce_in_place`, `normalize`, `duplicate`, `toggle_step_input`.
