@@ -2,6 +2,7 @@ extension SemanticOracleTable {
     static let conductorReceiptOnlyReadIDs: Set<OperationID> = [
         .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep,
         .projectScanRegions, .projectGetRegionGain, .projectGetRegionFade, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
+        .midiGetRegionNotes,
     ]
 
     static let pluginsGetPresetVerified = receiptOnlyRead(
@@ -27,6 +28,28 @@ extension SemanticOracleTable {
             .valueEquals(key: "editor_restored", expected: .bool(true)),
         ],
         reason: "The returned popup and menu observations share the operation's editor acquisition. The qualification harness has no independent readback of the referenced insert's source."
+    )
+
+    static let midiGetRegionNotes = receiptOnlyRead(
+        .midiGetRegionNotes, operation: "midi.get_region_notes",
+        constraints: [
+            .valueEquals(key: "verify_source", expected: .string("logic13_ax_event_list")),
+            .typedField(key: "target_ref", type: .string),
+            .typedField(key: "region", type: .string),
+            .integerMinimum(key: "event_count", min: 0),
+            .numericRange(key: "event_count", min: 0, max: 24),
+            .arrayElements(key: "notes", constraints: [
+                .integerMinimum(key: "channel", min: 1),
+                .numericRange(key: "channel", min: 1, max: 16),
+                .integerMinimum(key: "pitch", min: 0),
+                .numericRange(key: "pitch", min: 0, max: 127),
+                .integerMinimum(key: "velocity", min: 1),
+                .numericRange(key: "velocity", min: 1, max: 127),
+                .typedField(key: "position", type: .string),
+                .typedField(key: "length", type: .string),
+            ]),
+        ],
+        reason: "This generic run has no independently bound MIDI region and note inventory. The native release fixture verifies the Event List read against independently exported MIDI."
     )
 
     static let projectGetPatternStep = receiptOnlyRead(

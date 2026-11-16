@@ -64,7 +64,7 @@ enum SemanticOracleTable {
     /// entire typed `HealthResult` against the independent readback — a
     /// stronger check than any constraint list, and the only op whose readback
     /// resource returns the identical payload by construction.
-    static let bespokeOperationIDs: Set<OperationID> = [.systemHealth, .midiGetRegionNotes]
+    static let bespokeOperationIDs: Set<OperationID> = [.systemHealth]
 
     /// The read-only surface this table must FULLY cover, derived from the
     /// registry (the registry is truth — never a hand-maintained name list).
@@ -580,6 +580,7 @@ enum SemanticOracleTable {
         mixerGetInputBusVerified,
         midiListPorts,
         midiReadSelectedRegionEvents,
+        midiGetRegionNotes,
         tracksListLibrary,
         tracksScanLibrary,
         tracksResolvePath,

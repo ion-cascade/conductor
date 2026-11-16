@@ -3,7 +3,7 @@ import Foundation
 
 extension SemanticOracleFixtures {
     static let expectedReadDeferralIDs: Set<OperationID> = [
-        .midiListPorts, .tracksListLibrary, .midiReadSelectedRegionEvents,
+        .midiListPorts, .tracksListLibrary, .midiReadSelectedRegionEvents, .midiGetRegionNotes,
         .mixerGetOutputVerified, .mixerGetSendDestinationVerified, .mixerGetInputBusVerified,
         .mixerGetSendBypassVerified, .pluginsPlanParameterChanges, .pluginsGetHostParameterManifest,
         .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified,
@@ -18,6 +18,10 @@ extension SemanticOracleFixtures {
         ),
         .pluginsGetSidechainVerified: .init(
             response: #"{"operation":"logic_plugins.get_sidechain_verified","state":"A","success":true,"verified":true,"write_attempted":false,"source":"Internal","before":"Internal","choices":["Internal"],"changed":false,"editor_restored":true,"verify_source":"ax_compressor_popup_and_checked_menu"}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
+        .midiGetRegionNotes: .init(
+            response: #"{"operation":"midi.get_region_notes","state":"A","success":true,"verified":true,"write_attempted":false,"target_ref":"reg_fixture","region":"MIDI fixture","verify_source":"logic13_ax_event_list","event_count":2,"notes":[{"channel":1,"pitch":60,"velocity":94,"position":"1.1.1.1","length":"0.0.3.0"}]}"#,
             readback: #"{"independent_readback":false}"#
         ),
         .projectGetPatternStep: .init(
