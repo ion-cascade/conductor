@@ -26,6 +26,8 @@ struct OperationRegistryTests {
     private static let mixerCommands: [(OperationID, String)] = [
         (.mixerSetVolume, "set_volume"),
         (.mixerSetPan, "set_pan"),
+        (.mixerSetMute, "set_mute"),
+        (.mixerSetSolo, "set_solo"),
         (.mixerSetMasterVolume, "set_master_volume"),
         (.mixerSetPluginParam, "set_plugin_param"),
         (.mixerInsertPlugin, "insert_plugin"),
@@ -182,7 +184,7 @@ struct OperationRegistryTests {
     @Test("all mixer metadata matches current runtime truth")
     func mixerMetadata() throws {
         let mixerSpecs = OperationRegistry.specs.filter { $0.tool == .logicMixer }
-        let targetBearingCommands: Set<String> = ["set_volume", "set_pan", "set_output_verified", "get_output_verified", "get_input_bus_verified", "set_input_bus_verified", "get_send_destination_verified", "set_send_output_verified", "get_send_bypass_verified", "set_send_bypass_verified", "set_send_level_verified", "set_send_mode_verified"]
+        let targetBearingCommands: Set<String> = ["set_volume", "set_pan", "set_mute", "set_solo", "set_output_verified", "get_output_verified", "get_input_bus_verified", "set_input_bus_verified", "get_send_destination_verified", "set_send_output_verified", "get_send_bypass_verified", "set_send_bypass_verified", "set_send_level_verified", "set_send_mode_verified"]
         #expect(Set(Self.mixerCommands.map(\.1)) == Set(mixerSpecs.map(\.command)))
 
         for (id, command) in Self.mixerCommands {
@@ -534,6 +536,13 @@ struct OperationRegistryTests {
         ("logic_plugins", "plugins.set_param_verified", "set_param_verified", .mutating, .medium, .readbackRequired),
         ("logic_plugins", "plugins.set_eq_band_verified", "set_eq_band_verified", .mutating, .medium, .readbackRequired),
         ("logic_plugins", "plugins.insert_verified", "insert_verified", .mutating, .medium, .readbackRequired),
+        ("logic_plugins", "plugins.get_preset_verified", "get_preset_verified", .readOnly, .medium, .readbackRequired),
+        ("logic_plugins", "plugins.get_sidechain_verified", "get_sidechain_verified", .readOnly, .medium, .readbackRequired),
+        ("logic_plugins", "plugins.set_preset_verified", "set_preset_verified", .mutating, .medium, .readbackRequired),
+        ("logic_plugins", "plugins.set_sidechain_verified", "set_sidechain_verified", .mutating, .medium, .readbackRequired),
+        ("logic_plugins", "plugins.set_bypass_verified", "set_bypass_verified", .mutating, .medium, .readbackRequired),
+        ("logic_plugins", "plugins.get_gain_automation", "get_gain_automation", .readOnly, .medium, .readbackRequired),
+        ("logic_plugins", "plugins.set_gain_automation_point", "set_gain_automation_point", .mutating, .medium, .readbackRequired),
     ]
 
     @Test("small-tool registries are exact, unique, and isolated")
@@ -576,6 +585,10 @@ struct OperationRegistryTests {
                     || id == .pluginsGetChannelEQStateVerified || id == .pluginsPlanParameterChanges
                     || id == .pluginsSetParamVerified
                     || id == .pluginsSetEQBandVerified || id == .pluginsInsertVerified
+                    || id == .pluginsGetPresetVerified || id == .pluginsGetSidechainVerified
+                    || id == .pluginsSetPresetVerified || id == .pluginsSetSidechainVerified
+                    || id == .pluginsSetBypassVerified || id == .pluginsGetGainAutomation
+                    || id == .pluginsSetGainAutomationPoint
                     ? .acceptsStableTarget
                     : .none
             ))
@@ -752,6 +765,16 @@ struct OperationRegistryTests {
         ("project.launch", "launch", .mutating, .short, .readbackRequired),
         ("project.quit", "quit", .mutating, .medium, .readbackRequired),
         ("project.get_regions", "get_regions", .readOnly, .short, .none),
+        ("project.get_pattern_step", "get_pattern_step", .readOnly, .medium, .none),
+        ("project.set_pattern_step_enabled", "set_pattern_step_enabled", .mutating, .medium, .readbackRequired),
+        ("project.scan_regions", "scan_regions", .readOnly, .medium, .none),
+        ("project.get_region_smart_tempo", "get_region_smart_tempo", .readOnly, .medium, .readbackRequired),
+        ("project.get_region_gain", "get_region_gain", .readOnly, .medium, .none),
+        ("project.set_region_gain", "set_region_gain", .mutating, .medium, .readbackRequired),
+        ("project.get_region_fade", "get_region_fade", .readOnly, .medium, .none),
+        ("project.set_region_fade", "set_region_fade", .mutating, .medium, .readbackRequired),
+        ("project.edit_region", "edit_region", .mutating, .medium, .readbackRequired),
+        ("project.export_status", "export_status", .readOnly, .long, .none),
         ("project.export_plan", "export_plan", .readOnly, .short, .none),
         ("project.export_run", "export_run", .mutating, .long, .readbackRequired),
         ("project.export_resume", "export_resume", .mutating, .long, .readbackRequired),
@@ -779,6 +802,7 @@ struct OperationRegistryTests {
         ("logic_mixer", "insert_plugin", .l2),
         ("logic_system", "clear_traces", .l2),
         ("logic_tracks", "sort_verified", .l2),
+        ("logic_tracks", "split_selected_audio", .l2),
         ("logic_project", "close", .l3),
         ("logic_project", "quit", .l3),
     ]
@@ -837,6 +861,7 @@ struct OperationRegistryTests {
         #expect(expected == Set([
             "new", "open", "save", "save_as", "close", "bounce", "launch", "quit",
             "export_run", "export_resume", "cleanup_apply", "apply_session_repair",
+            "set_pattern_step_enabled", "set_region_gain", "set_region_fade", "edit_region",
         ]))
         #expect(OperationRegistry.mutatingCommands(tool: tool) == expected)
         for entry in Self.projectCommands {
@@ -848,8 +873,8 @@ struct OperationRegistryTests {
     @Test("project deadlines exactly match registry short medium and long tiers")
     func projectDeadlineParity() {
         #expect(Self.projectCommands.filter { $0.deadline == .short }.count == 8)
-        #expect(Self.projectCommands.filter { $0.deadline == .medium }.count == 6)
-        #expect(Self.projectCommands.filter { $0.deadline == .long }.count == 4)
+        #expect(Self.projectCommands.filter { $0.deadline == .medium }.count == 15)
+        #expect(Self.projectCommands.filter { $0.deadline == .long }.count == 5)
         #expect(Self.projectCommands.filter { $0.deadline == .saga }.map(\.command) == ["apply_session_repair"])
 
         for entry in Self.projectCommands {
@@ -1180,6 +1205,15 @@ struct OperationRegistryTests {
         ("tracks.record_sequence", "record_sequence", .mutating, .long, .readbackRequired),
         ("tracks.sort_verified", "sort_verified", .mutating, .medium, .readbackRequired),
         ("tracks.set_automation", "set_automation", .mutating, .short, .readbackRequired),
+        ("tracks.split_selected_audio", "split_selected_audio", .mutating, .long, .readbackRequired),
+        ("tracks.create_pan_automation_point", "create_pan_automation_point", .mutating, .medium, .readbackRequired),
+        ("tracks.get_pan_automation", "get_pan_automation", .readOnly, .medium, .readbackRequired),
+        ("tracks.set_pan_automation_point", "set_pan_automation_point", .mutating, .medium, .readbackRequired),
+        ("tracks.create_volume_automation_at_region_borders", "create_volume_automation_at_region_borders", .mutating, .medium, .readbackRequired),
+        ("tracks.get_volume_automation", "get_volume_automation", .readOnly, .medium, .readbackRequired),
+        ("tracks.set_volume_automation_point", "set_volume_automation_point", .mutating, .medium, .readbackRequired),
+        ("tracks.insert_volume_automation_point", "insert_volume_automation_point", .mutating, .medium, .readbackRequired),
+        ("tracks.move_volume_automation_point", "move_volume_automation_point", .mutating, .medium, .readbackRequired),
         ("tracks.set_instrument", "set_instrument", .mutating, .medium, .readbackRequired),
         ("tracks.list_library", "list_library", .readOnly, .long, .none),
         ("tracks.scan_library", "scan_library", .readOnly, .long, .none),
@@ -1213,7 +1247,10 @@ struct OperationRegistryTests {
         let tool = try #require(ToolID(rawValue: "logic_tracks"))
         let targetBearingCommands: Set<String> = [
             "select", "delete", "duplicate", "rename", "mute", "solo", "arm", "arm_only",
-            "set_automation", "set_instrument",
+            "set_automation", "set_instrument", "split_selected_audio",
+            "create_pan_automation_point", "get_pan_automation", "set_pan_automation_point",
+            "create_volume_automation_at_region_borders", "get_volume_automation", "set_volume_automation_point",
+            "insert_volume_automation_point", "move_volume_automation_point",
         ]
 
         for entry in Self.trackCommands {
@@ -1223,7 +1260,7 @@ struct OperationRegistryTests {
             #expect(spec.tool == tool)
             #expect(spec.command == entry.command)
             #expect(spec.mutability == entry.mutability)
-            let expectedConfirmation: ConfirmationPolicy = entry.command == "sort_verified" ? .l2 : .none
+            let expectedConfirmation: ConfirmationPolicy = ["sort_verified", "split_selected_audio"].contains(entry.command) ? .l2 : .none
             #expect(spec.confirmation == expectedConfirmation)
             #expect(spec.target == (targetBearingCommands.contains(entry.command) ? .acceptsStableTarget : .none))
             #expect(spec.verification == entry.verification)
@@ -1252,7 +1289,9 @@ struct OperationRegistryTests {
         #expect(expected == Set([
             "select", "create_audio", "create_instrument", "create_drummer", "create_external_midi",
             "delete", "duplicate", "rename", "mute", "solo", "arm", "arm_only", "record_sequence", "sort_verified",
-            "set_automation", "set_instrument",
+            "set_automation", "set_instrument", "split_selected_audio",
+            "create_pan_automation_point", "set_pan_automation_point", "create_volume_automation_at_region_borders",
+            "set_volume_automation_point", "insert_volume_automation_point", "move_volume_automation_point",
         ]))
         #expect(OperationRegistry.mutatingCommands(tool: tool) == expected)
         for command in ["list_library", "scan_library", "resolve_path", "scan_plugin_presets"] {
