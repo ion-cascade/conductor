@@ -17,7 +17,8 @@ func midiExportPanelNativeTimeoutRecovery() async throws {
     _ = ProcessUtils.activateLogicPro()
 
     let window = try #require(AXLogicProElements.mainWindow(runtime: runtime))
-    let document = try #require(AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime).get())
+    let observedDocument = try AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime).get()
+    let document = try #require(observedDocument)
     try #require(URL(string: document)?.standardizedFileURL == expected)
     try #require(AXLogicProElements.dialogPresenceReason(runtime: runtime) == .noBlockingWindow)
     let temporary = try ExportTemporaryFiles.temporaryExportFile()
