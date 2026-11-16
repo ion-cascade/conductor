@@ -211,11 +211,15 @@ final class MIDITrackExportPanel {
 
     /// AppKit attaches modal sheets directly to the Save window. Reading
     /// its sheet state should never walk the file browser or sidebar.
-    private func attachedSheet(on panel: AXUIElement) throws -> AXUIElement? {
+    private func panelChildren(_ panel: AXUIElement) throws -> [AXUIElement] {
         guard case .success(let children) = AXHelpers.childrenResult(panel, runtime: runtime.ax) else {
             throw Failure.unavailable("save_panel_children_unreadable")
         }
-        let sheets = try children.filter { try string(kAXRoleAttribute as String, of: $0) == kAXSheetRole as String }
+        return children
+    }
+
+    private func attachedSheet(on panel: AXUIElement) throws -> AXUIElement? {
+        let sheets = try panelChildren(panel).filter { try string(kAXRoleAttribute as String, of: $0) == kAXSheetRole as String }
         guard sheets.count <= 1 else { throw Failure.unavailable("ambiguous_save_panel_sheets") }
         return sheets.first
     }
@@ -238,6 +242,13 @@ final class MIDITrackExportPanel {
                 originalWindows.allSatisfy { original in current.contains { CFEqual($0, original) } } &&
                 current.contains { CFEqual($0, panel) }
         }
+        func ownCancelButton() throws -> AXUIElement? {
+            let candidates = try panelChildren(panel).filter {
+                try string(kAXRoleAttribute as String, of: $0) == kAXButtonRole as String &&
+                    string(kAXIdentifierAttribute as String, of: $0) == "CancelButton"
+            }
+            return candidates.count == 1 ? candidates[0] : nil
+        }
         do {
             try assertOwned(panel, app: app)
             guard try onlyOwnedWindowWasAdded() else { return false }
@@ -254,9 +265,10 @@ final class MIDITrackExportPanel {
                     return try self.ownedSheetIsGone(sheet, on: panel) ? panel : nil
                 }
             }
-            let cancel = try required(identifier: "CancelButton", role: kAXButtonRole as String, in: panel)
+            guard let cancel = try ownCancelButton() else { return false }
             try act(cancel, action: kAXPressAction as String, panel: panel, app: app) {
-                guard try onlyOwnedWindowWasAdded(), try self.attachedSheet(on: panel) == nil else {
+                guard try onlyOwnedWindowWasAdded(), try self.attachedSheet(on: panel) == nil,
+                      try ownCancelButton().map({ CFEqual($0, cancel) }) == true else {
                     throw Failure.unavailable("save_panel_cleanup_scope_changed")
                 }
                 try self.assertKeyboardFocus(panel, app: app)
