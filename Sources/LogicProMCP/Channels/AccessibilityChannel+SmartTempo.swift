@@ -86,8 +86,19 @@ extension AccessibilityChannel {
             return refuse(.windowIdentityUnresolved, "Logic did not expose the owned Smart Tempo analysis window.")
         }
 
-        let first = Self.smartTempoObservation(editor, runtime: ax)
-        let second = Self.smartTempoObservation(editor, runtime: ax)
+        // The detached window can become focused before its controls and marker grid mount.
+        var previous: SmartTempoObservation?
+        var stable: SmartTempoObservation?
+        for _ in 0..<10 {
+            guard !Task.isCancelled, owns(editor) else { break }
+            let current = Self.smartTempoObservation(editor, runtime: ax)
+            if let current, current == previous {
+                stable = current
+                break
+            }
+            previous = current
+            try? await Task.sleep(for: .milliseconds(125))
+        }
         guard owns(editor), let close: AXUIElement = AXHelpers.getAttribute(editor, kAXCloseButtonAttribute, runtime: ax),
               AXHelpers.performAction(close, kAXPressAction, runtime: ax) else {
             receipt["editor_close_observed"] = false
@@ -106,12 +117,12 @@ extension AccessibilityChannel {
         guard restored else {
             return refuse(.windowIdentityUnresolved, "The original region selection could not be confirmed after closing Smart Tempo.")
         }
-        guard !Task.isCancelled, let first, second == first else {
+        guard !Task.isCancelled, let stable else {
             return refuse(.readbackUnavailable, "Analyze the region in Logic and expose its first downbeat in the Smart Tempo Editor.")
         }
         receipt["region"] = held.info.name
-        receipt["tempo_bpm"] = first.tempo
-        receipt["first_downbeat_source_sample"] = first.firstDownbeat
+        receipt["tempo_bpm"] = stable.tempo
+        receipt["first_downbeat_source_sample"] = stable.firstDownbeat
         receipt["verify_source"] = "logic13_smart_tempo_editor"
         return .success(HonestContract.encodeStateA(extras: receipt))
     }
@@ -131,11 +142,11 @@ extension AccessibilityChannel {
             return groups.count == 1 ? groups.first : nil
         }
         guard let pane = direct(editor, description: "Smart Tempo"),
-              let content = direct(pane, description: "Smart Tempo contents") else { return nil }
-        let fields = AXHelpers.findAllDescendants(of: content, role: kAXTextFieldRole, maxDepth: 3, runtime: runtime).filter {
+              direct(pane, description: "Smart Tempo contents") != nil else { return nil }
+        let fields = AXHelpers.findAllDescendants(of: pane, role: kAXTextFieldRole, maxDepth: 3, runtime: runtime).filter {
             (AXHelpers.getAttribute($0, kAXHelpAttribute, runtime: runtime) as String?)?.hasPrefix("Shows the tempo of the audio file.") == true
         }
-        let displays = AXHelpers.findAllDescendants(of: content, role: kAXGroupRole, maxDepth: 3, runtime: runtime).filter {
+        let displays = AXHelpers.findAllDescendants(of: pane, role: kAXGroupRole, maxDepth: 3, runtime: runtime).filter {
             AXHelpers.getDescription($0, runtime: runtime) == "Smart Tempo editor"
         }
         guard fields.count == 1, displays.count == 1,
