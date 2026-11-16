@@ -475,9 +475,9 @@ Select one Keyboard Player region, open its Session Player editor and expand Gen
 
 #### Search Browser instruments and load a local patch
 
-Select a software instrument track in a saved, stopped Logic Pro 13 project. Open the Inspector and Browser Instruments in list view. Turn off Replace on selection and clear earlier search filters. `search_browser_patches` takes the current `project_path`, zero-based `track_index`, exact `track_name` and `query`. Logic supplies the ranked results, and Conductor returns the instrument patch names visible in the results pane.
+Select a software instrument track in a saved, stopped Logic Pro 13 project. Open the Inspector and Browser Instruments in list view. Turn off Replace on selection and clear earlier search filters. `search_browser_patches` takes the current `project_path`, unique selected `track_name` and `query`. Logic supplies the ranked results, and Conductor returns the instrument patch names visible in the results pane.
 
-Leave results unselected. Pass the same four parameters to `load_browser_patch` with the exact observed `patch` name. The operation checks the target, applies the patch, verifies it in the native Inspector and compares the Arrange tracks and regions. It restores Replace on selection to off.
+Leave results unselected. Pass the same three parameters to `load_browser_patch` with the exact observed `patch` name. The operation checks the target, applies the patch, verifies it in the native Inspector and compares the Arrange tracks and regions. It restores Replace on selection to off.
 
 #### Sample Arrange viewports and edit one region
 

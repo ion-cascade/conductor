@@ -19,6 +19,7 @@ struct ProjectUnifiedBrowser {
     let results: [Result]
     let query: String?
     let selectedIndex: Int
+    let selectedHeader: AXUIElement
     let names: [String]
     let regions: [String]
     let patchName: String?
@@ -98,14 +99,15 @@ struct ProjectUnifiedBrowser {
         return Self(projectPath: url.path, window: window, panel: browser, search: search, input: fields[0], replace: replacement,
                     replacementEnabled: enabled, selectionEmpty: selection?.isEmpty == true, results: result,
                     query: filters.count == 1 ? AXHelpers.getDescription(filters[0], runtime: ax) : nil,
-                    selectedIndex: index, names: names, regions: regions,
+                    selectedIndex: index, selectedHeader: headers[index], names: names, regions: regions,
                     patchName: indicators.count == 1 ? indicators[0] : nil,
                     instrumentSlotObserved: instrumentsInInspector.count == 1)
     }
 
     func holdsSameTarget(as other: Self) -> Bool {
         projectPath == other.projectPath && CFEqual(window, other.window) && CFEqual(panel, other.panel)
-            && selectedIndex == other.selectedIndex && names == other.names && regions == other.regions
+            && selectedIndex == other.selectedIndex && CFEqual(selectedHeader, other.selectedHeader)
+            && names == other.names && regions == other.regions
     }
 
     func loaded(_ name: String, replacing before: Self) -> Bool {

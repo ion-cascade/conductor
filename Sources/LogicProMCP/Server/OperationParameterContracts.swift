@@ -706,17 +706,15 @@ extension OperationRegistry {
             ], required: [["address"], ["expected_chord_source"], ["chord_source"]]),
             "project.search_browser_patches": .init(params: [
                 "project_path": .enforced(.string, .string("/tmp/Browser.logicx")),
-                "track_index": .enforced(.integer, .int(1)),
                 "track_name": .enforced(.string, .string("Inst 2")),
                 "query": .enforced(.string, .string("Keyboard")),
-            ], required: [["project_path"], ["track_index"], ["track_name"], ["query"]]),
+            ], required: [["project_path"], ["track_name"], ["query"]]),
             "project.load_browser_patch": .init(params: [
                 "project_path": .enforced(.string, .string("/tmp/Browser.logicx")),
-                "track_index": .enforced(.integer, .int(1)),
                 "track_name": .enforced(.string, .string("Inst 2")),
                 "query": .enforced(.string, .string("Keyboard")),
                 "patch": .enforced(.string, .string("Studio Grand")),
-            ], required: [["project_path"], ["track_index"], ["track_name"], ["query"], ["patch"]]),
+            ], required: [["project_path"], ["track_name"], ["query"], ["patch"]]),
             "project.get_region_smart_tempo": .init(params: [
                 "target_ref": .enforced(.string, .string("reg_test")),
             ], required: [["target_ref"]]),

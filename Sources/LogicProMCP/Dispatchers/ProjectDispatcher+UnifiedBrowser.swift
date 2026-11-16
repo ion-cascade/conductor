@@ -26,22 +26,21 @@ extension ProjectDispatcher {
         }
 
         guard let path = params["project_path"]?.stringValue, path.hasPrefix("/"),
-              let index = params["track_index"]?.intValue, index >= 0,
               let trackName = params["track_name"]?.stringValue, !trackName.isEmpty,
               let query = params["query"]?.stringValue, (1...80).contains(query.count),
               query == query.trimmingCharacters(in: .whitespacesAndNewlines),
               query.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }) else {
-            return refuse(.invalidParams, "Pass the current project, selected track index and name, and a short search query.")
+            return refuse(.invalidParams, "Pass the current project, the exact selected track name and a short search query.")
         }
         let loading = command == "load_browser_patch"
         let requested = params["patch"]?.stringValue
-        guard loading ? (params.count == 5 && requested?.isEmpty == false) : params.count == 4 else {
+        guard loading ? (params.count == 4 && requested?.isEmpty == false) : params.count == 3 else {
             return refuse(.invalidParams, "To load a result, pass the exact patch name from search_browser_patches.")
         }
         guard let before = ProjectUnifiedBrowser.read(), before.instrumentSlotObserved, !before.replacementEnabled else {
             return refuse(.readbackUnavailable, "Show Browser Instruments and the Inspector in stopped Arrange. Turn off Replace on selection.")
         }
-        guard before.projectPath == path, before.selectedIndex == index, before.names[index] == trackName else {
+        guard before.projectPath == path, before.names[before.selectedIndex] == trackName else {
             return refuse(.staleSnapshot, "The selected instrument track or project changed.")
         }
 

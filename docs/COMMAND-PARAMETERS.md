@@ -143,7 +143,7 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `inspect_session` | `allow_ui_navigation`: boolean, `domains`, `project_ref`, `scope`, `snapshot_id` | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `is_running` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `launch` | none | none | closed | mutating | l1 | none | readback_required | never_automatic | default_install |
-| `load_browser_patch` | `patch`: string, `project_path`: string, `query`: string, `track_index`: integer, `track_name`: string | `project_path`; `track_index`; `track_name`; `query`; `patch` | closed | mutating | none | none | readback_required | never_automatic | default_install |
+| `load_browser_patch` | `patch`: string, `project_path`: string, `query`: string, `track_name`: string | `project_path`; `track_name`; `query`; `patch` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `new` | none | none | closed | mutating | l1 | none | readback_required | never_automatic | default_install |
 | `open` | `confirmed`: boolean, `path`: scalar | `path` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `plan_session_repair` | `allow_create_aux`, `allow_replace_send`, `allow_stack_membership_change`, `digest`, `names`, `on_ambiguity`, `plan_id`, `policy`, `snapshot_id` | `plan_id` or `snapshot_id` and `policy` | closed | read_only | none | none | none | never_automatic | default_install |
@@ -151,7 +151,7 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `save` | none | none | closed | mutating | l1 | none | readback_required | never_automatic | default_install |
 | `save_as` | `confirmed`: boolean, `path`: scalar | `path` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `scan_regions` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
-| `search_browser_patches` | `project_path`: string, `query`: string, `track_index`: integer, `track_name`: string | `project_path`; `track_index`; `track_name`; `query` | closed | read_only | none | none | none | never_automatic | default_install |
+| `search_browser_patches` | `project_path`: string, `query`: string, `track_name`: string | `project_path`; `track_name`; `query` | closed | read_only | none | none | none | never_automatic | default_install |
 | `set_chord_quality` | `end_bar`: integer, `expected_chord`: string, `project_path`: string, `quality`: string, `start_bar`: integer | `project_path`; `start_bar`; `end_bar`; `expected_chord`; `quality` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `set_pattern_step_enabled` | `address`: object, `enabled`: boolean, `expected_enabled`: boolean | `address`; `expected_enabled`; `enabled` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `set_pattern_steps_enabled` | `address`: object, `changes`: array, `grid_snapshot`: string | `address`; `grid_snapshot`; `changes` | closed | mutating | none | none | readback_required | never_automatic | default_install |
