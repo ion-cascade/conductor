@@ -18,7 +18,8 @@ extension AccessibilityChannel {
         }
         func selected(_ scope: ArrangeRegionScope) -> Bool {
             guard let items = AXLogicProElements.logic13RegionItems(in: scope.content, runtime: ax),
-                  items.filter({ CFEqual($0, held.item) }).count == 1, scope.selectionIsOriginal() else { return false }
+                  items.filter({ CFEqual($0, held.item) }).count == 1, scope.selectionIsOriginal(),
+                  scope.originalSelection.allSatisfy({ CFEqual($0, held.item) }) else { return false }
             return items.allSatisfy {
                 AXValueExtractors.extractSelectedState($0, runtime: ax) == CFEqual($0, held.item)
             }

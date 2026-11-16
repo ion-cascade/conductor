@@ -980,7 +980,9 @@ actor LogicProServer {
         let mutatingCommand = isMutatingCommand(tool: tool, command: command)
         let ownedObservationRead = freshPopulationRead
             || (tool == "logic_midi" && command == "get_region_notes")
-            || (tool == "logic_project" && ["scan_regions", "get_pattern_step", "get_region_gain", "get_region_fade"].contains(command))
+            || (tool == "logic_project" && [
+                "scan_regions", "get_pattern_step", "get_region_gain", "get_region_fade", "get_region_smart_tempo",
+            ].contains(command))
             || selectedRegionEventRead
             || (tool == "logic_plugins" && command == "get_sidechain_verified")
             || (tool == "logic_mixer" && (command == "get_input_bus_verified" || command == "get_send_bypass_verified"))
