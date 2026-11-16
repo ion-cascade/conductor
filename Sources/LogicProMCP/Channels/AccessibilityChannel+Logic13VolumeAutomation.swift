@@ -304,7 +304,10 @@ extension AccessibilityChannel {
             AXHelpers.getRole($0, runtime: runtime) == kAXCheckBoxRole
                 && AXHelpers.getDescription($0, runtime: runtime) == "Enable Automation"
         }
-        if lane == .pan || lane == .gain || requireTrackMode {
+        // Gain also requires the owned Track Automation Root Folder Event List
+        // and exact Fader address. Its focused editor leaves Enable Automation
+        // readable while the Arrange Track/Region button has no description.
+        if lane == .pan || requireTrackMode {
             // Logic shows the Track/Region button when the pointer is away
             // from the parameter popup. Enable Automation can be absent.
             guard controls.filter({
