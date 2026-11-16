@@ -3913,8 +3913,8 @@ func dispatchWithPhysicalTrackFixture(
     let fixture = ExactNameFixture()
     let (project, track) = try await fixture.prepare(typedProducer: true)
     var request = params
-    if request["project_ref"] != nil { request["project_ref"] = .string(project.rawValue) }
-    if request["target_ref"] != nil { request["target_ref"] = .string(track.rawValue) }
+    if request["project_ref"] == .string("prj_lpm_reference") { request["project_ref"] = .string(project.rawValue) }
+    if request["target_ref"] == .string("trk_lpm_reference") { request["target_ref"] = .string(track.rawValue) }
     let runtime = fixture.runtime
     let boundRequest = request
     return await FeatureFlags.withAdr002TargetRefForTests(true) {

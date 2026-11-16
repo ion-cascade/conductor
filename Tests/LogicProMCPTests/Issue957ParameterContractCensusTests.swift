@@ -114,8 +114,17 @@ struct Issue957ParameterContractCensusTests {
         case .logicMidi:
             result = await MIDIDispatcher.handle(command: command, params: params, router: router, cache: cache)
         case .logicTracks:
-            result = await TrackDispatcher.handle(command: command, params: params, router: router, cache: cache,
-                                                  targetRegistry: targetRegistry, liveTrackNames: names)
+            if spec.id == .tracksSplitSelectedAudio {
+                do {
+                    result = try await dispatchWithPhysicalTrackFixture(command: command, params: params, router: router)
+                } catch {
+                    Issue.record("Could not prepare the stem splitter parameter fixture: \(error)")
+                    result = toolInvalidParamsResult("Physical track fixture unavailable")
+                }
+            } else {
+                result = await TrackDispatcher.handle(command: command, params: params, router: router, cache: cache,
+                                                      targetRegistry: targetRegistry, liveTrackNames: names)
+            }
         }
         var ran = false
         for channel in channels where !(await channel.executedOps.isEmpty) {
