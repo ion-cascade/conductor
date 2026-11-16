@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.12.1] — 2026-11-16
+
+- Keep the Tracks and Plug-ins command lists in MCP discovery aligned with the operation registry.
+- Restore the exact registry checks for command identity, confirmation, input targets, deadlines, and verification policy.
+
 ## [1.12.0] — 2026-11-16
 
 - Read the analyzed tempo and first downbeat of a referenced audio region through Logic's Smart Tempo Editor. ([#49](https://github.com/ion-cascade/conductor/issues/49))
