@@ -1,6 +1,6 @@
-# Conductor 1.10 compatibility
+# Conductor 1.11 compatibility
 
-The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.10 and the checks from earlier releases.
+The support target is the desktop version of Logic Pro on a logged-in Apple silicon Mac. The matrix records the Mac mini used to qualify Conductor 1.11 and the checks from earlier releases.
 
 | Layer | Qualification target |
 | --- | --- |
@@ -14,6 +14,18 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
+
+## 1.11 Bounded automation and mono Gain
+
+| Workflow | Mac mini scope |
+| --- | --- |
+| Track Volume envelope | Add one control point inside a matched flat segment and edit its value in the native Event List. The workflow exposes piecewise envelope editing. Logic's canvas curve handles remain outside this adapter. |
+| MIDI region Expression | Change the value of one identified existing CC11 event in an ordinary MIDI region. Match the native region, channel, controller and position, and verify peer events and saved readback. |
+| Stock Gain automation | Read and edit an existing Gain automation point for the qualified fourth audio insert. Bind the insert, selected lane and native event address. |
+| Stock mono Gain | Write −6.0 to 0.0 dB in 0.1 dB steps with the exact Controls editor manually opened and focused. Phase Invert stays read-only. |
+| Third-party Audio Units | The registered Mac mini catalogue contained Apple units only. |
+
+[Automation and plug-in commands](../API.md)
 
 ## 1.10 Track automation and stock plug-ins
 

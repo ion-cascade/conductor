@@ -264,6 +264,12 @@ On English desktop Logic Pro 13, select the target track, show Mixer and get the
 
 Call `set_param_verified` with the insert `target_ref`, `plugin:"Gain"`, `param:"gain"`, `unit:"dB"`, `mode:"duplicate_applyback"`, and the exact `project_expected_path`. The current and requested levels must be within −6.0 to 0.0 dB in 0.1 dB steps. Conductor verifies the raw value, display and Phase Invert after each step. After reopening, obtain a new insert reference before reading or writing the level.
 
+#### Edit a stock Gain automation point
+
+On English desktop Logic Pro 13, select the track with its only Gain in the fourth audio insert. Leave Mixer visible and take the occupied reference from `get_inventory`. In Arrange choose the Gain parameter for that insert in track automation, leave the lane in Read mode, then focus the Track Automation Event List.
+
+Call `get_gain_automation` with that `target_ref`. Use a reported `position` and `value` as `position` and `expected_current` for `set_gain_automation_point`. The new `value` must be reachable in ten-unit steps on Logic’s native 0–127 automation scale. The automation values are native integers. The separate static Gain setter takes decibels.
+
 The observation scope is one parameter of the **current referenced physical insert**, not a historical AU-object identity, an atomic whole-plugin snapshot, or all-parameter completeness. Project, slot, editor and control identity are checked around collection. Observed raw-value drift during display collection refuses with `parameter_read_status: unstable`; matching bookends cannot detect every intervening change. This audio-read-only operation shares the existing verified-operation serializer because editor acquisition can open windows, change focus or temporarily switch views. It does not select a track or write an audio parameter. It restores its observed entry view while ownership remains valid, closes only an editor it created, and reports unavailable restoration instead of acting through lost ownership. A confirmed view restoration is not a general focus-restoration guarantee. Ordinary inventory remains ungated. New-reader live qualification and the remaining snapshot/batch/application scope are tracked in #955.
 
 `plan_parameter_changes` is a read-only before-state and diff for an explicitly requested supported subset:
