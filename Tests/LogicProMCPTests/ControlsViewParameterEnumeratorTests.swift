@@ -5,6 +5,55 @@ import Testing
 
 @Suite("ADR-018 Controls-view parameter enumerator")
 struct ControlsViewParameterEnumeratorTests {
+    @Test(arguments: ["matched", "value", "range", "indicator", "group", "structure"])
+    func mirroredControlsSliderRequiresCorroboratingEvidence(disagreement: String) throws {
+        let fixture = makeControlsFixture(pluginName: "PurestGain", rows: [
+            RowFixture(label: "Gain:", controlRole: .slider, value: nil,
+                valueDescription: " -6.00 dB", valueSettable: true, additionalControlRole: .slider)
+        ])
+        let ax = fixture.builder
+        let label = ax.element(90_101)
+        let formatted = ax.element(90_102)
+        let bare = ax.element(90_103)
+        let cell = ax.element(90_104)
+        let group = ax.element(90_105)
+        let indicator = ax.element(90_106)
+        ax.setRole(group, kAXGroupRole)
+        ax.setRole(indicator, kAXValueIndicatorRole)
+        ax.setChildren(group, [formatted])
+        ax.setChildren(bare, [indicator])
+        ax.setChildren(cell, disagreement == "structure" ? [label, formatted, bare] : [label, group, bare])
+        for slider in [formatted, bare] {
+            ax.setAttribute(slider, kAXMinValueAttribute, 0)
+            ax.setAttribute(slider, kAXMaxValueAttribute, 800)
+            ax.setAttribute(slider, kAXValueAttribute, 340)
+        }
+        ax.setAttribute(bare, kAXValueDescriptionAttribute, "")
+        ax.setAttribute(group, kAXValueAttribute, disagreement == "group" ? "-5.00 dB" : " -6.00 dB")
+        ax.setAttribute(indicator, kAXValueAttribute, disagreement == "indicator" ? 341 : 340)
+        if disagreement == "value" { ax.setAttribute(bare, kAXValueAttribute, 341) }
+        if disagreement == "range" { ax.setAttribute(bare, kAXMaxValueAttribute, 1000) }
+
+        let result = try #require(ControlsViewParameterEnumerator.enumerate(
+            in: fixture.window, buildFingerprint: "PurestGain 1.0.0", runtime: fixture.runtime
+        ))
+        let observation = try #require(result.rowObservations.first)
+        #expect(observation.controlRoles == ["AXSlider", "AXSlider"])
+        #expect(!result.manifest.approved)
+        if disagreement == "matched" {
+            let parameter = try #require(result.manifest.parameters.first)
+            #expect(result.manifest.parameters.count == 1)
+            #expect(parameter.name == "Gain")
+            #expect(parameter.valueKind == .normalizedReadbackOnly)
+            #expect(observation.observedRawValue == .integer(340))
+            #expect(observation.valueDescription == "-6.00 dB")
+        } else {
+            #expect(result.manifest.parameters.isEmpty)
+            #expect(observation.classification == .refusedAmbiguousControl(roles: ["AXSlider", "AXSlider"]))
+            #expect(observation.observedRawValue == nil)
+        }
+    }
+
     @Test func rowObservationsPreserveExactSupportedAXValueScalars() throws {
         let stringFixture = makeControlsFixture()
         let booleanFixture = makeControlsFixture()

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.11.1] — 2026-11-16
+
+- Read Airwindows PurestGain Gain and Slow Fade values when Logic's formatted slider and its bare counterpart agree. Parameter writes remain unsupported for this plug-in. ([#46](https://github.com/ion-cascade/conductor/issues/46))
+
 ## [1.11.0] — 2026-11-16
 
 - Add an interior control point to a bounded flat track Volume segment and reshape the envelope with the existing point setter. ([#44](https://github.com/ion-cascade/conductor/issues/44))

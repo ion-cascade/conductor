@@ -190,7 +190,7 @@ enum ControlsViewParameterEnumerator {
                 classification = .refusedAmbiguousLabel
             } else if let candidate = rowRead.pairedCandidates.only {
                 label = candidate.label
-                if rowRead.controls.count == 1 {
+                if rowRead.controls.count == candidate.controlCount {
                     parameterControl = candidate.control
                     classification = classify(
                         for: candidate.label,
@@ -436,8 +436,11 @@ enum ControlsViewParameterEnumerator {
                 labels: contents.labelElements,
                 controls: cellControls.map(\.element)
             ))
-            if let label = cellLabels.only, let control = cellControls.only {
-                pairedCandidates.append(PairedCandidate(label: label, control: control))
+            if let label = cellLabels.only,
+               let control = cellControls.only ?? mirroredSlider(in: cell, controls: cellControls, runtime: runtime) {
+                pairedCandidates.append(PairedCandidate(
+                    label: label, control: control, controlCount: cellControls.count
+                ))
             }
         }
         return RowRead(
@@ -597,13 +600,50 @@ enum ControlsViewParameterEnumerator {
         }
     }
 
+    /// Logic's Controls table can expose one slider through both a formatted
+    /// group and a bare slider with an indicator. Require the observed direct
+    /// layout, matching range and value, and matching formatted group text.
+    private static func mirroredSlider(
+        in cell: AXUIElement,
+        controls: [ControlObservation],
+        runtime: AXHelpers.Runtime
+    ) -> ControlObservation? {
+        guard controls.count == 2, controls.allSatisfy({ $0.role == .slider }),
+              let formatted = controls.filter({ $0.valueDescription != nil }).only,
+              let bare = controls.filter({ $0.valueDescription == nil }).only,
+              let raw = formatted.observedRawValue, raw == bare.observedRawValue,
+              case .success(let children) = AXHelpers.childrenResult(cell, runtime: runtime),
+              children.count == 3, children.contains(where: { CFEqual($0, bare.element) }),
+              children.filter({ role(of: $0, runtime: runtime) == kAXStaticTextRole }).count == 1,
+              let group = children.filter({ role(of: $0, runtime: runtime) == kAXGroupRole }).only,
+              case .success(let groupChildren) = AXHelpers.childrenResult(group, runtime: runtime),
+              let groupSlider = groupChildren.only, CFEqual(groupSlider, formatted.element),
+              case .string(let groupValue) = observedRawValue(on: group, runtime: runtime),
+              trimmed(groupValue) == formatted.valueDescription,
+              case .success(let indicatorChildren) = AXHelpers.childrenResult(bare.element, runtime: runtime),
+              let indicator = indicatorChildren.only, role(of: indicator, runtime: runtime) == kAXValueIndicatorRole,
+              observedRawValue(on: indicator, runtime: runtime) == raw,
+              let minimum = observedRawValue(on: formatted.element, attribute: kAXMinValueAttribute, runtime: runtime),
+              let maximum = observedRawValue(on: formatted.element, attribute: kAXMaxValueAttribute, runtime: runtime),
+              minimum != maximum,
+              minimum == observedRawValue(on: bare.element, attribute: kAXMinValueAttribute, runtime: runtime),
+              maximum == observedRawValue(on: bare.element, attribute: kAXMaxValueAttribute, runtime: runtime),
+              observedRawValue(on: formatted.element, runtime: runtime) == raw,
+              valueDescription(on: formatted.element, runtime: runtime) == formatted.valueDescription
+        else {
+            return nil
+        }
+        return formatted
+    }
+
     private static func observedRawValue(
         on control: AXUIElement,
+        attribute: String = kAXValueAttribute,
         runtime: AXHelpers.Runtime
     ) -> ObservedRawValue? {
         let valueRead: Swift.Result<AnyObject?, AXHelpers.AXStatusError> = AXHelpers.getAttributeResult(
             control,
-            kAXValueAttribute as String,
+            attribute,
             runtime: runtime
         )
         switch valueRead {
@@ -917,6 +957,7 @@ enum ControlsViewParameterEnumerator {
     private struct PairedCandidate {
         let label: String
         let control: ControlObservation
+        let controlCount: Int
     }
 
     private struct RowRead {

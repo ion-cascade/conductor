@@ -15,6 +15,12 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
 
+## 1.11.1 Airwindows PurestGain
+
+PurestGain 1.0.0 is qualified for parameter readback on the Mac mini as a mono Audio Unit. Get the occupied insert's current reference from `logic_plugins.get_inventory` and pass it to `get_host_parameter_manifest`. The Controls view reports Gain in dB and Slow Fade as a unitless value. Read `value_description` for the formatted value. The raw AX slider integer has separate units.
+
+Conductor checks both native views of a slider before reporting its value. A mismatched or unrecognized layout returns a refused row. PurestGain's parameter writes remain unsupported.
+
 ## 1.11 Bounded automation and mono Gain
 
 | Workflow | Mac mini scope |
