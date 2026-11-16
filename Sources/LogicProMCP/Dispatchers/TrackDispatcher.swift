@@ -148,7 +148,7 @@ struct TrackDispatcher: OperationTraceDispatching {
                 return await finalizeTrace(TargetRefResolver.addEvidence(resolved.reference,
                     fingerprint: binding.observedFingerprint, to: toolTextResult(result)), traceID: traceID)
             }
-        case "get_volume_automation", "set_volume_automation_point", "move_volume_automation_point",
+        case "get_volume_automation", "set_volume_automation_point", "move_volume_automation_point", "insert_volume_automation_point",
              "create_volume_automation_at_region_borders",
              "get_pan_automation", "set_pan_automation_point", "create_pan_automation_point":
             let operation = "track.\(command)"
@@ -169,6 +169,16 @@ struct TrackDispatcher: OperationTraceDispatching {
                     }
                     automationParams["linked_position"] = linkedPosition
                 }
+            }
+            if command == "insert_volume_automation_point" {
+                guard let position = params["position"]?.stringValue,
+                      let previous = params["previous_position"]?.stringValue,
+                      let next = params["next_position"]?.stringValue,
+                      case .int(let expected) = params["expected_current"] else {
+                    return toolInvalidParamsResult("Supply the midpoint position, both adjacent positions and their expected common Volume.")
+                }
+                automationParams = ["position": position, "previous_position": previous,
+                                    "next_position": next, "expected_current": String(expected)]
             }
             if command == "move_volume_automation_point" {
                 guard let position = params["position"]?.stringValue,

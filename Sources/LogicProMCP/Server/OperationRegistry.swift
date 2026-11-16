@@ -160,6 +160,7 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case tracksCreateVolumeAutomation = "tracks.create_volume_automation_at_region_borders"
     case tracksGetVolumeAutomation = "tracks.get_volume_automation"
     case tracksSetVolumeAutomationPoint = "tracks.set_volume_automation_point"
+    case tracksInsertVolumeAutomationPoint = "tracks.insert_volume_automation_point"
     case tracksMoveVolumeAutomationPoint = "tracks.move_volume_automation_point"
     case tracksSetInstrument = "tracks.set_instrument"
     case tracksListLibrary = "tracks.list_library"
@@ -404,7 +405,7 @@ enum OperationRegistry {
             "tracks.create_drummer", "tracks.create_external_midi", "tracks.delete",
             "tracks.duplicate", "tracks.rename", "tracks.mute", "tracks.solo", "tracks.arm",
             "tracks.arm_only", "tracks.record_sequence", "tracks.sort_verified", "tracks.set_automation",
-            "tracks.split_selected_audio", "tracks.get_volume_automation", "tracks.set_volume_automation_point", "tracks.move_volume_automation_point", "tracks.create_volume_automation_at_region_borders",
+            "tracks.split_selected_audio", "tracks.get_volume_automation", "tracks.set_volume_automation_point", "tracks.move_volume_automation_point", "tracks.insert_volume_automation_point", "tracks.create_volume_automation_at_region_borders",
             "tracks.get_pan_automation", "tracks.set_pan_automation_point", "tracks.create_pan_automation_point",
             "tracks.set_instrument", "tracks.list_library", "tracks.scan_library",
             "tracks.resolve_path", "tracks.scan_plugin_presets",
@@ -462,7 +463,7 @@ enum OperationRegistry {
             "select", "create_audio", "create_instrument", "create_drummer",
             "create_external_midi", "delete", "duplicate", "rename", "mute", "solo", "arm",
             "arm_only", "record_sequence", "sort_verified", "set_automation", "set_instrument", "list_library",
-            "scan_library", "resolve_path", "scan_plugin_presets", "split_selected_audio", "get_volume_automation", "set_volume_automation_point", "move_volume_automation_point", "create_volume_automation_at_region_borders",
+            "scan_library", "resolve_path", "scan_plugin_presets", "split_selected_audio", "get_volume_automation", "set_volume_automation_point", "move_volume_automation_point", "insert_volume_automation_point", "create_volume_automation_at_region_borders",
             "get_pan_automation", "set_pan_automation_point", "create_pan_automation_point",
         ],
     ]
@@ -1120,6 +1121,8 @@ enum OperationRegistry {
         (.tracksCreateVolumeAutomation, "create_volume_automation_at_region_borders", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["start", "end"]),
         (.tracksGetVolumeAutomation, "get_volume_automation", Mutability.readOnly, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, []),
         (.tracksSetVolumeAutomationPoint, "set_volume_automation_point", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["position", "expected_current", "value", "linked_position"]),
+        (.tracksInsertVolumeAutomationPoint, "insert_volume_automation_point", Mutability.`mutating`, DeadlineClass.medium,
+         VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["position", "previous_position", "next_position", "expected_current"]),
         (.tracksMoveVolumeAutomationPoint, "move_volume_automation_point", Mutability.`mutating`,
          DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget,
          ["position", "new_position", "expected_current", "previous_position", "previous_value", "next_position", "next_value"]),

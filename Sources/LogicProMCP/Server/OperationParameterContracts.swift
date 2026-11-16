@@ -433,6 +433,13 @@ extension OperationRegistry {
                 "expected_current": .enforced(.integer, .int(64)), "value": .enforced(.integer, .int(74)),
                 "linked_position": .enforced(.string, "1.4.4.240"),
             ], required: [["target_ref"], ["position"], ["expected_current"], ["value"]]),
+            "tracks.insert_volume_automation_point": .init(params: [
+                "target_ref": .enforced(.string, .string("trk_lpm_reference")),
+                "position": .enforced(.string, .string("1.3.1.1")),
+                "previous_position": .enforced(.string, .string("1.1.1.121")),
+                "next_position": .enforced(.string, .string("1.4.4.240")),
+                "expected_current": .enforced(.integer, .int(80)),
+            ], required: [["target_ref"], ["position"], ["previous_position"], ["next_position"], ["expected_current"]]),
             "tracks.move_volume_automation_point": .init(params: [
                 "target_ref": targetRef, "project_ref": projectRef,
                 "position": .enforced(.string, "1.1.1.1"), "new_position": .enforced(.string, "1.1.1.121"),

@@ -294,6 +294,7 @@ enum SemanticOracleTable {
         .tracksCreateVolumeAutomation: "volume",
         .tracksSetVolumeAutomationPoint: "volume",
         .tracksMoveVolumeAutomationPoint: "volume_position",
+        .tracksInsertVolumeAutomationPoint: "volume_midpoint",
         .tracksSplitSelectedAudio: "splitter",
         .projectEditRegion: "region_edit",
         .tracksCreatePanAutomation: "pan",

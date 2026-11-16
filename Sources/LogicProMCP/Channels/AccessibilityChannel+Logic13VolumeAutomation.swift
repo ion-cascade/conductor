@@ -90,13 +90,15 @@ extension AccessibilityChannel {
     }
 
     static func createTrackAutomation(
-        params: [String: String], lane: Logic13AutomationLane, logic: AXLogicProElements.Runtime
+        params: [String: String], lane: Logic13AutomationLane, insertMidpoint: Bool = false, logic: AXLogicProElements.Runtime
     ) async -> ChannelResult {
-        let operation = lane == .pan ? "track.create_pan_automation_point" : "track.create_volume_automation_at_region_borders"
+        let operation = insertMidpoint ? "track.insert_volume_automation_point" : lane == .pan ? "track.create_pan_automation_point" : "track.create_volume_automation_at_region_borders"
         let ax = logic.ax
         func refuse(_ stage: String) -> ChannelResult {
             .error(HonestContract.encodeStateC(error: .readbackUnavailable,
-                hint: lane == .pan
+                hint: insertMidpoint
+                    ? "Show track Volume in Read mode and set the full Beats display to the requested position between two adjacent equal-value points."
+                    : lane == .pan
                     ? "Select the track in Arrange, show its empty absolute Pan lane in Read mode and set the playhead to the requested position with the full Beats display visible."
                     : "In Arrange, show and enable the Volume lane in Read mode and select exactly one region on the referenced track. The lane must be empty.",
                 extras: ["operation": operation, "readback_stage": stage, "write_attempted": false]))
@@ -107,14 +109,22 @@ extension AccessibilityChannel {
                 "editor_close_observed": cleanup, "safe_to_retry": false, "effect_unknown": true,
             ]))
         }
-        let startKey = lane == .pan ? "initial_position" : "start"
-        let endKey = lane == .pan ? "position" : "end"
+        let startKey = insertMidpoint ? "previous_position" : lane == .pan ? "initial_position" : "start"
+        let endKey = insertMidpoint || lane == .pan ? "position" : "end"
+        let expectedMidpointValue = params["expected_current"].flatMap(Int.init)
         guard let start = params[startKey], let end = params[endKey],
               let startFields = ProjectBounceRange.position(start), let endFields = ProjectBounceRange.position(end),
               startFields.lexicographicallyPrecedes(endFields) || (lane == .pan && start == end) else {
             return .error(HonestContract.encodeStateC(error: .invalidParams,
                 hint: "Supply ordered musical positions in bar.beat.division.tick format.",
                 extras: ["operation": operation, "write_attempted": false]))
+        }
+        if insertMidpoint {
+            guard let following = params["next_position"].flatMap(ProjectBounceRange.position),
+                  endFields.lexicographicallyPrecedes(following),
+                  let expectedMidpointValue, lane.allows(expectedMidpointValue) else {
+                return refuse("midpoint_witness_invalid")
+            }
         }
         guard ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
               let binding = AXTrackBinding.current, let index = binding.currentIndex(),
@@ -147,7 +157,14 @@ extension AccessibilityChannel {
                 if candidate == name { matches += 1 }
             }
             guard matches == 1, automationLaneIsReady(lane, header: binding.header, runtime: ax) else { return nil }
-            if lane == .pan {
+            if insertMidpoint {
+                let scope = AXHelpers.getChildren(binding.header, runtime: ax).filter {
+                    AXHelpers.getRole($0, runtime: ax) == kAXButtonRole as String
+                        && AXHelpers.getDescription($0, runtime: ax) == "Track"
+                }
+                guard scope.count == 1 else { return nil }
+            }
+            if insertMidpoint || lane == .pan {
                 guard let controlBar = AXLogicProElements.logic13ControlBarContainer(in: binding.window, runtime: ax),
                       TransportDispatcher.completeObservedMusicalPosition(
                         AXValueExtractors.extractTransportState(from: controlBar, runtime: ax)
@@ -206,12 +223,26 @@ extension AccessibilityChannel {
         guard let beforeEditor = await openEditor() else { return refuse("event_editor") }
         let before = beforeEditor.points()
         let beforeClosed = await closeEditor(beforeEditor)
-        guard beforeClosed, let before, !before.contains(where: { $0.lane == lane }) else {
+        guard beforeClosed, let before else { return refuse("points_before_create") }
+        if insertMidpoint {
+            let allowsInsertion = before.indices.dropLast().contains { i in
+                let previous = before[i], next = before[i+1]
+                return previous.lane == lane && next.lane == lane
+                    && previous.position == start && next.position == params["next_position"]
+                    && previous.value == expectedMidpointValue && next.value == expectedMidpointValue
+            }
+            guard allowsInsertion, before.filter({ $0.position == start }).count == 1,
+                  before.filter({ $0.position == params["next_position"] }).count == 1,
+                  !before.contains(where: { $0.position == end }) else {
+                return .error(HonestContract.encodeStateC(error: .staleSnapshot,
+                    hint: "Two adjacent Volume points must match both expected positions and the same current value.",
+                    extras: ["operation": operation, "write_attempted": false]))
+            }
+        } else if before.contains(where: { $0.lane == lane }) {
             return refuse("empty_lane_required")
         }
 
-        // The visible-parameter command seeds the first Pan point and Logic's initial anchor.
-        let command = ["Mix", "Create Track Automation", lane == .volume
+        let command = ["Mix", "Create Track Automation", lane == .volume && !insertMidpoint
             ? "Create 2 Automation Points at Region Borders" : "Create 1 Automation Point for Visible Parameter"]
         guard let item = AXLogicProElements.menuItem(path: command, runtime: logic),
               (AXHelpers.getAttribute(item, kAXEnabledAttribute as String, runtime: ax) as Bool?) == true,
@@ -222,6 +253,19 @@ extension AccessibilityChannel {
         guard let afterEditor = await openEditor() else { return uncertain("editor_after_create", cleanup: false) }
         let after = afterEditor.points()
         let closed = await closeEditor(afterEditor)
+        if insertMidpoint {
+            guard let after, closed, after.count == before.count + 1,
+                  let added = after.first(where: { $0.lane == .volume && $0.position == end }),
+                  added.value == expectedMidpointValue,
+                  sameAutomationValues(before, after.filter { $0.position != end }) else {
+                return uncertain("midpoint_or_peers_after_create", cleanup: closed)
+            }
+            return .success(HonestContract.encodeStateA(extras: [
+                "operation": operation, "lane": lane.rawValue, "unit": lane.unit,
+                "point": added.evidence, "peer_events_verified": before.count,
+                "verify_source": "ax_automation_event_list", "write_attempted": true, "editor_close_observed": true,
+            ]))
+        }
         let peers = after?.filter { $0.lane != lane }
         guard let after = after?.filter({ $0.lane == lane }), let peers, sameAutomationValues(before, peers),
               let first = after.first, after.allSatisfy({ $0.value == first.value }), closed else {

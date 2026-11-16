@@ -172,6 +172,10 @@ In desktop Logic Pro 13, stop playback and open the referenced track’s Automat
 
 The initial adapter supports an interior point between two adjacent Volume events and a destination within the same bar, beat and division. Musical positions use `bar.beat.division.tick` with ticks 1–240. Conductor checks the point and its peers after each native step. Refresh the lane after an uncertain result or after reopening.
 
+#### Reshape a flat Volume segment
+
+Show the selected track’s Volume automation in Read mode. Close the Track Automation Event List and put the playhead at the requested interior position with the full Beats display visible. Call `insert_volume_automation_point` with a fresh track `target_ref`, `position`, `previous_position`, `next_position` and their common `expected_current` Volume. Conductor confirms that one point was added and that the original points and values are intact. Open the Event List again and use `set_volume_automation_point` to raise or lower the new point. This workflow reshapes the envelope with an additional control point.
+
 Common commands: `select`, `create_audio`, `create_instrument`, `create_drummer`, `create_external_midi`, `delete`, `duplicate`, `rename`, `mute`, `solo`, `arm`, `arm_only`, `record_sequence`, `set_automation`, `set_instrument`, `list_library`, `scan_library`, `resolve_path`, `scan_plugin_presets`.
 
 **`delete`, `duplicate`, and `set_instrument` no longer accept a bare index.** They are `corroborated` (see [Index binding](#index-binding)): pass `expected_name` (the track name you expect at that index) or `target_ref`. Without one, they fail closed with `index_binding_corroboration_required` and write nothing.

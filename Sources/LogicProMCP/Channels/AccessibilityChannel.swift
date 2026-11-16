@@ -2121,6 +2121,9 @@ actor AccessibilityChannel: Channel {
         // MARK: - Track mutations
         case "track.split_selected_audio":
             return await ProjectLogic13StemSplitter.run(params: params, runtime: runtime.logicRuntime)
+        case "track.insert_volume_automation_point":
+            return await Self.createTrackAutomation(params: params, lane: .volume, insertMidpoint: true,
+                logic: runtime.logicRuntime)
         case "track.create_volume_automation_at_region_borders", "track.create_pan_automation_point":
             return await Self.createTrackAutomation(params: params,
                 lane: operation.contains("_pan_") ? .pan : .volume, logic: runtime.logicRuntime)
