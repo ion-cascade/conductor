@@ -4165,7 +4165,7 @@ extension AccessibilityChannel {
             viewSession = session
         }
         restorePluginViewOnExit = { viewSession.restore(allowingChanges: viewChangesAllowed) }
-        let resultAfterViewPreparation: ChannelResult = await {
+        let resultAfterViewPreparation: ChannelResult = {
         if case let .readManifest(buildFingerprint, contextIsCurrent, _) = access {
             func currentInstance() -> Bool {
                 contextIsCurrent() && targetPluginIdentityIsStable(
