@@ -172,6 +172,10 @@ In desktop Logic Pro 13, stop playback and open the referenced track’s Automat
 
 The initial adapter supports an interior point between two adjacent Volume events and a destination within the same bar, beat and division. Musical positions use `bar.beat.division.tick` with ticks 1–240. Conductor checks the point and its peers after each native step. Refresh the lane after an uncertain result or after reopening.
 
+#### Reshape a flat Volume segment
+
+Show the selected track’s Volume automation in Read mode. Close the Track Automation Event List and put the playhead at the requested interior position with the full Beats display visible. Call `insert_volume_automation_point` with a fresh track `target_ref`, `position`, `previous_position`, `next_position` and their common `expected_current` Volume. Conductor confirms that one point was added and that the original points and values are intact. Open the Event List again and use `set_volume_automation_point` to raise or lower the new point. This workflow reshapes the envelope with an additional control point.
+
 Common commands: `select`, `create_audio`, `create_instrument`, `create_drummer`, `create_external_midi`, `delete`, `duplicate`, `rename`, `mute`, `solo`, `arm`, `arm_only`, `record_sequence`, `set_automation`, `set_instrument`, `list_library`, `scan_library`, `resolve_path`, `scan_plugin_presets`.
 
 **`delete`, `duplicate`, and `set_instrument` no longer accept a bare index.** They are `corroborated` (see [Index binding](#index-binding)): pass `expected_name` (the track name you expect at that index) or `target_ref`. Without one, they fail closed with `index_binding_corroboration_required` and write nothing.
@@ -252,7 +256,19 @@ When the same complete native `get_inventory` observation can also read the curr
 
 The supported read subset is the catalogued Channel EQ native-editor sliders and Compressor `threshold`, `ratio`, `knee`, `attack`, `release`, `makeup`, `circuit_type`, `auto_gain`, `distortion`, `limiter_on`, and `auto_release`. The result contains `observed_raw`, `raw_unit`, the host's verbatim `observed_display` when available, and separate parameter/display read statuses. Threshold's canonical raw unit is the legacy `normalized` **0..100 percentage scale**, not a 0..1 fraction or dB. EQ and the five Compressor scalars return `raw_ax_value`; ratio preserves Logic's verbatim display such as `2.1:1`, and attack preserves displays such as `15.0 ms`. Knee, release, and makeup likewise preserve the host display verbatim without interpreting it as a verified normalized, milliseconds, or decibels conversion. `circuit_type`, `auto_gain`, and `distortion` return the current non-empty AX string (for example the measured `Platinum Digital`, `-12 dB`, and `Off`) with unit `string`; they do not open a popup, infer a complete choice list, or authorize selection. The two Compressor switches return JSON Booleans with unit `boolean`. The five scalars and three popup values are read-only and authorize no write method. Ratio's AXSlider was measured non-actuating; actuation and raw-to-engineering conversion for the other four scalars remain unmeasured, and the three popup rows were measured not addressable by name. An optional unit must equal the canonical raw representation; no engineering-unit conversion is inferred. Unknown, unsupported, absent, malformed and unreadable observations are explicit refusals/statuses, never an invented zero.
 
-Gain also exposes `gain` (`raw_ax_value` with the verbatim dB display), mono-instance `phase_invert`, and stereo-instance `phase_invert_left`, `phase_invert_right`, `swap_lr`, and `mono` (Boolean reads). Sample Delay exposes mono-instance `delay` and stereo-instance `left_delay`/`right_delay` in `samples`. These keys describe the actual plug-in instance, which can differ from the track's channel format. A key whose measured row is absent does not fall back to another format. Sample counts require the existing Unit selector to read Samples consistently; ms mode remains unknown and the reader never changes units. These read-only entries do not authorize parameter writes. Scalar reads refuse blocking or unreadable modal state before acquiring an editor and discard values if a modal appears during collection.
+Gain also exposes `gain` (`raw_ax_value` with the verbatim dB display), mono-instance `phase_invert`, and stereo-instance `phase_invert_left`, `phase_invert_right`, `swap_lr`, and `mono` (Boolean reads). Sample Delay exposes mono-instance `delay` and stereo-instance `left_delay`/`right_delay` in `samples`. These keys describe the actual plug-in instance, which can differ from the track's channel format. A key whose measured row is absent does not fall back to another format. Sample counts require the existing Unit selector to read Samples consistently; ms mode remains unknown and the reader never changes units. Gain’s switches and Sample Delay values are read-only. Scalar reads refuse blocking or unreadable modal state before acquiring an editor and discard values if a modal appears during collection.
+
+#### Set the mono stock Gain level
+
+On English desktop Logic Pro 13, select the target track, show Mixer and get the occupied Gain `plugin_insert_ref`. Open that insert's Controls view and leave its editor frontmost. Stop playback and recording. The qualified track has a single Gain insert with the mono Phase Invert row.
+
+Call `set_param_verified` with the insert `target_ref`, `plugin:"Gain"`, `param:"gain"`, `unit:"dB"`, `mode:"duplicate_applyback"`, and the exact `project_expected_path`. The current and requested levels must be within −6.0 to 0.0 dB in 0.1 dB steps. Conductor verifies the raw value, display and Phase Invert after each step. After reopening, obtain a new insert reference before reading or writing the level.
+
+#### Edit a stock Gain automation point
+
+On English desktop Logic Pro 13, select the track with its only Gain in the fourth audio insert. Leave Mixer visible and take the occupied reference from `get_inventory`. In Arrange choose the Gain parameter for that insert in track automation, leave the lane in Read mode, then focus the Track Automation Event List.
+
+Call `get_gain_automation` with that `target_ref`. Use a reported `position` and `value` as `position` and `expected_current` for `set_gain_automation_point`. The new `value` must be reachable in ten-unit steps on Logic’s native 0–127 automation scale. The automation values are native integers. The separate static Gain setter takes decibels.
 
 The observation scope is one parameter of the **current referenced physical insert**, not a historical AU-object identity, an atomic whole-plugin snapshot, or all-parameter completeness. Project, slot, editor and control identity are checked around collection. Observed raw-value drift during display collection refuses with `parameter_read_status: unstable`; matching bookends cannot detect every intervening change. This audio-read-only operation shares the existing verified-operation serializer because editor acquisition can open windows, change focus or temporarily switch views. It does not select a track or write an audio parameter. It restores its observed entry view while ownership remains valid, closes only an editor it created, and reports unavailable restoration instead of acting through lost ownership. A confirmed view restoration is not a general focus-restoration guarantee. Ordinary inventory remains ungated. New-reader live qualification and the remaining snapshot/batch/application scope are tracked in #955.
 
@@ -371,6 +387,12 @@ For `logic_midi.edit_region_note`, pass the region reference, the note's complet
 ```
 
 The adapter verifies the exact row before editing and checks peer events after every action. It refuses ambiguous note identities, locked notes, a selection of other Event List rows, unavailable event columns, and a request that requires more than 48 native actions. The initial supported Event List has at most 24 materialized events, with notes, controller events and program changes. Re-scan after a write attempt. Save the project to keep the verified note change.
+
+#### Edit MIDI region Expression
+
+In desktop Logic Pro 13, stop the transport and select one uniquely named ordinary MIDI region in Arrange. Open its unfiltered Event List with absolute musical positions. Scan regions for a current `target_ref`, then call `get_region_notes` to read identified Expression events in `expression_events`.
+
+`edit_region_expression` takes that reference, `position`, `channel`, `expected_current` and `value`. It adjusts an existing MIDI CC11 value in ten-unit steps within 0–127. Conductor checks the exact Event List row, its other fields, every peer event and the region binding after each step. Reacquire the region reference after a write or after reopening.
 
 ### `logic_edit`
 

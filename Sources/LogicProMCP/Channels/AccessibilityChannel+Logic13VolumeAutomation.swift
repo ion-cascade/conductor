@@ -4,9 +4,16 @@ import Foundation
 enum Logic13AutomationLane: String {
     case volume
     case pan
+    case gain
 
-    var label: String { self == .volume ? "Volume" : "Pan" }
-    var unit: String { self == .volume ? "logic_fader_value" : "logic_pan_value" }
+    var label: String { rawValue.capitalized }
+    var unit: String {
+        switch self {
+        case .volume: "logic_fader_value"
+        case .pan: "logic_pan_value"
+        case .gain: "logic_plugin_automation_value"
+        }
+    }
 
     func allows(_ value: Int) -> Bool { (0...127).contains(value) }
 }
@@ -83,13 +90,15 @@ extension AccessibilityChannel {
     }
 
     static func createTrackAutomation(
-        params: [String: String], lane: Logic13AutomationLane, logic: AXLogicProElements.Runtime
+        params: [String: String], lane: Logic13AutomationLane, insertMidpoint: Bool = false, logic: AXLogicProElements.Runtime
     ) async -> ChannelResult {
-        let operation = lane == .pan ? "track.create_pan_automation_point" : "track.create_volume_automation_at_region_borders"
+        let operation = insertMidpoint ? "track.insert_volume_automation_point" : lane == .pan ? "track.create_pan_automation_point" : "track.create_volume_automation_at_region_borders"
         let ax = logic.ax
         func refuse(_ stage: String) -> ChannelResult {
             .error(HonestContract.encodeStateC(error: .readbackUnavailable,
-                hint: lane == .pan
+                hint: insertMidpoint
+                    ? "Show track Volume in Read mode and set the full Beats display to the requested position between two adjacent equal-value points."
+                    : lane == .pan
                     ? "Select the track in Arrange, show its empty absolute Pan lane in Read mode and set the playhead to the requested position with the full Beats display visible."
                     : "In Arrange, show and enable the Volume lane in Read mode and select exactly one region on the referenced track. The lane must be empty.",
                 extras: ["operation": operation, "readback_stage": stage, "write_attempted": false]))
@@ -100,14 +109,22 @@ extension AccessibilityChannel {
                 "editor_close_observed": cleanup, "safe_to_retry": false, "effect_unknown": true,
             ]))
         }
-        let startKey = lane == .pan ? "initial_position" : "start"
-        let endKey = lane == .pan ? "position" : "end"
+        let startKey = insertMidpoint ? "previous_position" : lane == .pan ? "initial_position" : "start"
+        let endKey = insertMidpoint || lane == .pan ? "position" : "end"
+        let expectedMidpointValue = params["expected_current"].flatMap(Int.init)
         guard let start = params[startKey], let end = params[endKey],
               let startFields = ProjectBounceRange.position(start), let endFields = ProjectBounceRange.position(end),
               startFields.lexicographicallyPrecedes(endFields) || (lane == .pan && start == end) else {
             return .error(HonestContract.encodeStateC(error: .invalidParams,
                 hint: "Supply ordered musical positions in bar.beat.division.tick format.",
                 extras: ["operation": operation, "write_attempted": false]))
+        }
+        if insertMidpoint {
+            guard let following = params["next_position"].flatMap(ProjectBounceRange.position),
+                  endFields.lexicographicallyPrecedes(following),
+                  let expectedMidpointValue, lane.allows(expectedMidpointValue) else {
+                return refuse("midpoint_witness_invalid")
+            }
         }
         guard ProcessInfo.processInfo.environment["LOGIC_MCP_LOGIC13_TRACKS"] == "1",
               let binding = AXTrackBinding.current, let index = binding.currentIndex(),
@@ -139,8 +156,9 @@ extension AccessibilityChannel {
                       AXValueExtractors.extractSelectedState(header, runtime: ax) == (offset == index) else { return nil }
                 if candidate == name { matches += 1 }
             }
-            guard matches == 1, automationLaneIsReady(lane, header: binding.header, runtime: ax) else { return nil }
-            if lane == .pan {
+            guard matches == 1, automationLaneIsReady(lane, header: binding.header,
+                runtime: ax, requireTrackMode: insertMidpoint) else { return nil }
+            if insertMidpoint || lane == .pan {
                 guard let controlBar = AXLogicProElements.logic13ControlBarContainer(in: binding.window, runtime: ax),
                       TransportDispatcher.completeObservedMusicalPosition(
                         AXValueExtractors.extractTransportState(from: controlBar, runtime: ax)
@@ -199,12 +217,26 @@ extension AccessibilityChannel {
         guard let beforeEditor = await openEditor() else { return refuse("event_editor") }
         let before = beforeEditor.points()
         let beforeClosed = await closeEditor(beforeEditor)
-        guard beforeClosed, let before, !before.contains(where: { $0.lane == lane }) else {
+        guard beforeClosed, let before else { return refuse("points_before_create") }
+        if insertMidpoint {
+            let allowsInsertion = before.indices.dropLast().contains { i in
+                let previous = before[i], next = before[i+1]
+                return previous.lane == lane && next.lane == lane
+                    && previous.position == start && next.position == params["next_position"]
+                    && previous.value == expectedMidpointValue && next.value == expectedMidpointValue
+            }
+            guard allowsInsertion, before.filter({ $0.position == start }).count == 1,
+                  before.filter({ $0.position == params["next_position"] }).count == 1,
+                  !before.contains(where: { $0.position == end }) else {
+                return .error(HonestContract.encodeStateC(error: .staleSnapshot,
+                    hint: "Two adjacent Volume points must match both expected positions and the same current value.",
+                    extras: ["operation": operation, "write_attempted": false]))
+            }
+        } else if before.contains(where: { $0.lane == lane }) {
             return refuse("empty_lane_required")
         }
 
-        // The visible-parameter command seeds the first Pan point and Logic's initial anchor.
-        let command = ["Mix", "Create Track Automation", lane == .volume
+        let command = ["Mix", "Create Track Automation", lane == .volume && !insertMidpoint
             ? "Create 2 Automation Points at Region Borders" : "Create 1 Automation Point for Visible Parameter"]
         guard let item = AXLogicProElements.menuItem(path: command, runtime: logic),
               (AXHelpers.getAttribute(item, kAXEnabledAttribute as String, runtime: ax) as Bool?) == true,
@@ -215,6 +247,19 @@ extension AccessibilityChannel {
         guard let afterEditor = await openEditor() else { return uncertain("editor_after_create", cleanup: false) }
         let after = afterEditor.points()
         let closed = await closeEditor(afterEditor)
+        if insertMidpoint {
+            guard let after, closed, after.count == before.count + 1,
+                  let added = after.first(where: { $0.lane == .volume && $0.position == end }),
+                  added.value == expectedMidpointValue,
+                  sameAutomationValues(before, after.filter { $0.position != end }) else {
+                return uncertain("midpoint_or_peers_after_create", cleanup: closed)
+            }
+            return .success(HonestContract.encodeStateA(extras: [
+                "operation": operation, "lane": lane.rawValue, "unit": lane.unit,
+                "point": added.evidence, "peer_events_verified": before.count,
+                "verify_source": "ax_automation_event_list", "write_attempted": true, "editor_close_observed": true,
+            ]))
+        }
         let peers = after?.filter { $0.lane != lane }
         guard let after = after?.filter({ $0.lane == lane }), let peers, sameAutomationValues(before, peers),
               let first = after.first, after.allSatisfy({ $0.value == first.value }), closed else {
@@ -240,8 +285,8 @@ extension AccessibilityChannel {
         }
     }
 
-    private static func automationLaneIsReady(
-        _ lane: Logic13AutomationLane, header: AXUIElement, runtime: AXHelpers.Runtime
+    static func automationLaneIsReady(
+        _ lane: Logic13AutomationLane, header: AXUIElement, runtime: AXHelpers.Runtime, requireTrackMode: Bool = false
     ) -> Bool {
         guard case .success(let controls) = AXHelpers.childrenResult(header, runtime: runtime) else { return false }
         func value<T>(_ label: String, role: String) -> T? {
@@ -252,15 +297,19 @@ extension AccessibilityChannel {
             guard matches.count == 1 else { return nil }
             return AXHelpers.getAttribute(matches[0], kAXValueAttribute as String, runtime: runtime)
         }
-        guard (value("Automation Parameter", role: kAXPopUpButtonRole) as String?) == lane.label,
+        let laneLabel = lane == .gain ? "5 Gain: Gain" : lane.label
+        guard (value("Automation Parameter", role: kAXPopUpButtonRole) as String?) == laneLabel,
               (value("Automation Mode", role: kAXPopUpButtonRole) as String?) == "Read" else { return false }
         let enableControls = controls.filter {
             AXHelpers.getRole($0, runtime: runtime) == kAXCheckBoxRole
                 && AXHelpers.getDescription($0, runtime: runtime) == "Enable Automation"
         }
-        if lane == .pan {
-            // The native header has a Track/Region button. An empty absolute Pan
-            // lane can lack a separate Enable Automation checkbox.
+        // Gain also requires the owned Track Automation Root Folder Event List
+        // and exact Fader address. Its focused editor leaves Enable Automation
+        // readable while the Arrange Track/Region button has no description.
+        if lane == .pan || requireTrackMode {
+            // Logic shows the Track/Region button when the pointer is away
+            // from the parameter popup. Enable Automation can be absent.
             guard controls.filter({
                 AXHelpers.getRole($0, runtime: runtime) == kAXButtonRole
                     && AXHelpers.getDescription($0, runtime: runtime) == "Track"
@@ -371,7 +420,7 @@ extension AccessibilityChannel {
         ]))
     }
 
-    private static func changeTrackAutomationPoint(
+    static func changeTrackAutomationPoint(
         params: [String: String], points: [Logic13AutomationEventList.Point], lane: Logic13AutomationLane,
         editor: Logic13AutomationEventList, current: () -> Bool,
         logic: AXLogicProElements.Runtime, operation: String
@@ -450,7 +499,7 @@ extension AccessibilityChannel {
         while observed != requested {
             guard stopped(), current(), let fresh = editor.points(), matches(fresh, value: observed),
                   affectedIndices(fresh) == affected, editor.ownsEditor(),
-                  OperationTraceContext.claimDeadlineEffect("track_volume_automation_edit") else {
+                  OperationTraceContext.claimDeadlineEffect("track_automation_value_edit") else {
                 return attempted ? uncertain(observed, stage: "before_next_step")
                     : refusal(.staleSnapshot, "The native \(lane.label) event changed before the edit.")
             }
@@ -487,7 +536,7 @@ extension AccessibilityChannel {
     }
 }
 
-private struct Logic13AutomationEventList {
+struct Logic13AutomationEventList {
     struct Point {
         let lane: Logic13AutomationLane
         let position: String
@@ -510,6 +559,8 @@ private struct Logic13AutomationEventList {
     let title: String
     let trackName: String
     let runtime: AXHelpers.Runtime
+
+    var includesStockGain = false
 
     func ownsEditor() -> Bool {
         let path = "Track Automation Root Folder:" + trackName
@@ -567,7 +618,7 @@ private struct Logic13AutomationEventList {
                   unique("Fader", role: kAXCellRole as String, in: AXHelpers.getChildren(cells[3], runtime: runtime)) != nil
             else { onRefusal("event_identity"); return nil }
             let eventLabels = AXHelpers.getChildren(cells[7], runtime: runtime)
-            let lanes: [Logic13AutomationLane] = [.volume, .pan]
+            let lanes: [Logic13AutomationLane] = includesStockGain ? [.volume, .pan, .gain] : [.volume, .pan]
             let matches = lanes.filter { unique($0.label, role: kAXCellRole as String, in: eventLabels) != nil }
             guard matches.count == 1, let lane = matches.first else { onRefusal("event_lane"); return nil }
             guard let positionGroup = hitInCell(cells[2], column: 2, role: kAXGroupRole as String),
@@ -584,6 +635,15 @@ private struct Logic13AutomationEventList {
                       let text = AXValueExtractors.extractValueDescription(slider, runtime: runtime),
                       !text.isEmpty else { onRefusal("pan_event_value"); return nil }
                 displayed = text
+            }
+            if lane == .gain {
+                guard let channel = hitInCell(cells[4], column: 4, role: kAXSliderRole),
+                      let parameter = hitInCell(cells[5], column: 5, role: kAXSliderRole),
+                      (AXHelpers.getAttribute(channel, kAXValueAttribute, runtime: runtime) as Int?) == 6,
+                      (AXHelpers.getAttribute(parameter, kAXValueAttribute, runtime: runtime) as Int?) == 4,
+                      AXValueExtractors.extractValueDescription(slider, runtime: runtime) == String(value)
+                else { onRefusal("stock_gain_event_address"); return nil }
+                displayed = String(value)
             }
             points.append(Point(lane: lane, position: position, value: value, displayed: displayed,
                                 selected: selected, slider: slider, positionGroup: positionGroup))

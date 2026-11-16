@@ -3,9 +3,9 @@ import Foundation
 
 extension AccessibilityChannel {
     func logic13MIDINoteOperation(
-        parameters: [String: String], writing: Bool, runtime: AXLogicProElements.Runtime
+        parameters: [String: String], writing: Bool, expression: Bool = false, runtime: AXLogicProElements.Runtime
     ) async -> ChannelResult {
-        let operation = writing ? "midi.edit_region_note" : "midi.get_region_notes"
+        let operation = expression ? "midi.edit_region_expression" : writing ? "midi.edit_region_note" : "midi.get_region_notes"
         let reference = parameters["target_ref"] ?? ""
         let ax = runtime.ax
 
@@ -60,7 +60,15 @@ extension AccessibilityChannel {
         ]
         guard writing else {
             evidence["notes"] = notes.map { $0.evidence }
+            evidence["expression_events"] = stable.compactMap { $0.expression?.evidence }
             return .success(HonestContract.encodeStateA(extras: evidence))
+        }
+        if expression {
+            return await editMIDIRegionExpression(parameters: parameters, eventList: eventList, rows: stable,
+                evidence: evidence, scopeIsCurrent: {
+                    guard let refreshed = Self.regionEditCensus(scope: scope), ownsRegion(refreshed) else { return false }
+                    return Self.sameRegionPeers(initialRegions, refreshed, ignoring: held.item)
+                })
         }
         guard let expected = Self.midiEditValue(parameters, prefix: "expected_"),
               let desired = Self.midiEditValue(parameters, prefix: "", defaultValue: expected) else {

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.11.0] — 2026-11-16
+
+- Add an interior control point to a bounded flat track Volume segment and reshape the envelope with the existing point setter. ([#44](https://github.com/ion-cascade/conductor/issues/44))
+- Edit existing MIDI region Expression events and existing stock Gain automation points on the qualified insert. Verify each native change and preserve peer events. ([#45](https://github.com/ion-cascade/conductor/issues/45))
+- Set the stock mono Gain level through its focused Controls editor. Verify native level and unchanged Phase Invert after every step. ([#46](https://github.com/ion-cascade/conductor/issues/46))
+
 ## [1.10.0] — 2026-11-16
 
 - Move one selected track Volume point within its current division using its exact position, value and adjacent points. Conductor checks native readback after each step. ([#44](https://github.com/ion-cascade/conductor/issues/44))

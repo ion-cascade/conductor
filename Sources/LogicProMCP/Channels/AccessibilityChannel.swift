@@ -2121,6 +2121,9 @@ actor AccessibilityChannel: Channel {
         // MARK: - Track mutations
         case "track.split_selected_audio":
             return await ProjectLogic13StemSplitter.run(params: params, runtime: runtime.logicRuntime)
+        case "track.insert_volume_automation_point":
+            return await Self.createTrackAutomation(params: params, lane: .volume, insertMidpoint: true,
+                logic: runtime.logicRuntime)
         case "track.create_volume_automation_at_region_borders", "track.create_pan_automation_point":
             return await Self.createTrackAutomation(params: params,
                 lane: operation.contains("_pan_") ? .pan : .volume, logic: runtime.logicRuntime)
@@ -2370,6 +2373,9 @@ actor AccessibilityChannel: Channel {
         // unreachable — a reader who grepped the operation found a refusal that is not what it does.
 
         // MARK: - MIDI file import (AX menu navigation)
+        case "midi.edit_region_expression":
+            return await logic13MIDINoteOperation(parameters: params, writing: true, expression: true,
+                runtime: runtime.logicRuntime)
         case "midi.get_region_notes", "midi.edit_region_note":
             return await logic13MIDINoteOperation(parameters: params, writing: operation == "midi.edit_region_note",
                                                   runtime: runtime.logicRuntime)
@@ -2491,6 +2497,9 @@ actor AccessibilityChannel: Channel {
         case "plugin.get_preset_verified", "plugin.set_preset_verified":
             return await Self.defaultCompressorPreset(params: params,
                 writing: operation == "plugin.set_preset_verified", runtime: runtime.logicRuntime)
+        case "plugin.get_gain_automation", "plugin.set_gain_automation_point":
+            return await Self.defaultGainAutomation(params: params, edit: operation == "plugin.set_gain_automation_point",
+                logic: runtime.logicRuntime)
         case "plugin.get_param_verified":
             return await AccessibilityChannel.defaultGetParamVerified(params: params, runtime: runtime.logicRuntime)
         case "plugin.get_channel_eq_state_verified":

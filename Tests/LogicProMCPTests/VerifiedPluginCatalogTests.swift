@@ -62,13 +62,17 @@ import Testing
     #expect(VerifiedPluginCatalog.pluginID(forObservedName: "Drum Machine Designer") == nil)
 }
 
-// MARK: - Capability preflight (AC10) — Gain is currently unsupported
+// MARK: - Capability preflight
 
-@Test func testGainParamCapabilityIsUnsupportedUntilEvidence() {
-    // Gain's catalog param has writeMethod:nil, readbackMethod:nil (.inferred),
-    // so preflight must report .unsupported → State C unsupported_param_readback.
-    let cap = VerifiedPluginCatalog.paramCapability(pluginID: "logic.stock.effect.gain", paramKey: "gain")
-    #expect(cap == .unsupported)
+@Test func testGainHasBoundedLogic13WriteCapability() {
+    let capability = VerifiedPluginCatalog.paramCapability(pluginID: "logic.stock.effect.gain", paramKey: "gain")
+    #expect(capability == .writeReadback)
+    #expect(Logic13GainControlWrite.rawValue(for: 0) == 960)
+    #expect(Logic13GainControlWrite.rawValue(for: -6) == 900)
+    #expect(Logic13GainControlWrite.rawValue(for: -5.9) == 901)
+    #expect(Logic13GainControlWrite.rawValue(for: -6.1) == nil)
+    #expect(Logic13GainControlWrite.rawValue(for: 0.1) == nil)
+    #expect(Logic13GainControlWrite.rawValue(for: -5.95) == nil)
 }
 
 @Test func testUnknownParamCapabilityIsUnknownParameter() {

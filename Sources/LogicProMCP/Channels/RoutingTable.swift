@@ -72,6 +72,7 @@ extension ChannelRouter {
         "track.create_pan_automation_point": [.accessibility],
         "track.get_volume_automation": [.accessibility],
         "track.set_volume_automation_point": [.accessibility],
+        "track.insert_volume_automation_point": [.accessibility],
         "track.move_volume_automation_point": [.accessibility],
         "track.create_volume_automation_at_region_borders": [.accessibility],
 
@@ -164,6 +165,8 @@ extension ChannelRouter {
         "plugin.set_preset_verified": [.accessibility],
         "plugin.get_sidechain_verified": [.accessibility],
         "plugin.set_sidechain_verified": [.accessibility],
+        "plugin.get_gain_automation": [.accessibility],
+        "plugin.set_gain_automation_point": [.accessibility],
         "plugin.get_param_verified":  [.accessibility],
         "plugin.get_channel_eq_state_verified": [.accessibility],
         "plugin.set_param_verified":  [.accessibility],
@@ -205,6 +208,7 @@ extension ChannelRouter {
         // MIDI file import — AX menu path only (AppleScript path abandoned:
         // NSWorkspace.open on .mid creates new project instead of importing)
         "midi.get_region_notes":      [.accessibility],
+        "midi.edit_region_expression": [.accessibility],
         "midi.edit_region_note":      [.accessibility],
         "midi.import_file":           [.accessibility],
 

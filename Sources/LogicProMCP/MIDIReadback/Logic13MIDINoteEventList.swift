@@ -4,11 +4,22 @@ import Foundation
 /// A single, small English Logic 13 Event List. The visible row count, unfiltered
 /// pane and materialized eight-column rows must all agree for an edit.
 struct Logic13MIDINoteEventList {
+    struct Expression: Equatable {
+        let position: Logic13MIDINoteCoordinate
+        let channel: Int
+        let value: Int
+
+        var evidence: [String: Any] {
+            ["position": position.description, "channel": channel, "controller": 11, "value": value]
+        }
+    }
+
     struct Row {
         let element: AXUIElement
         let fields: [AXUIElement?]
         let signature: [[String]]
         let note: Logic13MIDINoteValue?
+        let expression: Expression?
         let locked: Bool
     }
 
@@ -68,6 +79,16 @@ struct Logic13MIDINoteEventList {
     func selectionPermits(_ target: AXUIElement) -> Bool {
         guard let selected: [AXUIElement] = attribute(table, kAXSelectedRowsAttribute) else { return false }
         return selected.allSatisfy { CFEqual($0, target) }
+    }
+
+    func stepExpression(_ row: Row, toward target: Int, authorize: () -> Bool) -> Bool {
+        guard let current = row.expression, (0...127).contains(target), abs(target - current.value) == 10,
+              let control = row.fields[6],
+              let raw: NSNumber = attribute(control, kAXValueAttribute),
+              raw.int64Value == Int64(current.value) * Self.scale else { return false }
+        let action = target < current.value ? kAXDecrementAction : kAXIncrementAction
+        guard AXHelpers.getActionNames(control, runtime: ax).contains(action), authorize() else { return false }
+        return AXHelpers.performAction(control, action, runtime: ax)
     }
 
     /// The setter takes one step for pitch and musical scrubber segments.
@@ -149,14 +170,13 @@ struct Logic13MIDINoteEventList {
             signature.append(field.map(fingerprint) ?? [])
         }
         guard let status = fields[3].flatMap({ AXHelpers.getDescription($0, runtime: ax) }),
-              !status.isEmpty, let start = fields[2], coordinate(start, length: false) != nil else { return nil }
+              !status.isEmpty, let start = fields[2], let position = coordinate(start, length: false) else { return nil }
         let note: Logic13MIDINoteValue?
         if status == "Note" {
             guard let channel = fields[4].flatMap(sliderInt), (1...16).contains(channel),
                   let pitch = fields[5].flatMap(sliderInt), (0...127).contains(pitch),
                   let velocity = fields[6].flatMap({ attribute($0, kAXValueDescriptionAttribute) as String? }).flatMap(Int.init),
                   (1...127).contains(velocity), let duration = fields[7],
-                  let position = coordinate(start, length: false),
                   let length = coordinate(duration, length: true) else { return nil }
             note = Logic13MIDINoteValue(channel: channel, pitch: pitch, velocity: velocity,
                                         position: position, length: length)
@@ -164,7 +184,21 @@ struct Logic13MIDINoteEventList {
             guard ["Program", "Control", "Controller"].contains(status) else { return nil }
             note = nil
         }
-        return Row(element: row, fields: fields, signature: signature, note: note, locked: fields[0] != nil)
+        let expression: Expression?
+        if status == "Control", fields[5].flatMap(sliderInt) == 11,
+           let label = fields[7], role(label) == kAXPopUpButtonRole,
+           (attribute(label, kAXValueAttribute) as String?) == "11 = Expression",
+           let channel = fields[4].flatMap(sliderInt), (1...16).contains(channel),
+           let valueControl = fields[6], role(valueControl) == kAXSliderRole,
+           let raw: NSNumber = attribute(valueControl, kAXValueAttribute),
+           let display: String = attribute(valueControl, kAXValueDescriptionAttribute),
+           let value = Int(display), (0...127).contains(value), raw.int64Value == Int64(value) * Self.scale {
+            expression = Expression(position: position, channel: channel, value: value)
+        } else {
+            expression = nil
+        }
+        return Row(element: row, fields: fields, signature: signature, note: note,
+                   expression: expression, locked: fields[0] != nil)
     }
 
     private func coordinate(_ element: AXUIElement, length: Bool) -> Logic13MIDINoteCoordinate? {

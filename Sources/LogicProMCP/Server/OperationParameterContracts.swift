@@ -328,6 +328,13 @@ extension OperationRegistry {
             "midi.get_region_notes": .init(params: [
                 "target_ref": .enforced(.string, .string("reg_lpm_reference")),
             ], required: [["target_ref"]]),
+            "midi.edit_region_expression": .init(params: [
+                "target_ref": .enforced(.string, .string("reg_lpm_reference")),
+                "position": .enforced(.string, .string("1.1.1.1")),
+                "channel": .enforced(.integer, .int(1)),
+                "expected_current": .enforced(.integer, .int(100)),
+                "value": .enforced(.integer, .int(20)),
+            ], required: [["target_ref"], ["position"], ["channel"], ["expected_current"], ["value"]]),
             "midi.edit_region_note": .init(params: [
                 "target_ref": .enforced(.string, .string("reg_lpm_reference")),
                 "expected_channel": .enforced(.integer, .int(1)),
@@ -426,6 +433,13 @@ extension OperationRegistry {
                 "expected_current": .enforced(.integer, .int(64)), "value": .enforced(.integer, .int(74)),
                 "linked_position": .enforced(.string, "1.4.4.240"),
             ], required: [["target_ref"], ["position"], ["expected_current"], ["value"]]),
+            "tracks.insert_volume_automation_point": .init(params: [
+                "target_ref": .enforced(.string, .string("trk_lpm_reference")),
+                "position": .enforced(.string, .string("1.3.1.1")),
+                "previous_position": .enforced(.string, .string("1.1.1.121")),
+                "next_position": .enforced(.string, .string("1.4.4.240")),
+                "expected_current": .enforced(.integer, .int(80)),
+            ], required: [["target_ref"], ["position"], ["previous_position"], ["next_position"], ["expected_current"]]),
             "tracks.move_volume_automation_point": .init(params: [
                 "target_ref": targetRef, "project_ref": projectRef,
                 "position": .enforced(.string, "1.1.1.1"), "new_position": .enforced(.string, "1.1.1.121"),
@@ -539,6 +553,15 @@ extension OperationRegistry {
                 "track": .enforced(.integer, .int(0)),
                 "insert": .enforced(.integer, .int(6)),
             ], required: [["target_ref"], ["expected_build_fingerprint"]]),
+            "plugins.get_gain_automation": .init(params: [
+                "target_ref": .enforced(.string, .string("ins_lpm_reference")),
+            ], required: [["target_ref"]]),
+            "plugins.set_gain_automation_point": .init(params: [
+                "target_ref": .enforced(.string, .string("ins_lpm_reference")),
+                "position": .enforced(.string, .string("1.1.1.1")),
+                "expected_current": .enforced(.integer, .int(101)),
+                "value": .enforced(.integer, .int(91)),
+            ], required: [["target_ref"], ["position"], ["expected_current"], ["value"]]),
             "plugins.get_param_verified": .init(params: [
                 "target_ref": .enforced(.string, .string("ins_lpm_contract_955")), "project_ref": projectRef,
                 "param": .enforced(.string, .string("threshold")),
