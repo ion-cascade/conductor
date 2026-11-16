@@ -5,7 +5,7 @@ import Foundation
 struct ServerConfig: Sendable {
     // MARK: - Server Identity
     static let serverName = "ion-cascade-conductor"
-    static let serverVersion = "1.12.2"
+    static let serverVersion = "1.13.0"
     static let versionMarker = "LOGIC_PRO_MCP_VERSION=\(serverVersion)"
 
     // MARK: - MIDI

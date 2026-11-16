@@ -767,6 +767,14 @@ struct OperationRegistryTests {
         ("project.get_regions", "get_regions", .readOnly, .short, .none),
         ("project.get_pattern_step", "get_pattern_step", .readOnly, .medium, .none),
         ("project.set_pattern_step_enabled", "set_pattern_step_enabled", .mutating, .medium, .readbackRequired),
+        ("project.capture_pattern_grid", "capture_pattern_grid", .readOnly, .long, .none),
+        ("project.get_chord_track", "get_chord_track", .readOnly, .medium, .none),
+        ("project.get_session_player", "get_session_player", .readOnly, .medium, .none),
+        ("project.search_browser_patches", "search_browser_patches", .readOnly, .medium, .none),
+        ("project.set_pattern_steps_enabled", "set_pattern_steps_enabled", .mutating, .long, .readbackRequired),
+        ("project.set_chord_quality", "set_chord_quality", .mutating, .medium, .readbackRequired),
+        ("project.set_session_player_chord_source", "set_session_player_chord_source", .mutating, .medium, .readbackRequired),
+        ("project.load_browser_patch", "load_browser_patch", .mutating, .medium, .readbackRequired),
         ("project.scan_regions", "scan_regions", .readOnly, .medium, .none),
         ("project.get_region_smart_tempo", "get_region_smart_tempo", .readOnly, .medium, .readbackRequired),
         ("project.get_region_gain", "get_region_gain", .readOnly, .medium, .none),
@@ -862,6 +870,7 @@ struct OperationRegistryTests {
             "new", "open", "save", "save_as", "close", "bounce", "launch", "quit",
             "export_run", "export_resume", "cleanup_apply", "apply_session_repair",
             "set_pattern_step_enabled", "set_region_gain", "set_region_fade", "edit_region",
+            "set_pattern_steps_enabled", "set_chord_quality", "set_session_player_chord_source", "load_browser_patch",
         ]))
         #expect(OperationRegistry.mutatingCommands(tool: tool) == expected)
         for entry in Self.projectCommands {
@@ -873,8 +882,8 @@ struct OperationRegistryTests {
     @Test("project deadlines exactly match registry short medium and long tiers")
     func projectDeadlineParity() {
         #expect(Self.projectCommands.filter { $0.deadline == .short }.count == 8)
-        #expect(Self.projectCommands.filter { $0.deadline == .medium }.count == 15)
-        #expect(Self.projectCommands.filter { $0.deadline == .long }.count == 5)
+        #expect(Self.projectCommands.filter { $0.deadline == .medium }.count == 21)
+        #expect(Self.projectCommands.filter { $0.deadline == .long }.count == 7)
         #expect(Self.projectCommands.filter { $0.deadline == .saga }.map(\.command) == ["apply_session_repair"])
 
         for entry in Self.projectCommands {

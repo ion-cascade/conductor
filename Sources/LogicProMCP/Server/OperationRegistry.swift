@@ -100,6 +100,14 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case projectGetRegions = "project.get_regions"
     case projectGetPatternStep = "project.get_pattern_step"
     case projectSetPatternStepEnabled = "project.set_pattern_step_enabled"
+    case projectCapturePatternGrid = "project.capture_pattern_grid"
+    case projectGetChordTrack = "project.get_chord_track"
+    case projectSearchBrowserPatches = "project.search_browser_patches"
+    case projectLoadBrowserPatch = "project.load_browser_patch"
+    case projectSetChordQuality = "project.set_chord_quality"
+    case projectGetSessionPlayer = "project.get_session_player"
+    case projectSetSessionPlayerChordSource = "project.set_session_player_chord_source"
+    case projectSetPatternStepsEnabled = "project.set_pattern_steps_enabled"
     case projectScanRegions = "project.scan_regions"
     case projectEditRegion = "project.edit_region"
     case projectGetRegionSmartTempo = "project.get_region_smart_tempo"
@@ -389,7 +397,7 @@ enum OperationRegistry {
         ToolID.logicProject.rawValue: [
             "project.new", "project.open", "project.save", "project.save_as", "project.close",
             "project.bounce", "project.is_running", "project.launch", "project.quit",
-            "project.get_regions", "project.get_pattern_step", "project.set_pattern_step_enabled", "project.scan_regions", "project.edit_region", "project.get_region_smart_tempo", "project.get_region_gain", "project.set_region_gain", "project.get_region_fade", "project.set_region_fade", "project.export_plan", "project.export_run",
+            "project.get_regions", "project.get_pattern_step", "project.set_pattern_step_enabled", "project.capture_pattern_grid", "project.search_browser_patches", "project.load_browser_patch", "project.get_chord_track", "project.set_chord_quality", "project.get_session_player", "project.set_session_player_chord_source", "project.set_pattern_steps_enabled", "project.scan_regions", "project.edit_region", "project.get_region_smart_tempo", "project.get_region_gain", "project.set_region_gain", "project.get_region_fade", "project.set_region_fade", "project.export_plan", "project.export_run",
             "project.export_resume", "project.export_status", "project.audit", "project.cleanup_plan",
             "project.inspect_session", "project.plan_session_repair", "project.apply_session_repair", "project.cleanup_apply",
         ],
@@ -450,7 +458,7 @@ enum OperationRegistry {
         ],
         ToolID.logicProject.rawValue: [
             "new", "open", "save", "save_as", "close", "bounce", "is_running", "launch",
-            "quit", "get_regions", "get_pattern_step", "set_pattern_step_enabled", "scan_regions", "edit_region", "get_region_smart_tempo", "get_region_gain", "set_region_gain", "get_region_fade", "set_region_fade", "export_plan", "export_run", "export_resume", "export_status", "audit",
+            "quit", "get_regions", "get_pattern_step", "set_pattern_step_enabled", "capture_pattern_grid", "search_browser_patches", "load_browser_patch", "get_chord_track", "set_chord_quality", "get_session_player", "set_session_player_chord_source", "set_pattern_steps_enabled", "scan_regions", "edit_region", "get_region_smart_tempo", "get_region_gain", "set_region_gain", "get_region_fade", "set_region_fade", "export_plan", "export_run", "export_resume", "export_status", "audit",
             "cleanup_plan", "inspect_session", "plan_session_repair", "apply_session_repair", "cleanup_apply",
         ],
         ToolID.logicMidi.rawValue: [
@@ -965,6 +973,14 @@ enum OperationRegistry {
         (.projectGetRegions, "get_regions", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.short, []),
         (.projectGetPatternStep, "get_pattern_step", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.medium, []),
         (.projectSetPatternStepEnabled, "set_pattern_step_enabled", Mutability.mutating, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.medium, ["address", "expected_enabled", "enabled"]),
+        (.projectCapturePatternGrid, "capture_pattern_grid", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.long, []),
+        (.projectSetPatternStepsEnabled, "set_pattern_steps_enabled", Mutability.mutating, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.long, ["address", "grid_snapshot", "changes"]),
+        (.projectGetChordTrack, "get_chord_track", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.medium, []),
+        (.projectSearchBrowserPatches, "search_browser_patches", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.medium, ["project_path", "track_index", "track_name", "query"]),
+        (.projectLoadBrowserPatch, "load_browser_patch", Mutability.mutating, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.medium, ["project_path", "track_index", "track_name", "query", "patch"]),
+        (.projectSetChordQuality, "set_chord_quality", Mutability.mutating, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.medium, ["project_path", "start_bar", "end_bar", "expected_chord", "quality"]),
+        (.projectGetSessionPlayer, "get_session_player", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.medium, []),
+        (.projectSetSessionPlayerChordSource, "set_session_player_chord_source", Mutability.mutating, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.medium, ["address", "expected_chord_source", "chord_source"]),
         (.projectScanRegions, "scan_regions", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.medium, []),
         (.projectGetRegionSmartTempo, "get_region_smart_tempo", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.medium, ["target_ref"]),
         (.projectGetRegionGain, "get_region_gain", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.medium, ["target_ref"]),

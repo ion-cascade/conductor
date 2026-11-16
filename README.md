@@ -36,9 +36,11 @@ Use the [compatibility matrix](docs/conductor/compatibility.md) to check the tes
 | Arrangement | Scan Arrange viewports for offscreen audio or MIDI regions, then move or trim a bound region. Set audio-region gain and standard linear fades. |
 | Track automation | Create and edit supported Volume and absolute Pan points, move a Volume point, or shape a flat segment by inserting one control point. |
 | MIDI | Import and export track MIDI. Edit an existing note’s pitch, start, length and velocity, or change an existing Expression (CC11) event. |
+| Composition | Read whole-bar Chord Track events, change a supported chord quality, and change which chords a Keyboard Player region follows. |
+| Browser | Search visible instrument patches and load an exact result onto the selected software instrument track. |
 | Mixer and inserts | Adjust a referenced strip. Read Channel EQ, apply supported Compressor presets and sidechains, bypass occupied inserts, and edit qualified mono Gain levels and Gain automation. |
 | Render and delivery | Bounce an exact stereo PCM range, export selected aligned stems, verify a delivery receipt and resume unfinished outputs after reconnecting. |
-| Stem Splitter and Step Sequencer | Separate audio into stems or individual drum kit pieces, or inspect and toggle a selected Drum Machine Designer step. |
+| Stem Splitter and Step Sequencer | Separate audio into stems or individual drum kit pieces, or read and edit batches of Drum Machine Designer steps. |
 | Audio analysis | Read an audio file’s format, levels and spectral measurements. |
 
 [Workflow examples and command requirements](docs/API.md) · [Command parameters](docs/COMMAND-PARAMETERS.md)

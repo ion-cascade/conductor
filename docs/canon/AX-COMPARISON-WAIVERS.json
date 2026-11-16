@@ -1,0 +1,8 @@
+{
+  "literals": {
+    ", Session Player region.": "The Logic 13 English Keyboard Player adapter requires this native Arrange region kind marker alongside exact region and track binding. Other wording causes refusal.",
+    "Chord Track, Chord Track": "The English Logic 13.0 build 7801 Region Inspector exposes this exact Pitch Source value and corroborates it in the control description.",
+    "Region Chords, Region Chords": "The English Logic 13.0 build 7801 Region Inspector exposes this exact Pitch Source value after switching the selected Keyboard Player region to its own chords.",
+    "library indicator, ": "The English Logic 13.0 build 7801 Browser adapter combines this Inspector prefix with the exact requested patch and verifies the selected track and peer layout independently."
+  }
+}

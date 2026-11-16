@@ -124,6 +124,7 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `apply_session_repair` | `confirmed`, `digest`, `idempotency_key`, `plan_id` | `plan_id`; `digest`; `confirmed`; `idempotency_key` | closed | mutating | l1 | none | readback_required | never_automatic | default_install |
 | `audit` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `bounce` | none | none | closed | mutating | none | none | none | never_automatic | unsupported |
+| `capture_pattern_grid` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `cleanup_apply` | `confirmed`: boolean, `name`, `names`, `new_name`, `stepId`, `step_id` | `step_id` or `stepId`; `confirmed` | closed | mutating | l1 | none | readback_required | never_automatic | default_install |
 | `cleanup_plan` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `close` | `confirmed`: boolean, `saving` | none | closed | mutating | l3 | none | none | never_automatic | default_install |
@@ -132,14 +133,17 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `export_resume` | `artifact`, `artifacts`, `bounce_settings`, `collision_policy`, `confirmed`: boolean, `kind`, `naming_policy`, `outputRoot`, `output_root`, `path`, `project`, `projects`, `stem_settings` | `projects` or `project` or `path`; `output_root` or `outputRoot` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `export_run` | `artifact`, `artifacts`, `bounce_settings`, `collision_policy`, `confirmed`: boolean, `kind`, `naming_policy`, `outputRoot`, `output_root`, `path`, `project`, `projects`, `stem_settings` | `projects` or `project` or `path`; `output_root` or `outputRoot` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `export_status` | `delivery_id`: string, `expected_settings`: object, `output_root`: string | `delivery_id`; `output_root` | closed | read_only | none | none | none | never_automatic | default_install |
+| `get_chord_track` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `get_pattern_step` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `get_region_fade` | `edge`: string (in, out), `target_ref`: string | `target_ref`; `edge` | closed | read_only | none | none | none | never_automatic | default_install |
 | `get_region_gain` | `target_ref`: string | `target_ref` | closed | read_only | none | none | none | never_automatic | default_install |
 | `get_region_smart_tempo` | `target_ref`: string | `target_ref` | closed | read_only | none | none | readback_required | never_automatic | default_install |
 | `get_regions` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
+| `get_session_player` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `inspect_session` | `allow_ui_navigation`: boolean, `domains`, `project_ref`, `scope`, `snapshot_id` | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `is_running` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `launch` | none | none | closed | mutating | l1 | none | readback_required | never_automatic | default_install |
+| `load_browser_patch` | `patch`: string, `project_path`: string, `query`: string, `track_index`: integer, `track_name`: string | `project_path`; `track_index`; `track_name`; `query`; `patch` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `new` | none | none | closed | mutating | l1 | none | readback_required | never_automatic | default_install |
 | `open` | `confirmed`: boolean, `path`: scalar | `path` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `plan_session_repair` | `allow_create_aux`, `allow_replace_send`, `allow_stack_membership_change`, `digest`, `names`, `on_ambiguity`, `plan_id`, `policy`, `snapshot_id` | `plan_id` or `snapshot_id` and `policy` | closed | read_only | none | none | none | never_automatic | default_install |
@@ -147,9 +151,13 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `save` | none | none | closed | mutating | l1 | none | readback_required | never_automatic | default_install |
 | `save_as` | `confirmed`: boolean, `path`: scalar | `path` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `scan_regions` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
+| `search_browser_patches` | `project_path`: string, `query`: string, `track_index`: integer, `track_name`: string | `project_path`; `track_index`; `track_name`; `query` | closed | read_only | none | none | none | never_automatic | default_install |
+| `set_chord_quality` | `end_bar`: integer, `expected_chord`: string, `project_path`: string, `quality`: string, `start_bar`: integer | `project_path`; `start_bar`; `end_bar`; `expected_chord`; `quality` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `set_pattern_step_enabled` | `address`: object, `enabled`: boolean, `expected_enabled`: boolean | `address`; `expected_enabled`; `enabled` | closed | mutating | none | none | readback_required | never_automatic | default_install |
+| `set_pattern_steps_enabled` | `address`: object, `changes`: array, `grid_snapshot`: string | `address`; `grid_snapshot`; `changes` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `set_region_fade` | `edge`: string (in, out), `expected_time_ms`: JSON number, `target_ref`: string, `time_ms`: JSON number | `target_ref`; `edge`; `expected_time_ms`; `time_ms` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `set_region_gain` | `expected_gain_db`: JSON number, `gain_db`: JSON number, `target_ref`: string | `target_ref`; `expected_gain_db`; `gain_db` | closed | mutating | none | none | readback_required | never_automatic | default_install |
+| `set_session_player_chord_source` | `address`: object, `chord_source`: string, `expected_chord_source`: string | `address`; `expected_chord_source`; `chord_source` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 
 ## `logic_system`
 

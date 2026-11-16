@@ -677,6 +677,46 @@ extension OperationRegistry {
                 "expected_enabled": .enforced(.boolean, .bool(false)),
                 "enabled": .enforced(.boolean, .bool(true)),
             ], required: [["address"], ["expected_enabled"], ["enabled"]]),
+            "project.set_pattern_steps_enabled": .init(params: [
+                "address": .enforced(.object, .object([
+                    "project_path": .string("/tmp/Pattern.logicx"), "region_name": .string("Beat"),
+                    "region_location": .string("Region starts at 1 bar and ends at 2 bars"),
+                    "track": .string("Track 1 “Kit”"),
+                ])),
+                "grid_snapshot": .enforced(.string, .string("grid_" + String(repeating: "0", count: 64))),
+                "changes": .enforced(.array, .array([.object([
+                    "row": .string("01: Kick 1 - C1"), "step": .int(1), "enabled": .bool(true),
+                ])])),
+            ], required: [["address"], ["grid_snapshot"], ["changes"]]),
+            "project.set_chord_quality": .init(params: [
+                "project_path": .enforced(.string, .string("/tmp/Chord.logicx")),
+                "start_bar": .enforced(.integer, .int(1)),
+                "end_bar": .enforced(.integer, .int(2)),
+                "expected_chord": .enforced(.string, .string("c major")),
+                "quality": .enforced(.string, .string("minor")),
+            ], required: [["project_path"], ["start_bar"], ["end_bar"], ["expected_chord"], ["quality"]]),
+            "project.set_session_player_chord_source": .init(params: [
+                "address": .enforced(.object, .object([
+                    "project_path": .string("/tmp/Player.logicx"), "region_name": .string("Keyboard Player - Freely"),
+                    "region_location": .string("Region starts at 1 bar and ends at 9 bars"),
+                    "track": .string("Track 2 “Piano”"),
+                ])),
+                "expected_chord_source": .enforced(.string, .string("global")),
+                "chord_source": .enforced(.string, .string("region")),
+            ], required: [["address"], ["expected_chord_source"], ["chord_source"]]),
+            "project.search_browser_patches": .init(params: [
+                "project_path": .enforced(.string, .string("/tmp/Browser.logicx")),
+                "track_index": .enforced(.integer, .int(1)),
+                "track_name": .enforced(.string, .string("Inst 2")),
+                "query": .enforced(.string, .string("Keyboard")),
+            ], required: [["project_path"], ["track_index"], ["track_name"], ["query"]]),
+            "project.load_browser_patch": .init(params: [
+                "project_path": .enforced(.string, .string("/tmp/Browser.logicx")),
+                "track_index": .enforced(.integer, .int(1)),
+                "track_name": .enforced(.string, .string("Inst 2")),
+                "query": .enforced(.string, .string("Keyboard")),
+                "patch": .enforced(.string, .string("Studio Grand")),
+            ], required: [["project_path"], ["track_index"], ["track_name"], ["query"], ["patch"]]),
             "project.get_region_smart_tempo": .init(params: [
                 "target_ref": .enforced(.string, .string("reg_test")),
             ], required: [["target_ref"]]),

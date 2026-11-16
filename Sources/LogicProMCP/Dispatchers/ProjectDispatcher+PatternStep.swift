@@ -16,6 +16,9 @@ extension ProjectDispatcher {
                 result["address"] = step.address.json
                 result["enabled"] = step.enabled
                 result["velocity"] = step.velocity
+                result["chance_percent"] = step.chance
+                result["repeat_count"] = step.repeatCount
+                result["tied"] = step.tied
                 result["visible_grid"] = step.visibleRows.map(\.json)
             }
             if state == "B" { result["reason"] = "Check the selected step in Logic before trying another edit." }
@@ -51,7 +54,7 @@ extension ProjectDispatcher {
         }
         if desired == first.enabled { return response(first, state: "A", attempted: false) }
         guard let before = ProjectPatternStep.read(), before.holdsSameSelection(as: first),
-              before.enabled == first.enabled, before.velocity == first.velocity,
+              before.enabled == first.enabled, before.holdsSameParameters(as: first),
               before.visibleRows == first.visibleRows,
               await recordWriteBoundary(traceID, deadlineStage: "pattern_step_enabled") else {
             return refuse(.staleSnapshot, "The selected pattern step changed before the edit.")
@@ -60,7 +63,7 @@ extension ProjectDispatcher {
         for _ in 0..<5 {
             do { try await Task.sleep(for: .milliseconds(90)) } catch { break }
             guard let after = ProjectPatternStep.read(), after.holdsSameSelection(as: before) else { break }
-            if after.enabled == desired, after.velocity == before.velocity, after.visibleRows == before.visibleRows {
+            if after.enabled == desired, after.holdsSameParameters(as: before), after.visibleRows == before.visibleRows {
                 return response(after, state: "A", attempted: true)
             }
         }

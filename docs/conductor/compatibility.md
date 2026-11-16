@@ -15,6 +15,17 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
 
+## 1.13 Composition, Browser and drum patterns
+
+| Workflow | Verified scope on Logic Pro 13.0 |
+| --- | --- |
+| Chord Track | Read up to 32 whole-bar events. In a three-event progression, changed C major to C minor at bars 3–4, preserved the first and last events, refused a stale chord identity and verified the saved progression after reopening. Writes are limited to standalone natural-root major or minor chords. |
+| Keyboard Player | Read the selected region, track, Complexity and Intensity and verified the native Pitch Source switch between region chords and the Chord Track. The region-source bounce was PCM-identical across the global edit. The Chord Track source reflected the edit and its reopened bounce matched the saved result. |
+| Unified Browser | Searched the native Instruments list view. Applied Hi-Hat Open 2 - Topaz to one selected track, checked the Inspector, retained the other three tracks and region layout, and verified the saved patch after reopening. |
+| Drum Machine Designer | Read three complete 16-step rows. Edited two cells, checked all 46 peers, refused a stale snapshot and verified the saved grid after reopening. The edited and reopened exact-range bounces had identical PCM. |
+
+The Browser commands use Logic's ranked search and local instrument patch replacement. Patch merging, Find Similar, content downloads, Apple Loop and sample placement, and plug-in presets are outside the verified Browser workflow. Velocity, Chance, repeat count and tie state are read-only. Session Player types other than Keyboard Player and direct performance-parameter writes are outside this qualification.
+
 ## 1.12.1 Native Flex and take-comp qualification
 
 These checks use disposable Logic Pro 13.0 build 7801 projects and compare the saved project with a fresh native read and an independent stem render after reopening.

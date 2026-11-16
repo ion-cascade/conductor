@@ -447,7 +447,7 @@ If status reports a resumable partial delivery, reopen the same saved project, r
 
 ### `logic_project`
 
-Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `get_pattern_step`, `set_pattern_step_enabled`, `scan_regions`, `edit_region`, `get_region_gain`, `set_region_gain`, `get_region_fade`, `set_region_fade`, `export_plan`, `export_run`, `export_resume`, `export_status`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
+Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `get_pattern_step`, `set_pattern_step_enabled`, `capture_pattern_grid`, `set_pattern_steps_enabled`, `get_chord_track`, `set_chord_quality`, `get_session_player`, `set_session_player_chord_source`, `search_browser_patches`, `load_browser_patch`, `scan_regions`, `edit_region`, `get_region_gain`, `set_region_gain`, `get_region_fade`, `set_region_fade`, `export_plan`, `export_run`, `export_resume`, `export_status`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
 
 File-writing paths require confirmation. `save_as` verifies the resulting `.logicx` package. `audit` marks GM Device and External MIDI tracks with MIDI regions as export blockers. Use the read-only `export_plan` and confirmed `export_run` to produce audio. The standalone `bounce` command is unsupported.
 
@@ -459,7 +459,25 @@ Call `logic_project.get_pattern_step` with empty parameters. The response includ
 
 Call `logic_project.set_pattern_step_enabled` with the unmodified `address`, the observed Boolean as `expected_enabled`, and the desired Boolean as `enabled`. Conductor compares the live selection and previous value before pressing the inspector’s On/Off control, then reads the same step again. An already-matching value returns without pressing the control. Save the project in Logic to retain the change. Read again after reopening or changing the selection.
 
-Velocity is read-only. See the [compatibility matrix](conductor/compatibility.md#15-production-editors) for the tested editor scope and Flex Time findings.
+When exposed independently by the Step inspector, `chance_percent`, `repeat_count` and `tied` accompany `velocity`. These four parameters are read-only.
+
+#### Read and edit a Drum Machine Designer grid
+
+Use the same stopped Step Sequencer with its On/Off mode and Step inspector visible. `capture_pattern_grid` reads one to three complete 16-step drum rows and restores the original cell selection. It returns the region `address`, its `grid_snapshot` and the native On/Off and inspector values for each cell.
+
+Pass the address and snapshot to `set_pattern_steps_enabled` with one to four unique changes of the form `{"row":"01: Kick 1 - C1","step":2,"enabled":true}`. This command rereads the complete grid before changing a cell and compares every cell after the batch. A stale snapshot or missing address is refused before an edit. A State B response means you should recapture the grid before retrying.
+
+#### Edit a Chord Track or Keyboard Player region
+
+Show the Chord Track in a saved, stopped Logic Pro 13 project. `get_chord_track` reads an exposed lane of up to 32 chords across up to 16 groups with whole-bar starts and ends. Pass the returned `project_path`, `start_bar`, `end_bar` and `chord` as `expected_chord` to `set_chord_quality` with `quality` set to `major` or `minor`. The setter supports standalone chords with natural roots. It verifies both boundaries and every visible peer event after the edit. Readback also supports multi-event chord groups.
+
+Select one Keyboard Player region, open its Session Player editor and expand General in the Region Inspector. `get_session_player` returns the player type, the selected region and track address, complexity, intensity and the current Pitch Source. Pass the observed `address` and `expected_chord_source` together with the desired `chord_source` to `set_session_player_chord_source`.
+
+#### Search Browser instruments and load a local patch
+
+Select a software instrument track in a saved, stopped Logic Pro 13 project. Open the Inspector and Browser Instruments in list view. Turn off Replace on selection and clear earlier search filters. `search_browser_patches` takes the current `project_path`, zero-based `track_index`, exact `track_name` and `query`. Logic supplies the ranked results, and Conductor returns the instrument patch names visible in the results pane.
+
+Leave results unselected. Pass the same four parameters to `load_browser_patch` with the exact observed `patch` name. The operation checks the target, applies the patch, verifies it in the native Inspector and compares the Arrange tracks and regions. It restores Replace on selection to off.
 
 #### Sample Arrange viewports and edit one region
 

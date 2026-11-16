@@ -100,6 +100,22 @@ extension AXLogicProElements {
         return matches.count == 1 ? matches[0] : nil
     }
 
+    /// Individual Arrange items carry selection even when the split editor
+    /// reports an empty selected-children array at the group level.
+    static func logic13SelectedRegion(in content: AXUIElement, runtime: AXHelpers.Runtime) -> AXUIElement? {
+        guard let items = logic13RegionItems(in: content, runtime: runtime) else { return nil }
+        var selection: AXUIElement?
+        for item in items where (AXHelpers.getAttribute(item, kAXRoleDescriptionAttribute, runtime: runtime) as String?) == "Region" {
+            guard case .success(let selected?) = AXHelpers.getAttributeResult(item, kAXSelectedAttribute, runtime: runtime)
+                as Result<NSNumber?, AXHelpers.AXStatusError> else { return nil }
+            if selected.boolValue {
+                guard selection == nil else { return nil }
+                selection = item
+            }
+        }
+        return selection
+    }
+
     /// An unreadable, cyclic or truncated tree is not an empty region set.
     static func logic13RegionItems(in content: AXUIElement, runtime: AXHelpers.Runtime) -> [AXUIElement]? {
         var pending: [(AXUIElement, Int)] = [(content, 0)]

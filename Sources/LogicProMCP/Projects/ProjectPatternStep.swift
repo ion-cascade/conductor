@@ -12,7 +12,17 @@ struct ProjectPatternStep {
     let address: Address
     let enabled: Bool
     let velocity: Int
+    let chance: Int?
+    let repeatCount: Int?
+    let tied: Bool?
     let visibleRows: [GridRow]
+    private let gridTargets: [CellAddress: AXUIElement]
+    private let onOffMode: Bool
+
+    struct CellAddress: Hashable {
+        let row: String
+        let step: Int
+    }
 
     struct Address: Equatable {
         let projectPath: String
@@ -43,8 +53,31 @@ struct ProjectPatternStep {
     }
 
     func holdsSameSelection(as other: Self) -> Bool {
-        address == other.address && CFEqual(window, other.window) && CFEqual(editor, other.editor)
-            && CFEqual(region, other.region) && CFEqual(cell, other.cell)
+        address == other.address && holdsSamePattern(as: other) && CFEqual(cell, other.cell)
+    }
+
+    func holdsSameParameters(as other: Self) -> Bool {
+        velocity == other.velocity && chance == other.chance && repeatCount == other.repeatCount && tied == other.tied
+    }
+
+    func holdsSamePattern(as other: Self) -> Bool {
+        address.projectPath == other.address.projectPath && address.regionName == other.address.regionName
+            && address.regionLocation == other.address.regionLocation && address.track == other.address.track
+            && CFEqual(window, other.window) && CFEqual(editor, other.editor) && CFEqual(region, other.region)
+    }
+
+    var cellAddress: CellAddress { .init(row: address.row, step: address.step) }
+
+    /// The batch adapter accepts only a complete 16-step grid for at most three visible drum rows.
+    var completeGrid: [CellAddress]? {
+        guard onOffMode, (1...3).contains(visibleRows.count),
+              visibleRows.allSatisfy({ row in
+                  row.steps == Array(1...16) &&
+                    row.name.range(of: #"^[0-9]{2}: .+ - [A-G][#♯♭b]?-?[0-9]+$"#,
+                                   options: .regularExpression) != nil
+              }),
+              gridTargets.count == visibleRows.count * 16 else { return nil }
+        return visibleRows.flatMap { row in row.steps.map { .init(row: row.name, step: $0) } }
     }
 
     static func read(runtime: AXLogicProElements.Runtime = .production) -> Self? {
@@ -56,7 +89,7 @@ struct ProjectPatternStep {
               case .success(let document?) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
               let url = URL(string: document), url.isFileURL, url.pathExtension.lowercased() == "logicx",
               let content = AXLogicProElements.logic13TrackContent(in: window, runtime: runtime),
-              let region = selectedRegion(in: content, ax: ax),
+              let region = AXLogicProElements.logic13SelectedRegion(in: content, runtime: ax),
               AXHelpers.getRole(region, runtime: ax) == kAXLayoutItemRole,
               let help = AXHelpers.getHelp(region, runtime: ax), help.contains(", Pattern region."),
               let regionName = AXHelpers.getDescription(region, runtime: ax), !regionName.isEmpty,
@@ -70,6 +103,8 @@ struct ProjectPatternStep {
                                    name: "Step Sequencer", ax: ax)
         else { return nil }
         let controls = descendants(toolbar, depth: 3, ax: ax)
+        let onOffMode = single(controls, role: kAXRadioButtonRole, name: "On/Off", ax: ax)
+            .flatMap { AXValueExtractors.extractButtonState($0, runtime: ax) } == true
         guard ["Mono Mode", "Pattern Live Recording", "Preview", "MIDI In (Step Record)"].allSatisfy({ name in
             single(controls, role: kAXCheckBoxRole, name: name, ax: ax).flatMap {
                 AXValueExtractors.extractButtonState($0, runtime: ax)
@@ -90,6 +125,7 @@ struct ProjectPatternStep {
         guard selected.count == 1, let cell = selected.first else { return nil }
 
         var visibleRows: [GridRow] = []
+        var gridTargets: [CellAddress: AXUIElement] = [:]
         var selectedRows: [String] = []
         for header in headers {
             guard let label = AXHelpers.getDescription(header, runtime: ax), !label.isEmpty,
@@ -98,6 +134,9 @@ struct ProjectPatternStep {
             let steps = rowCells.map(\.number).sorted()
             guard Set(steps).count == steps.count else { return nil }
             let name = label.hasSuffix(", selected") ? String(label.dropLast(", selected".count)) : label
+            for entry in rowCells {
+                gridTargets[.init(row: name, step: entry.number)] = entry.element
+            }
             if rowCells.contains(where: \.selected) {
                 guard label.hasSuffix(", selected") else { return nil }
                 selectedRows.append(name)
@@ -115,22 +154,76 @@ struct ProjectPatternStep {
               let toggle = single(editorControls, role: kAXCheckBoxRole, name: "On/Off", ax: ax),
               let enabled = AXValueExtractors.extractButtonState(toggle, runtime: ax)
         else { return nil }
-        let velocities = editorControls.compactMap { element -> Int? in
-            guard AXHelpers.getRole(element, runtime: ax) == kAXButtonRole,
-                  let label = AXHelpers.getDescription(element, runtime: ax), label.hasPrefix("Velocity, "),
-                  let value = Int(label.dropFirst("Velocity, ".count)), (1...127).contains(value) else { return nil }
-            return value
-        }
-        guard velocities.count == 1, let velocity = velocities.first,
+        let chance = inspectorInteger(editorControls, label: "Chance, ", suffix: "%", ax: ax)
+            .flatMap { (0...100).contains($0) ? $0 : nil }
+        let repeatCount = inspectorInteger(editorControls, label: "Repeat, ", ax: ax)
+            .flatMap { $0 >= 1 ? $0 : nil }
+        let tied = single(editorControls, role: kAXCheckBoxRole, name: "Tie", ax: ax)
+            .flatMap { AXValueExtractors.extractButtonState($0, runtime: ax) }
+        guard let velocity = inspectorInteger(editorControls, label: "Velocity, ", ax: ax),
+              (1...127).contains(velocity),
               ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime, ignoringHelpTags: true),
               AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime) == .success(document),
-              selectedRegion(in: content, ax: ax).map({ CFEqual($0, region) }) == true
+              AXLogicProElements.logic13SelectedRegion(in: content, runtime: ax).map({ CFEqual($0, region) }) == true
         else { return nil }
 
         let address = Address(projectPath: url.path, regionName: regionName, regionLocation: location,
                               track: track, row: row, step: cell.number)
         return .init(window: window, editor: editor, region: region, cell: cell.element, toggle: toggle,
-                     address: address, enabled: enabled, velocity: velocity, visibleRows: visibleRows)
+                     address: address, enabled: enabled, velocity: velocity, chance: chance, repeatCount: repeatCount,
+                     tied: tied, visibleRows: visibleRows,
+                     gridTargets: gridTargets.count == cells.count ? gridTargets : [:], onOffMode: onOffMode)
+    }
+
+    func moveSelection(to target: CellAddress, runtime: AXLogicProElements.Runtime = .production) async -> Self? {
+        guard target != cellAddress, let destination = gridTargets[target] else { return nil }
+        // AXPress on a grid cell toggles the note. Two Shift-clicks change only the selection.
+        guard shiftClick(destination, runtime: runtime) else { return nil }
+        try? await Task.sleep(for: .milliseconds(100))
+        let ax = runtime.ax
+        guard let old = Self.gridCell(cell, ax: ax), old.selected,
+              let new = Self.gridCell(destination, ax: ax), new.selected else { return nil }
+        if !shiftClick(cell, runtime: runtime) {
+            _ = shiftClick(destination, runtime: runtime)
+            return nil
+        }
+        try? await Task.sleep(for: .milliseconds(100))
+        guard let observed = Self.read(runtime: runtime), observed.holdsSamePattern(as: self),
+              observed.cellAddress == target, observed.visibleRows == visibleRows else { return nil }
+        return observed
+    }
+
+    private func shiftClick(_ target: AXUIElement, runtime: AXLogicProElements.Runtime) -> Bool {
+        guard CGPreflightPostEventAccess(), let extent = Self.frame(target, runtime.ax) else { return false }
+        let point = CGPoint(x: extent.midX, y: extent.midY)
+        guard let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: point,
+                                 mouseButton: .left),
+              let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: point,
+                               mouseButton: .left),
+              ControlBarDisplayMode.foregroundStoppedProject(window: window, runtime: runtime, ignoringHelpTags: true),
+              case .success(let document?) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
+              URL(string: document)?.path == address.projectPath else { return false }
+        var hit: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(point.x), Float(point.y), &hit)
+                == .success, let hit, CFEqual(hit, target) else { return false }
+        for event in [down, up] {
+            event.flags = [.maskShift]
+            event.setIntegerValueField(.mouseEventClickState, value: 1)
+            event.post(tap: .cghidEventTap)
+        }
+        return true
+    }
+
+    private static func inspectorInteger(_ controls: [AXUIElement], label: String, suffix: String = "",
+                                         ax: AXHelpers.Runtime) -> Int? {
+        let matches = controls.compactMap { element -> String? in
+            guard AXHelpers.getRole(element, runtime: ax) == kAXButtonRole,
+                  let description = AXHelpers.getDescription(element, runtime: ax),
+                  description.hasPrefix(label) else { return nil }
+            return String(description.dropFirst(label.count)).trimmingCharacters(in: .whitespaces)
+        }
+        guard matches.count == 1, let match = matches.first, match.hasSuffix(suffix) else { return nil }
+        return Int(match.dropLast(suffix.count).trimmingCharacters(in: .whitespaces))
     }
 
     private static func uniqueLocation(for name: String, selected: AXUIElement, in lane: AXUIElement,
@@ -146,22 +239,6 @@ struct ProjectPatternStep {
         }
         guard matching.count == 1, matching.first.map({ CFEqual($0, selected) }) == true else { return nil }
         return location
-    }
-
-    private static func selectedRegion(in content: AXUIElement, ax: AXHelpers.Runtime) -> AXUIElement? {
-        // In the split editor, the Arrange group's selected-children array is empty
-        // even while its individual pattern item reports AXSelected=true.
-        guard let items = AXLogicProElements.logic13RegionItems(in: content, runtime: ax) else { return nil }
-        var selection: AXUIElement?
-        for item in items where roleDescription(item, ax) == "Region" {
-            guard case .success(let selected?) = AXHelpers.getAttributeResult(item, kAXSelectedAttribute, runtime: ax)
-                as Result<NSNumber?, AXHelpers.AXStatusError> else { return nil }
-            if selected.boolValue {
-                guard selection == nil else { return nil }
-                selection = item
-            }
-        }
-        return selection
     }
 
     private static func gridCell(_ item: AXUIElement, ax: AXHelpers.Runtime) -> GridCell? {

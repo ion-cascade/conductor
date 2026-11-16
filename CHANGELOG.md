@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.13.0] — 2026-11-16
+
+- Read bar-aligned Chord Track events and change one standalone natural-root major or minor chord while checking the peer events. ([#50](https://github.com/ion-cascade/conductor/issues/50))
+- Read a selected Keyboard Player region and switch its Pitch Source between the Chord Track and region chords. ([#51](https://github.com/ion-cascade/conductor/issues/51))
+- Search the Logic 13 Browser and load one exact local instrument patch on the selected, verified instrument track. ([#52](https://github.com/ion-cascade/conductor/issues/52))
+- Read complete 16-step Drum Machine Designer rows and apply up to four guarded On/Off changes with a full-grid readback. Where present, the Step inspector also reports velocity, Chance, repeat count and tie state. ([#59](https://github.com/ion-cascade/conductor/issues/59))
+
 ## [1.12.2] — 2026-11-16
 
 - Observe the MIDI Save panel’s attached Go to Folder sheet directly and verify the selected destination after navigation.
