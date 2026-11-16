@@ -23,15 +23,17 @@ struct ControlsViewParameterEnumeratorTests {
         ax.setChildren(group, [formatted])
         ax.setChildren(bare, [indicator])
         ax.setChildren(cell, disagreement == "structure" ? [label, formatted, bare] : [label, group, bare])
+        ax.setAttribute(formatted, kAXMinValueAttribute, 0)
+        ax.setAttribute(formatted, kAXMaxValueAttribute, 800)
+        ax.setAttribute(bare, kAXMinValueAttribute, 0.0)
+        ax.setAttribute(bare, kAXMaxValueAttribute, 800.0)
         for slider in [formatted, bare] {
-            ax.setAttribute(slider, kAXMinValueAttribute, 0)
-            ax.setAttribute(slider, kAXMaxValueAttribute, 800)
-            ax.setAttribute(slider, kAXValueAttribute, 340)
+            ax.setAttribute(slider, kAXValueAttribute, 340.0)
         }
         ax.setAttribute(bare, kAXValueDescriptionAttribute, "")
         ax.setAttribute(group, kAXValueAttribute, disagreement == "group" ? "-5.00 dB" : " -6.00 dB")
-        ax.setAttribute(indicator, kAXValueAttribute, disagreement == "indicator" ? 341 : 340)
-        if disagreement == "value" { ax.setAttribute(bare, kAXValueAttribute, 341) }
+        ax.setAttribute(indicator, kAXValueAttribute, disagreement == "indicator" ? 341.0 : 340.0)
+        if disagreement == "value" { ax.setAttribute(bare, kAXValueAttribute, 341.0) }
         if disagreement == "range" { ax.setAttribute(bare, kAXMaxValueAttribute, 1000) }
 
         let result = try #require(ControlsViewParameterEnumerator.enumerate(
@@ -45,7 +47,7 @@ struct ControlsViewParameterEnumeratorTests {
             #expect(result.manifest.parameters.count == 1)
             #expect(parameter.name == "Gain")
             #expect(parameter.valueKind == .normalizedReadbackOnly)
-            #expect(observation.observedRawValue == .integer(340))
+            #expect(observation.observedRawValue == .number(340.0))
             #expect(observation.valueDescription == "-6.00 dB")
         } else {
             #expect(result.manifest.parameters.isEmpty)

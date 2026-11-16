@@ -623,11 +623,11 @@ enum ControlsViewParameterEnumerator {
               case .success(let indicatorChildren) = AXHelpers.childrenResult(bare.element, runtime: runtime),
               let indicator = indicatorChildren.only, role(of: indicator, runtime: runtime) == kAXValueIndicatorRole,
               observedRawValue(on: indicator, runtime: runtime) == raw,
-              let minimum = observedRawValue(on: formatted.element, attribute: kAXMinValueAttribute, runtime: runtime),
-              let maximum = observedRawValue(on: formatted.element, attribute: kAXMaxValueAttribute, runtime: runtime),
-              minimum != maximum,
-              minimum == observedRawValue(on: bare.element, attribute: kAXMinValueAttribute, runtime: runtime),
-              maximum == observedRawValue(on: bare.element, attribute: kAXMaxValueAttribute, runtime: runtime),
+              let formattedRange = AXValueExtractors.extractSliderRange(formatted.element, runtime: runtime),
+              let bareRange = AXValueExtractors.extractSliderRange(bare.element, runtime: runtime),
+              formattedRange.min.isFinite, formattedRange.max.isFinite,
+              formattedRange.min < formattedRange.max,
+              formattedRange.min == bareRange.min, formattedRange.max == bareRange.max,
               observedRawValue(on: formatted.element, runtime: runtime) == raw,
               valueDescription(on: formatted.element, runtime: runtime) == formatted.valueDescription
         else {
@@ -638,12 +638,11 @@ enum ControlsViewParameterEnumerator {
 
     private static func observedRawValue(
         on control: AXUIElement,
-        attribute: String = kAXValueAttribute,
         runtime: AXHelpers.Runtime
     ) -> ObservedRawValue? {
         let valueRead: Swift.Result<AnyObject?, AXHelpers.AXStatusError> = AXHelpers.getAttributeResult(
             control,
-            attribute,
+            kAXValueAttribute as String,
             runtime: runtime
         )
         switch valueRead {
