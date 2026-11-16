@@ -1093,7 +1093,7 @@ enum OperationRegistry {
         // confirmation but accepts no track target reference.
         (.tracksSortVerified, "sort_verified", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.none, ["confirmed", "criterion", "expected_order"]),
         (.tracksSetAutomation, "set_automation", Mutability.`mutating`, DeadlineClass.short, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["index", "mode", "track"]),
-        (.tracksSplitSelectedAudio, "split_selected_audio", Mutability.`mutating`, DeadlineClass.long, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["region_name", "start", "end", "confirmed"]),
+        (.tracksSplitSelectedAudio, "split_selected_audio", Mutability.`mutating`, DeadlineClass.long, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["region_name", "start", "end", "confirmed", "preset"]),
         (.tracksCreatePanAutomation, "create_pan_automation_point", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["position", "initial_position"]),
         (.tracksGetPanAutomation, "get_pan_automation", Mutability.readOnly, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, []),
         (.tracksSetPanAutomationPoint, "set_pan_automation_point", Mutability.`mutating`, DeadlineClass.medium, VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["position", "expected_current", "value", "linked_position"]),

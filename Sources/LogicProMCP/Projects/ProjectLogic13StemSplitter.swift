@@ -6,7 +6,29 @@ import Foundation
 /// Measured Logic 13 path for a single selected audio region in a saved package.
 @MainActor
 struct ProjectLogic13StemSplitter {
-    private static let labels = ["Vocals", "Drums", "Bass", "Guitar", "Piano", "Other"]
+    enum Preset: String, CaseIterable {
+        case allStems = "all_stems"
+        case drumKitPieces = "drum_kit_pieces"
+
+        var nativeTitle: String {
+            switch self {
+            case .allStems: "Separate All Stems"
+            case .drumKitPieces: "Drums (Individual Kit Pieces)"
+            }
+        }
+
+        var labels: [String] {
+            switch self {
+            case .allStems: ["Vocals", "Drums", "Bass", "Guitar", "Piano", "Other"]
+            case .drumKitPieces: ["Kick", "Snare", "Hi-Hat", "Toms", "Cymbals", "Drums Other"]
+            }
+        }
+    }
+
+    private struct ArrangementEvidence {
+        let tracks: [Int]
+        let stackName: String?
+    }
     private static let operation = "track.split_selected_audio"
     private enum Failure: Error { case unavailable(String) }
 
@@ -19,10 +41,16 @@ struct ProjectLogic13StemSplitter {
     private let bounds: ArrangeRegionBounds
     private let trackIndex: Int
     private let media: URL
+    private let preset: Preset
 
     static func run(
         params: [String: String], runtime: AXLogicProElements.Runtime
     ) async -> ChannelResult {
+        guard let preset = Preset(rawValue: params["preset"] ?? Preset.allStems.rawValue) else {
+            return .error(HonestContract.encodeStateC(error: .invalidParams,
+                hint: "Use all_stems or drum_kit_pieces.",
+                extras: ["operation": operation, "write_attempted": false]))
+        }
         guard let binding = AXTrackBinding.current, let trackIndex = binding.currentIndex(),
               let name = params["region_name"], !name.isEmpty, !name.contains("/"),
               let start = params["start"], let end = params["end"], start != end,
@@ -38,7 +66,8 @@ struct ProjectLogic13StemSplitter {
             return refusal("project_media_custody")
         }
         let workflow = Self(runtime: runtime, window: binding.window, app: app, pid: pid, document: document,
-                            name: name, bounds: .init(start: start, end: end), trackIndex: trackIndex, media: media)
+                            name: name, bounds: .init(start: start, end: end), trackIndex: trackIndex,
+                            media: media, preset: preset)
         return await workflow.split(binding: binding)
     }
 
@@ -64,9 +93,13 @@ struct ProjectLogic13StemSplitter {
             let input = directory.filter {
                 $0.deletingPathExtension().lastPathComponent == name && ["wav", "aif", "aiff"].contains($0.pathExtension.lowercased())
             }
-            let expected = Self.labels.map { media.appendingPathComponent("\(name)_\($0).aif") }
+            let expected = outputFiles(preset)
+            // On Logic 13.0 the sheet initially reserves the broad-stem names
+            // even when its remembered preset is the individual kit pieces.
+            let reservations = outputFiles(.allStems)
+            let occupiedNames = Set(directory.map(\.lastPathComponent))
             guard input.count == 1, let source = audioFile(input[0]),
-                  expected.allSatisfy({ !FileManager.default.fileExists(atPath: $0.path) }),
+                  (expected + reservations).allSatisfy({ !occupiedNames.contains($0.lastPathComponent) }),
                   AXHelpers.getActionNames(region, runtime: runtime.ax).contains(kAXShowMenuAction)
             else { throw Failure.unavailable("source_or_output_files") }
 
@@ -91,18 +124,10 @@ struct ProjectLogic13StemSplitter {
             }
             menu = nil
             sheet = panel
+            try await selectPreset(in: panel)
             let controls = descendants(panel, depth: 7)
             let apply = try control("Apply", role: kAXButtonRole, in: controls)
-            let kit = try only(controls.filter {
-                text($0, kAXIdentifierAttribute) == "isDrumsSubstemsVisibleToggle"
-            }, "kit_pieces_switch")
-            let submix = try control("Submix", role: kAXCheckBoxRole, in: controls)
-            guard controls.filter({ role($0) == kAXPopUpButtonRole && text($0, kAXValueAttribute) == "Separate All Stems" }).count == 1,
-                  value(kit) == 0, value(submix) == 0 else { throw Failure.unavailable("separate_all_stems_preset") }
-            for label in Self.labels {
-                let checkbox = try control(label, role: kAXCheckBoxRole, in: controls)
-                guard value(checkbox) == 1 else { throw Failure.unavailable("stem_selection:\(label)") }
-            }
+            try verifyPresetControls(controls)
             guard holdsProject(), sheets().count == 1, sheets().contains(panel), isSplitterSheet(panel) else {
                 throw Failure.unavailable("splitter_sheet_ownership")
             }
@@ -118,8 +143,8 @@ struct ProjectLogic13StemSplitter {
             // as soon as the sheet opens. Before the menu action, those names
             // were all absent. Check that the sheet created only this set.
             guard let reserved = directoryFiles(),
-                  Set(reserved.map(\.path)) == Set((directory + expected).map(\.path)),
-                  expected.allSatisfy(isNativeReservation) else {
+                  Set(reserved.map(\.path)) == Set((directory + reservations).map(\.path)),
+                  reservations.allSatisfy(isNativeReservation) else {
                 throw Failure.unavailable("splitter_output_reservations")
             }
             guard !Task.isCancelled, OperationTraceContext.claimDeadlineEffect("stem_splitter_apply") else {
@@ -147,17 +172,22 @@ struct ProjectLogic13StemSplitter {
                 guard outputs.count == expected.count, outputs.allSatisfy({ $0.rate == source.rate
                     && $0.channels == source.channels && $0.frames == source.frames }) else { continue }
 
-                return .success(HonestContract.encodeStateA(extras: [
-                    "operation": Self.operation, "write_attempted": true,
+                var receipt: [String: Any] = [
+                    "operation": Self.operation, "write_attempted": true, "preset": preset.rawValue,
                     "source_region": name, "source_muted": true,
                     "start": bounds.start, "end": bounds.end, "verify_source": "ax_arrange_and_project_media",
                     "separation": "logic_pro_estimated_stems", "save_required": true,
-                    "stems": zip(zip(Self.labels, expected), zip(outputs, regionEvidence)).map { pair in
+                    "stems": zip(zip(preset.labels, expected), zip(outputs, regionEvidence.tracks)).map { pair in
                         let ((label, path), (audio, track)) = pair
                         return ["stem": label.lowercased(), "path": path.path, "track": track,
                                 "sample_rate": audio.rate, "channels": audio.channels, "frames": audio.frames] as [String: Any]
                     },
-                ]))
+                ]
+                if let stackName = regionEvidence.stackName {
+                    receipt["drum_stack"] = ["name": stackName, "track": trackIndex + 1,
+                                             "child_tracks": regionEvidence.tracks] as [String: Any]
+                }
+                return .success(HonestContract.encodeStateA(extras: receipt))
             }
             throw Failure.unavailable(readbackStage)
         } catch {
@@ -201,7 +231,7 @@ struct ProjectLogic13StemSplitter {
     private func observedRegions(
         in observedWindow: AXUIElement, original retainedRegion: AXUIElement,
         header retainedHeader: AXUIElement, originalTrackName: String?
-    ) -> [Int]? {
+    ) -> ArrangementEvidence? {
         guard case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: observedWindow, runtime: runtime),
               headers.indices.contains(trackIndex),
               let content = AXLogicProElements.logic13TrackContent(in: observedWindow, runtime: runtime),
@@ -217,14 +247,88 @@ struct ProjectLogic13StemSplitter {
                   names.filter({ $0 == originalTrackName }).count == 1 else { return nil }
         }
         var tracks: [Int] = []
-        for label in Self.labels {
+        for label in preset.labels {
             let matches = items.filter { regionName($0) == "\(name) (\(label))" && audioBounds($0) == bounds }
             guard matches.count == 1, let region = matches.first,
                   let index = AXLogicProElements.logic13RegionTrackIndex(region, in: content, headers: headers, runtime: runtime.ax),
                   index > trackIndex, !tracks.contains(index) else { return nil }
             tracks.append(index)
         }
-        return tracks
+        if preset == .allStems { return ArrangementEvidence(tracks: tracks, stackName: nil) }
+        let stackIndex = trackIndex + 1
+        let stackName = name + " (Drums)"
+        guard headers.indices.contains(stackIndex), trackName(headers[stackIndex]) == stackName,
+              headers.filter({ trackName($0) == stackName }).count == 1,
+              tracks == Array((stackIndex + 1)...(stackIndex + preset.labels.count)) else { return nil }
+        let stack = AXValueExtractors.extractTrackStackState(from: headers[stackIndex], runtime: runtime.ax)
+        guard stack.isStackHeader == true, stack.collapsed == false,
+              zip(tracks, preset.labels).allSatisfy({ index, label in
+                  trackName(headers[index]) == "\(name) (\(label))"
+                      && AXValueExtractors.extractTrackStackState(from: headers[index], runtime: runtime.ax).isStackHeader == false
+              }) else { return nil }
+        return ArrangementEvidence(tracks: tracks, stackName: stackName)
+    }
+
+    private func outputFiles(_ mode: Preset) -> [URL] {
+        mode.labels.map { media.appendingPathComponent("\(name)_\($0).aif") }
+    }
+
+    private func selectPreset(in panel: AXUIElement) async throws {
+        func popups() -> [AXUIElement] {
+            descendants(panel, depth: 7).filter { role($0) == kAXPopUpButtonRole }
+        }
+        let popup = try only(popups(), "splitter_preset_control")
+        if text(popup, kAXValueAttribute) == preset.nativeTitle { return }
+        guard holdsProject(), sheets() == [panel], isSplitterSheet(panel), enabled(popup), !Task.isCancelled else {
+            throw Failure.unavailable("splitter_preset_ownership")
+        }
+        _ = AXHelpers.performAction(popup, kAXPressAction, runtime: runtime.ax)
+        do {
+            let menu = try await wait("splitter_preset_menu", attempts: 15) {
+                let menus = children(popup).filter { role($0) == kAXMenuRole }
+                guard menus.count <= 1 else { throw Failure.unavailable("multiple_preset_menus") }
+                return menus.first
+            }
+            let choice = try only(children(menu).filter {
+                role($0) == kAXMenuItemRole && title($0) == preset.nativeTitle
+            }, "splitter_preset_option")
+            guard holdsProject(), sheets() == [panel], children(popup).contains(menu), enabled(choice), !Task.isCancelled else {
+                throw Failure.unavailable("splitter_preset_option_ownership")
+            }
+            _ = AXHelpers.performAction(choice, kAXPressAction, runtime: runtime.ax)
+            _ = try await wait("splitter_preset_readback", attempts: 20) {
+                guard sheets() == [panel] else { throw Failure.unavailable("splitter_preset_sheet_changed") }
+                return popups().first(where: { text($0, kAXValueAttribute) == preset.nativeTitle })
+            }
+        } catch {
+            if holdsProject(), sheets() == [panel],
+               let menu = try? only(children(popup).filter({ role($0) == kAXMenuRole }), "splitter_preset_cleanup") {
+                _ = AXHelpers.performAction(menu, kAXCancelAction, runtime: runtime.ax)
+            }
+            throw error
+        }
+    }
+
+    private func verifyPresetControls(_ controls: [AXUIElement]) throws {
+        let popup = try only(controls.filter { role($0) == kAXPopUpButtonRole }, "splitter_preset_control")
+        let kit = try only(controls.filter {
+            role($0) == kAXCheckBoxRole && text($0, kAXIdentifierAttribute) == "isDrumsSubstemsVisibleToggle"
+        }, "kit_pieces_switch")
+        let submix = try control("Submix", role: kAXCheckBoxRole, in: controls)
+        guard text(popup, kAXValueAttribute) == preset.nativeTitle,
+              value(kit) == (preset == .drumKitPieces ? 1 : 0), value(submix) == 0 else {
+            throw Failure.unavailable("splitter_preset_state")
+        }
+        for label in preset.labels {
+            let checkbox = try control(label, role: kAXCheckBoxRole, in: controls)
+            guard value(checkbox) == 1 else { throw Failure.unavailable("stem_selection:\(label)") }
+        }
+        if preset == .drumKitPieces {
+            for label in Preset.allStems.labels where label != "Drums" {
+                let checkbox = try control(label, role: kAXCheckBoxRole, in: controls)
+                guard value(checkbox) == 0 else { throw Failure.unavailable("unexpected_stem_selection:\(label)") }
+            }
+        }
     }
 
     private func audioBounds(_ item: AXUIElement) -> ArrangeRegionBounds? {

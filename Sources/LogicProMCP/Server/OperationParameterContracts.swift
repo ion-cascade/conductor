@@ -566,6 +566,8 @@ extension OperationRegistry {
                 "region_name": .enforced(.string, .string("Audio Region")),
                 "start": .enforced(.string, .string("1.1.1.1")),
                 "end": .enforced(.string, .string("2.1.1.1")),
+                "preset": .enforced(.string, .string(ProjectLogic13StemSplitter.Preset.allStems.rawValue),
+                    allowed: ProjectLogic13StemSplitter.Preset.allCases.map(\.rawValue)),
                 "confirmed": .enforced(.boolean, .bool(false)),
             ], required: [["project_ref"], ["target_ref"], ["region_name"], ["start"], ["end"], ["confirmed"]]),
 
