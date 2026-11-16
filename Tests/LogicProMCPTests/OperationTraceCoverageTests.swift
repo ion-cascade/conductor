@@ -676,6 +676,12 @@ extension OperationTraceTests {
             eligible.count >= 40,
             Comment(rawValue: "presence census only saw \(eligible.count) channel-dispatching ops: \(eligible.sorted())")
         )
+        let newRoutedWrites = Set(additionalWriteCensusRoutes.compactMap { id, _ in
+            // The pattern edit uses a direct AX action, outside ChannelRouter.
+            id == .projectSetPatternStepEnabled ? nil : id.rawValue
+        })
+        let notExercised = newRoutedWrites.subtracting(eligible).sorted()
+        #expect(notExercised.isEmpty, "Write fixtures that never reached a channel: \(notExercised)")
         // Guard the exclusion: if nothing refused before writing in this run, the
         // read-only branch above went unexercised and could be wrong unnoticed.
         #expect(

@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - Keep the Tracks and Plug-ins command lists in MCP discovery aligned with the operation registry.
 - Restore the exact registry checks for command identity, confirmation, input targets, deadlines, and verification policy.
+- Complete parameter contracts for track automation, Mixer toggles, and verified plug-in commands.
+- Record operation traces at the routed write boundary for track automation, plug-in preset, bypass, and sidechain edits.
+- Exercise the managed installer and real CoreMIDI endpoints in the Swift suite with private test lock directories.
 - Record the bounded native Flex Time, Flex Pitch, and take-comp checks, including saved readback and render comparisons.
 
 ## [1.12.0] — 2026-11-16
