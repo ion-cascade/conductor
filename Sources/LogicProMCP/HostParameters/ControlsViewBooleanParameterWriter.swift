@@ -457,6 +457,7 @@ enum ControlsViewBooleanParameterWriter {
         windowRefresher: (() -> AXUIElement?)? = nil,
         allowingChanges: () -> Bool = { true },
         headerBoundUndescribedView: ((PluginWindowView) -> Bool)? = nil,
+        waitForBoundViewToSettle: Bool = false,
         runtime: AXHelpers.Runtime = .production
     ) -> ViewPreparationResult {
         let effectiveWindowRefresher = windowRefresher ?? { window }
@@ -500,6 +501,7 @@ enum ControlsViewBooleanParameterWriter {
             confirmationTimeout: confirmationTimeout,
             allowingChanges: allowingChanges,
             headerBoundUndescribedView: headerBoundUndescribedView,
+            waitForBoundViewToSettle: waitForBoundViewToSettle,
             runtime: runtime
         ) {
         case let .confirmed(switched):
@@ -827,6 +829,7 @@ enum ControlsViewBooleanParameterWriter {
         forceSelection: Bool = false,
         allowingChanges: () -> Bool = { true },
         headerBoundUndescribedView: ((PluginWindowView) -> Bool)? = nil,
+        waitForBoundViewToSettle: Bool = false,
         runtime: AXHelpers.Runtime
     ) -> ViewChangeResult {
         if !forceSelection {
@@ -933,6 +936,7 @@ enum ControlsViewBooleanParameterWriter {
             windowRefresher: windowRefresher,
             timeout: confirmationTimeout,
             headerBoundUndescribedView: headerBoundUndescribedView,
+            waitForBoundViewToSettle: waitForBoundViewToSettle,
             runtime: runtime
         ) {
         case .confirmed:
@@ -1065,6 +1069,7 @@ enum ControlsViewBooleanParameterWriter {
         windowRefresher: @escaping () -> AXUIElement?,
         timeout: TimeInterval,
         headerBoundUndescribedView: ((PluginWindowView) -> Bool)? = nil,
+        waitForBoundViewToSettle: Bool = false,
         runtime: AXHelpers.Runtime
     ) -> ViewWaitResult {
         let started = Date()
@@ -1078,6 +1083,12 @@ enum ControlsViewBooleanParameterWriter {
             ) {
             case let .success(.some(observed)) where observed == expected:
                 return .confirmed
+            case .failure(.sliderDescription) where waitForBoundViewToSettle
+                && headerBoundUndescribedView?(.editor) == true:
+                // Logic 13 Gain can expose a partially rebuilt table just
+                // after selection. Continue observing the same bound editor.
+                // A settled view still needs the normal structural proof.
+                break
             case let .failure(error):
                 return .readFailed(error)
             case .success:
