@@ -44,18 +44,18 @@ extension AccessibilityChannel {
               EventListReadbackCollector.requireLogic13NoteDisplay(in: eventList.pane, runtime: ax),
               let checkedRegions = Self.regionEditCensus(scope: scope), ownsRegion(checkedRegions),
               let before = eventList.rows(), let stable = eventList.rows(),
-              before.map(.signature) == stable.map(.signature) else {
+              before.map(\.signature) == stable.map(\.signature) else {
             return refuse(.readbackUnavailable, "Show the unfiltered Event List for the selected region with absolute musical positions and elapsed lengths.")
         }
 
-        let notes = stable.compactMap(.note)
+        let notes = stable.compactMap { $0.note }
         var evidence: [String: Any] = [
             "operation": operation, "target_ref": reference, "write_attempted": false,
             "region": held.info.name, "verify_source": "logic13_ax_event_list",
             "event_count": stable.count,
         ]
         guard writing else {
-            evidence["notes"] = notes.map(.evidence)
+            evidence["notes"] = notes.map { $0.evidence }
             return .success(HonestContract.encodeStateA(extras: evidence))
         }
         guard let expected = Self.midiEditValue(parameters, prefix: "expected_"),
@@ -68,7 +68,7 @@ extension AccessibilityChannel {
         }
         let peers = stable.filter { !CFEqual($0.element, target.element) }
         guard !target.locked, eventList.selectionPermits(target.element),
-              let plan = Logic13MIDINoteEditPlan(before: expected, after: desired, peers: peers.compactMap(.note)),
+              let plan = Logic13MIDINoteEditPlan(before: expected, after: desired, peers: peers.compactMap(\.note)),
               Self.midiEditFitsRegion(plan: plan, held: held) else {
             return refuse(.unsupportedState, "The unlocked note must be uniquely addressable, inside its region and within the write step limit.")
         }
@@ -77,7 +77,7 @@ extension AccessibilityChannel {
             let candidates = rows.filter { $0.note?.hasSameIdentity(as: note) == true }
             guard candidates.count == 1, let candidate = candidates.first, candidate.note == note,
                   !candidate.locked else { return nil }
-            var remaining = rows.filter { !CFEqual($0.element, candidate.element) }.map(.signature)
+            var remaining = rows.filter { !CFEqual($0.element, candidate.element) }.map { $0.signature }
             for peer in peers {
                 guard let match = remaining.firstIndex(of: peer.signature) else { return nil }
                 remaining.remove(at: match)
