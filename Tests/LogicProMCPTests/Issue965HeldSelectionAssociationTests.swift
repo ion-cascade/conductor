@@ -5041,6 +5041,7 @@ struct Issue965HeldSelectionAssociationTests {
     func outputReadbackRenewsRetiredSourceOnlyThroughOriginalCapturedHeader(condition: String) async throws {
         try await FeatureFlags.withAdr002TargetRefForTests(true) {
             let f = try Fixture()
+            f.pollingClock = AXTestPollingClock().clock
             if condition.hasPrefix("track_ref") {
                 f.builder.setAttribute(f.headers[0], kAXTitleAttribute as String, "Original")
                 f.builder.setAttribute(f.headers[1], kAXTitleAttribute as String, "Other")
