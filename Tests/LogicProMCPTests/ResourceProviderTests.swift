@@ -125,9 +125,10 @@ struct ResourceProviderTests {
     }
 
     @Test("resource annotations use the current public-surface timestamp")
-    func resourceAnnotationsUseCurrentSurfaceTimestamp() {
+    func resourceAnnotationsUseCurrentSurfaceTimestamp() throws {
+        let release = try #require(try latestChangelogReleaseHeading())
         let timestamps = Set(ResourceProvider.resources.compactMap { $0.annotations?.lastModified })
-        #expect(timestamps == ["2026-11-16T00:00:00Z"])
+        #expect(timestamps == ["\(release.date)T00:00:00Z"])
     }
 
     // MARK: - Stable resource surface (#215)

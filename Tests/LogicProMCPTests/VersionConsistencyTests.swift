@@ -16,12 +16,12 @@ private func readRepoFile(_ relativePath: String) throws -> String {
     )
 }
 
-private struct ChangelogReleaseHeading {
+struct ChangelogReleaseHeading {
     let version: String
     let date: String
 }
 
-private func latestChangelogReleaseHeading() throws -> ChangelogReleaseHeading? {
+func latestChangelogReleaseHeading() throws -> ChangelogReleaseHeading? {
     let changelog = try readRepoFile("CHANGELOG.md")
     let regex = try NSRegularExpression(
         pattern: #"^## \[([0-9]+\.[0-9]+\.[0-9]+)\] — ([0-9]{4}-[0-9]{2}-[0-9]{2})$"#
