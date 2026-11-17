@@ -981,7 +981,7 @@ actor LogicProServer {
         let ownedObservationRead = freshPopulationRead
             || (tool == "logic_midi" && command == "get_region_notes")
             || (tool == "logic_project" && [
-                "scan_regions", "get_pattern_step", "capture_pattern_grid", "get_chord_track", "get_session_player", "search_browser_patches", "get_region_gain", "get_region_fade", "get_region_smart_tempo",
+                "scan_regions", "get_pattern_step", "capture_pattern_grid", "read_live_loops", "get_chord_track", "get_session_player", "search_browser_patches", "get_region_gain", "get_region_fade", "get_region_smart_tempo",
             ].contains(command))
             || selectedRegionEventRead
             || (tool == "logic_plugins" && command == "get_sidechain_verified")

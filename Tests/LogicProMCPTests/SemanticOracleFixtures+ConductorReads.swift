@@ -37,6 +37,10 @@ extension SemanticOracleFixtures {
             response: #"{"operation":"project.capture_pattern_grid","state":"A","success":true,"verified":true,"write_attempted":false,"address":{"project_path":"/tmp/Pattern.logicx","track":"Drums","region_name":"Pattern","region_location":"1.1.1.1"},"grid_snapshot":"grid_fixture","cells":[{"row":"Kick","step":2,"enabled":true,"velocity":64}]}"#,
             readback: #"{"independent_readback":false}"#
         ),
+        .projectReadLiveLoops: .init(
+            response: #"{"operation":"project.read_live_loops","state":"A","success":true,"verified":true,"write_attempted":false,"project_path":"/tmp/Loops.logicx","quantize_start":"1 Bar","transport_playing":false,"grid_snapshot":"loops_fixture","rows":[{"track":"Piano","activity":"deactivate track"}],"cells":[{"cell_ref":"cell_fixture","scene":"scene 1","track":"Piano","name":"MIDI Region"}]}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
         .projectGetChordTrack: .init(
             response: #"{"operation":"project.get_chord_track","state":"A","success":true,"verified":true,"write_attempted":false,"project_path":"/tmp/Chords.logicx","events":[{"chord":"c major","start_bar":1,"end_bar":2,"duration_bars":1}]}"#,
             readback: #"{"independent_readback":false}"#

@@ -109,6 +109,28 @@ extension SemanticOracleTable {
         reason: "The generic harness has no independent native drum-grid observation or selection-restoration witness."
     )
 
+    static let projectReadLiveLoops = receiptOnlyRead(
+        .projectReadLiveLoops, operation: "project.read_live_loops",
+        constraints: [
+            .typedField(key: "project_path", type: .string),
+            .typedField(key: "quantize_start", type: .string),
+            .typedField(key: "transport_playing", type: .bool),
+            .typedField(key: "grid_snapshot", type: .string),
+            .nonEmptyArray(key: "rows"),
+            .arrayElements(key: "rows", constraints: [
+                .typedField(key: "track", type: .string),
+                .typedField(key: "activity", type: .string),
+            ]),
+            .nonEmptyArray(key: "cells"),
+            .arrayElements(key: "cells", constraints: [
+                .typedField(key: "cell_ref", type: .string),
+                .typedField(key: "scene", type: .string),
+                .typedField(key: "track", type: .string),
+            ]),
+        ],
+        reason: "The generic harness has no independent Live Loops grid and activity observation."
+    )
+
     static let projectGetChordTrack = receiptOnlyRead(
         .projectGetChordTrack, operation: "project.get_chord_track",
         constraints: [

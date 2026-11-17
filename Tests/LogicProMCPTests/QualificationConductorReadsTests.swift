@@ -75,7 +75,7 @@ struct QualificationConductorReadsTests {
         OperationID.pluginsGetPresetVerified, .pluginsGetSidechainVerified,
         .projectGetPatternStep, .projectScanRegions, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
         .projectGetRegionGain, .projectGetRegionFade, .midiGetRegionNotes, .pluginsGetGainAutomation,
-        .projectCapturePatternGrid, .projectGetChordTrack, .projectGetSessionPlayer, .projectSearchBrowserPatches,
+        .projectCapturePatternGrid, .projectReadLiveLoops, .projectGetChordTrack, .projectGetSessionPlayer, .projectSearchBrowserPatches,
     ])
     func receiptOnlyReadWithholdsCreditAndRejectsMalformedResponse(id: OperationID) throws {
         let spec = try #require(OperationRegistry.specs.first { $0.id == id })

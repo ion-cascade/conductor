@@ -768,6 +768,8 @@ struct OperationRegistryTests {
         ("project.get_pattern_step", "get_pattern_step", .readOnly, .medium, .none),
         ("project.set_pattern_step_enabled", "set_pattern_step_enabled", .mutating, .medium, .readbackRequired),
         ("project.capture_pattern_grid", "capture_pattern_grid", .readOnly, .long, .none),
+        ("project.read_live_loops", "read_live_loops", .readOnly, .medium, .none),
+        ("project.set_live_loops_cell_playing", "set_live_loops_cell_playing", .mutating, .long, .readbackRequired),
         ("project.get_chord_track", "get_chord_track", .readOnly, .medium, .none),
         ("project.get_session_player", "get_session_player", .readOnly, .medium, .none),
         ("project.search_browser_patches", "search_browser_patches", .readOnly, .medium, .none),
@@ -870,7 +872,7 @@ struct OperationRegistryTests {
             "new", "open", "save", "save_as", "close", "bounce", "launch", "quit",
             "export_run", "export_resume", "cleanup_apply", "apply_session_repair",
             "set_pattern_step_enabled", "set_region_gain", "set_region_fade", "edit_region",
-            "set_pattern_steps_enabled", "set_chord_quality", "set_session_player_chord_source", "load_browser_patch",
+            "set_pattern_steps_enabled", "set_live_loops_cell_playing", "set_chord_quality", "set_session_player_chord_source", "load_browser_patch",
         ]))
         #expect(OperationRegistry.mutatingCommands(tool: tool) == expected)
         for entry in Self.projectCommands {
