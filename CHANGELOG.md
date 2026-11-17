@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.14.1] — 2026-11-17
+
+- Use monotonic deadlines when polling Logic's Mixer output menus and readback.
+- Reuse the prepared Swift test build across the serial release qualification stages.
+- Use fixture clocks and bounded missing-reply waits to shorten Swift tests while preserving assertion coverage.
+
 ## [1.14.0] — 2026-11-17
 
 - Read the native Live Loops grid and start or stop one selected cell with activity and transport readback. ([#53](https://github.com/ion-cascade/conductor/issues/53))
