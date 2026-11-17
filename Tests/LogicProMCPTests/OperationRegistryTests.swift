@@ -810,6 +810,7 @@ struct OperationRegistryTests {
         ("logic_project", "open", .l2),
         ("logic_project", "save_as", .l2),
         ("logic_project", "export_run", .l2),
+        ("logic_project", "export_score_musicxml", .l2),
         ("logic_project", "export_resume", .l2),
         ("logic_mixer", "insert_plugin", .l2),
         ("logic_system", "clear_traces", .l2),
