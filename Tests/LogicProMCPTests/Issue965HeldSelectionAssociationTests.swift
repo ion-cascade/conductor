@@ -480,7 +480,8 @@ struct Issue965HeldSelectionAssociationTests {
             }, setAttributeHandler: nil, performActionHandler: nil)
             let logic = AXLogicProElements.Runtime(logicProPID: { 4242 }, ax: base.ax,
                 executeAppleScript: { _ in Issue.record("No scripts"); return .error("forbidden") },
-                onScreenWindowList: { [] }, focusedApplicationPID: { 4242 })
+                onScreenWindowList: { [] }, postPopupMenuEscape: { Issue.record("no Escape") },
+                focusedApplicationPID: { 4242 })
             guard let association = AccessibilityChannel.HeldSelectionAssociation(window: f.window,
                 logic: logic, expectedProject: nil, requiresProjectReference: false,
                 allowsSelectedChildRailEntry: fault.hasPrefix("rail")) else {
@@ -573,7 +574,8 @@ struct Issue965HeldSelectionAssociationTests {
             }, setAttributeHandler: nil, performActionHandler: nil)
             let logic = AXLogicProElements.Runtime(logicProPID: { 4242 }, ax: base.ax,
                 executeAppleScript: { _ in Issue.record("No scripts"); return .error("forbidden") },
-                onScreenWindowList: { [] }, focusedApplicationPID: { 4242 })
+                onScreenWindowList: { [] }, postPopupMenuEscape: { Issue.record("no Escape") },
+                focusedApplicationPID: { 4242 })
             guard let association = AccessibilityChannel.HeldSelectionAssociation(window: f.window,
                 logic: logic, expectedProject: nil, requiresProjectReference: false) else {
                 Issue.record("Expected a qualified original association")
