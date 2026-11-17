@@ -46,6 +46,7 @@ struct QualificationTransport: Sendable {
     let handshakeTimeout: TimeInterval
     let requestTimeout: TimeInterval
     let shutdownGrace: TimeInterval
+    let mutationReplyTimeout: @Sendable (OperationSpec) -> TimeInterval
     let midiPortReadback: @Sendable () throws -> Data
     let libraryPanelReadback: @Sendable () throws -> Data
     let cleanupSleep: @Sendable (TimeInterval) -> Void
@@ -59,6 +60,8 @@ struct QualificationTransport: Sendable {
         handshakeTimeout: TimeInterval = 45,
         requestTimeout: TimeInterval = 10,
         shutdownGrace: TimeInterval = 1,
+        mutationReplyTimeout: @escaping @Sendable (OperationSpec) -> TimeInterval =
+            QualificationTransport.operationRequestTimeout(for:),
         midiPortReadback: @escaping @Sendable () throws -> Data = {
             try QualificationTransport.coreMIDIPortReadback()
         },
@@ -83,6 +86,7 @@ struct QualificationTransport: Sendable {
         self.handshakeTimeout = handshakeTimeout
         self.requestTimeout = requestTimeout
         self.shutdownGrace = shutdownGrace
+        self.mutationReplyTimeout = mutationReplyTimeout
         self.midiPortReadback = midiPortReadback
         self.libraryPanelReadback = libraryPanelReadback
         self.cleanupSleep = cleanupSleep

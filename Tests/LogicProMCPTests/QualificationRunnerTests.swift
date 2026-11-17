@@ -46,7 +46,8 @@ struct QualificationRunnerTests {
         let fixture = try SlowHandshakeFixture(playheadStep: .transportFastForward, playheadFault: "stage_lost_step_reply")
         defer { fixture.remove() }
         let spec = try #require(OperationRegistry.specs.first { $0.id == .transportFastForward })
-        let result = try QualificationTransport(handshakeTimeout: 2, requestTimeout: 2, shutdownGrace: 2)
+        let result = try QualificationTransport(handshakeTimeout: 2, requestTimeout: 2, shutdownGrace: 2,
+            mutationReplyTimeout: { _ in 1.5 })
             .drive(.init(executableURL: fixture.executableURL,
                 environment: ["HANDSHAKE_DELAY": "0"], expectedOperationCount: 0, operations: [spec]))
         #expect(FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("step-fault-consumed").path))
@@ -1085,7 +1086,8 @@ struct QualificationRunnerTests {
             valueCycle: .mixerSetVolume, valueFault: "lost_mutation_reply")
         defer { fixture.remove() }
         let spec = try #require(OperationRegistry.specs.first { $0.id == .mixerSetVolume })
-        let result = try QualificationTransport(handshakeTimeout: 2, requestTimeout: 0.2, shutdownGrace: 2)
+        let result = try QualificationTransport(handshakeTimeout: 2, requestTimeout: 0.2, shutdownGrace: 2,
+            mutationReplyTimeout: { _ in 1.5 })
             .drive(.init(executableURL: fixture.executableURL,
                 environment: ["HANDSHAKE_DELAY": "0"], expectedOperationCount: 0, operations: [spec]))
 

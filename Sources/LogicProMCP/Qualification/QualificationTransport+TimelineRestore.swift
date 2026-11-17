@@ -821,7 +821,7 @@ extension QualificationTransport {
             // staged inverse before crossing that boundary, not only after parsing a reply.
             ownedStagedPosition = nil
             let mutation = try invoke(session, id: step(), tool: spec.tool.rawValue, command: spec.command,
-                params: [:], phase: "phase_b.mutation", timeout: spec.deadline.seconds + 5)
+                params: [:], phase: "phase_b.mutation", timeout: mutationReplyTimeout(spec))
             if stageWrite != nil,
                !Self.playheadStepWriteWasIndeterminate(mutation.text),
                let bytes = mutation.text.data(using: .utf8),

@@ -242,7 +242,7 @@ extension QualificationTransport {
             let mutation = try invoke(
                 session, id: step(), tool: spec.tool.rawValue, command: spec.command,
                 params: ["target_ref": pre.trackRef, readbackField: target],
-                phase: "phase_b.mutation", timeout: spec.deadline.seconds + 5)
+                phase: "phase_b.mutation", timeout: mutationReplyTimeout(spec))
             guard !Self.mutationSaysItFailed(mutation.text) else {
                 // The refusal's own word for it. `write_attempted: false` is the fail-closed shape
                 // this repository refuses with everywhere, and it is the one case where the answer
