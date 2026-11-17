@@ -467,11 +467,15 @@ Use the same stopped Step Sequencer with its On/Off mode and Step inspector visi
 
 Pass the address and snapshot to `set_pattern_steps_enabled` with one to four unique changes of the form `{"row":"01: Kick 1 - C1","step":2,"enabled":true}`. This command rereads the complete grid before changing a cell and compares every cell after the batch. A stale snapshot or missing address is refused before an edit. A State B response means you should recapture the grid before retrying.
 
+#### Read and control a Live Loops cell
+
+Show Live Loops in a saved Logic Pro 13 project with up to eight track rows and sixteen numbered scenes exposed by Logic. `read_live_loops` returns occupied and empty cell identities, the selected cell reference, row activity and transport state. To launch or stop a populated cell, select it in Logic, hover over the cell to expose its Play/Stop control, and start the transport. With the grid set to 1 Bar, pass `cell_ref`, `grid_snapshot` and the desired `playing` Boolean to `set_live_loops_cell_playing`. Capture the grid again before the next action.
+
+#### Read a score and export MusicXML
+
+Stop playback, select the only MIDI region in a saved one-track project and show Score. `read_score` reports the native pitch labels, positions, rest count and meter for one visible staff. `export_score_musicxml` takes its exact `project_path` and `track_name`, a new absolute `.musicxml` `output_path` in an existing folder, and `confirmed: true`. The returned `musicxml_score` reports written measure offsets and durations in MusicXML divisions. Existing outputs are protected.
+
 #### Edit a Chord Track or Keyboard Player region
-
-Show Live Loops in a saved Logic Pro 13 project with up to eight track rows and sixteen numbered scenes exposed by Logic. `read_live_loops` returns occupied and empty cell identities, the selected cell reference, row activity and transport state. To launch or stop a populated cell, select it in Logic, expose its Play/Stop control and start the transport. With the grid set to 1 Bar, pass `cell_ref`, `grid_snapshot` and the desired `playing` Boolean to `set_live_loops_cell_playing`. Capture the grid again before the next action.
-
-For notation, stop playback, select the only MIDI region in a saved one-track project and show Score. `read_score` reports the native pitch labels, positions, rest count and meter for one visible staff. `export_score_musicxml` takes its exact `project_path` and `track_name`, a new absolute `.musicxml` `output_path` in an existing folder, and `confirmed: true`. The returned `musicxml_score` reports written measure offsets and durations in MusicXML divisions. Existing outputs are protected.
 
 Show the Chord Track in a saved, stopped Logic Pro 13 project. `get_chord_track` reads an exposed lane of up to 32 chords across up to 16 groups with whole-bar starts and ends. Pass the returned `project_path`, `start_bar`, `end_bar` and `chord` as `expected_chord` to `set_chord_quality` with `quality` set to `major` or `minor`. The setter supports standalone chords with natural roots. It verifies both boundaries and every visible peer event after the edit. Readback also supports multi-event chord groups.
 

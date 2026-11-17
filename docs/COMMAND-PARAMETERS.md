@@ -132,6 +132,7 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `export_plan` | `artifact`, `artifacts`, `bounce_settings`, `collision_policy`, `kind`, `naming_policy`, `outputRoot`, `output_root`, `path`, `project`, `projects`, `stem_settings` | `projects` or `project` or `path`; `output_root` or `outputRoot` | closed | read_only | none | none | none | never_automatic | default_install |
 | `export_resume` | `artifact`, `artifacts`, `bounce_settings`, `collision_policy`, `confirmed`: boolean, `kind`, `naming_policy`, `outputRoot`, `output_root`, `path`, `project`, `projects`, `stem_settings` | `projects` or `project` or `path`; `output_root` or `outputRoot` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `export_run` | `artifact`, `artifacts`, `bounce_settings`, `collision_policy`, `confirmed`: boolean, `kind`, `naming_policy`, `outputRoot`, `output_root`, `path`, `project`, `projects`, `stem_settings` | `projects` or `project` or `path`; `output_root` or `outputRoot` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
+| `export_score_musicxml` | `confirmed`: boolean, `output_path`: string, `project_path`: string, `track_name`: string | `confirmed`; `output_path`; `project_path`; `track_name` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `export_status` | `delivery_id`: string, `expected_settings`: object, `output_root`: string | `delivery_id`; `output_root` | closed | read_only | none | none | none | never_automatic | default_install |
 | `get_chord_track` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `get_pattern_step` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
@@ -149,6 +150,7 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `plan_session_repair` | `allow_create_aux`, `allow_replace_send`, `allow_stack_membership_change`, `digest`, `names`, `on_ambiguity`, `plan_id`, `policy`, `snapshot_id` | `plan_id` or `snapshot_id` and `policy` | closed | read_only | none | none | none | never_automatic | default_install |
 | `quit` | `confirmed`: boolean | none | closed | mutating | l3 | none | readback_required | never_automatic | default_install |
 | `read_live_loops` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
+| `read_score` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `save` | none | none | closed | mutating | l1 | none | readback_required | never_automatic | default_install |
 | `save_as` | `confirmed`: boolean, `path`: scalar | `path` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `scan_regions` | none | none | closed | read_only | none | none | none | never_automatic | default_install |

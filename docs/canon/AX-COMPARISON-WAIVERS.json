@@ -2,7 +2,13 @@
   "literals": {
     ", Session Player region.": "The Logic 13 English Keyboard Player adapter requires this native Arrange region kind marker alongside exact region and track binding. Other wording causes refusal.",
     "Chord Track, Chord Track": "The English Logic 13.0 build 7801 Region Inspector exposes this exact Pitch Source value and corroborates it in the control description.",
+    "Note at ": "The scoped English Logic 13.0 build 7801 Score staff exposes each notation note as an AX button with this prefix, a position and a pitch. The read requires the bound Score staff and rejects differing note syntax.",
     "Region Chords, Region Chords": "The English Logic 13.0 build 7801 Region Inspector exposes this exact Pitch Source value after switching the selected Keyboard Player region to its own chords.",
-    "library indicator, ": "The English Logic 13.0 build 7801 Browser adapter combines this Inspector prefix with the exact requested patch and verifies the selected track and peer layout independently."
+    "activate track": "The scoped English Logic 13.0 build 7801 Live Loops Divider uses this exact native label for an inactive row. Actions require a bound row and matching per-cell readback.",
+    "cancel playing": "The scoped English Logic 13.0 build 7801 Live Loops Divider uses this exact native label for an armed launch awaiting its quantization boundary.",
+    "cancel stopping": "The scoped English Logic 13.0 build 7801 Live Loops Divider uses this exact native label for an armed stop awaiting its quantization boundary.",
+    "deactivate track": "The scoped English Logic 13.0 build 7801 Live Loops Divider uses this exact label on an inactive row in the alternate track-activation state. This row state is preserved independently of the target.",
+    "library indicator, ": "The English Logic 13.0 build 7801 Browser adapter combines this Inspector prefix with the exact requested patch and verifies the selected track and peer layout independently.",
+    "rest": "The scoped English Logic 13.0 build 7801 Score staff exposes a written rest as an AX button with this exact description. The read checks the staff in a bound single-region score."
   }
 }
