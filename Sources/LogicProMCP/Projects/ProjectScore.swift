@@ -59,11 +59,12 @@ struct ProjectScore {
               let view = bounded(surface, depth: 5, ax: ax),
               let score = onlyGroup(view, named: "Score contents", ax: ax),
               let objects = bounded(score, depth: 4, ax: ax),
-              let bar = AXLogicProElements.logic13ControlBarContainer(in: window, runtime: ax),
-              let controls = bounded(bar, depth: 4, ax: ax)
+              let windowControls = bounded(window, depth: 3, ax: ax),
+              let display = onlyGroup(windowControls, named: "Transport Display", ax: ax)
         else { return nil }
 
-        let meters = controls.filter {
+        // Logic publishes the LCD separately from the transport button toolbar.
+        let meters = AXHelpers.getChildren(display, runtime: ax).filter {
             AXHelpers.getRole($0, runtime: ax) == kAXPopUpButtonRole
                 && AXHelpers.getDescription($0, runtime: ax) == "Time Signature"
         }
