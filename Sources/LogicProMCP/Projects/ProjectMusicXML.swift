@@ -30,6 +30,33 @@ struct ProjectMusicXML: Encodable, Equatable {
 
     static let maximumBytes = 1_048_576
 
+    func matchesNative(_ readback: ProjectScore.Readback) -> Bool {
+        guard part_name == readback.track_name, let meter = measures.first?.meter,
+              readback.time_signature == "\(meter.beats)/\(meter.beat_type)" else { return false }
+        let events = measures.flatMap(\.events)
+        guard events.filter(\.is_rest).count == readback.rest_count else { return false }
+        let pitchClass = ["C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11]
+        let written = events.compactMap { event -> Int? in
+            guard let step = event.step, let base = pitchClass[step], let octave = event.octave else { return nil }
+            return (octave + 1) * 12 + base + (event.alter ?? 0)
+        }
+        let native = readback.notes.compactMap { note -> Int? in
+            guard let step = note.pitch.first, let base = pitchClass[String(step)] else { return nil }
+            var tail = note.pitch.dropFirst()
+            var alter = 0
+            if let accidental = tail.first, "#♯b♭".contains(accidental) {
+                alter = "#♯".contains(accidental) ? 1 : -1
+                tail = tail.dropFirst()
+            }
+            guard let octave = Int(tail) else { return nil }
+            return (octave + 1) * 12 + base + alter
+        }
+        guard native.count == readback.notes.count, native.count == written.count else { return false }
+        // Logic's middle-C display convention can be C3 or C4. One
+        // convention must account for all pitches in a score.
+        return native.sorted() == written.sorted() || native.map { $0 + 12 }.sorted() == written.sorted()
+    }
+
     static func parse(_ data: Data) -> Self? {
         guard (1...maximumBytes).contains(data.count),
               let document = try? XMLDocument(data: data, options: [.nodeLoadExternalEntitiesNever]),

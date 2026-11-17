@@ -91,7 +91,9 @@ struct ProjectScoreExport {
             throw error
         }
 
-        guard let final = ProjectScore.read(runtime: runtime), final.holdsSameScore(as: source),
+        // Logic can retire the Score staff accessibility objects when its
+        // Save panel closes. Check the retained Arrange region and its output.
+        guard holdsProject(), focused(source.window), source.selectionMatches(runtime: runtime),
               let entries = try? fm.contentsOfDirectory(at: privateDirectory, includingPropertiesForKeys: nil),
               entries.count == 1, let file = entries.first,
               ["xml", "musicxml"].contains(file.pathExtension.lowercased()),
@@ -99,7 +101,7 @@ struct ProjectScoreExport {
               metadata[.type] as? FileAttributeType == .typeRegular,
               let size = metadata[.size] as? NSNumber, (1...ProjectMusicXML.maximumBytes).contains(size.intValue),
               let bytes = try? Data(contentsOf: file), let score = ProjectMusicXML.parse(bytes),
-              try Self.vacant(output)
+              score.matchesNative(source.readback), try Self.vacant(output)
         else { throw Failure.artifactUnverified }
         do {
             // The staged file and final destination share a volume. link fails

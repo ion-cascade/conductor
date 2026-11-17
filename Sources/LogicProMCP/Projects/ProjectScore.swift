@@ -33,6 +33,21 @@ struct ProjectScore {
             && CFEqual(region, other.region) && CFEqual(surface, other.surface)
     }
 
+    func selectionMatches(runtime: AXLogicProElements.Runtime) -> Bool {
+        let ax = runtime.ax
+        guard runtime.logicProPID() == pid, Self.foreground(pid, runtime: runtime),
+              AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime) == .success(document),
+              case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: window, runtime: runtime),
+              headers.count == 1, let currentHeader = headers.first, CFEqual(currentHeader, header),
+              (try? AXValueExtractors.extractTrackNameResult(from: currentHeader, runtime: ax).get()) == readback.track_name,
+              let arrange = AXLogicProElements.logic13TrackContent(in: window, runtime: runtime),
+              let selected = AXLogicProElements.logic13SelectedRegion(in: arrange, runtime: ax),
+              CFEqual(selected, region),
+              AXHelpers.getDescription(selected, runtime: ax) == readback.region_name
+        else { return false }
+        return true
+    }
+
     static func read(runtime: AXLogicProElements.Runtime = .production) -> Self? {
         _ = runtime.onScreenWindowList()
         let ax = runtime.ax
