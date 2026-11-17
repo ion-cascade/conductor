@@ -77,7 +77,7 @@ import Testing
                                                   range: releaseLoop.upperBound..<gate.endIndex))
     let debugLoop = try #require(gate.range(of: "for live_test in \"${debug_live_tests[@]}\"",
                                             range: debugExecutable.upperBound..<gate.endIndex))
-    let suite = try #require(gate.range(of: "\nswift test --no-parallel\n"))
+    let suite = try #require(gate.range(of: "\nswift test --skip-build --no-parallel\n"))
     let finalHash = try #require(gate.range(of: "verify_candidate_bytes", range: suite.upperBound..<gate.endIndex))
 
     #expect(inventory.lowerBound < stage.lowerBound)
@@ -87,6 +87,11 @@ import Testing
     #expect(releaseLoop.lowerBound < debugExecutable.lowerBound)
     #expect(debugExecutable.lowerBound < debugLoop.lowerBound)
     #expect(debugLoop.lowerBound < suite.lowerBound)
+    let releaseTests = gate[releaseLoop.upperBound..<debugExecutable.lowerBound]
+    let debugTests = gate[debugLoop.upperBound..<suite.lowerBound]
+    for tests in [releaseTests, debugTests] {
+        #expect(tests.contains("swift test --skip-build --no-parallel --filter \"$live_test\""))
+    }
     #expect(suite.lowerBound < finalHash.lowerBound)
     #expect(gate.contains("realReleaseBinaryExecutesEveryOperationWithIndependentReadback"))
     #expect(gate.contains("runnerIgnoresPartialStateFaultEnvOnRealServer"))

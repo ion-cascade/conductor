@@ -4,7 +4,7 @@
 #
 # Ordinary tests must not drive Logic merely because a release executable exists.
 # This runner prepares the debug tests, stages an already-built release candidate,
-# requires running Logic and its permissions, then runs every real-server test in a
+# requires running Logic and its permissions, then reuses that debug build to run every real-server test in a
 # fresh test process before the ordinary full
 # suite. The process boundary matters: production CoreMIDI endpoint ownership is
 # intentionally held for a process lifetime, so an earlier unit test in the same
@@ -81,7 +81,7 @@ if ! .build/release/LogicProMCP --check-permissions; then
     exit 1
 fi
 for live_test in "${release_live_tests[@]}"; do
-    LOGIC_PRO_MCP_RUN_LIVE_QA=1 swift test --no-parallel --filter "$live_test"
+    LOGIC_PRO_MCP_RUN_LIVE_QA=1 swift test --skip-build --no-parallel --filter "$live_test"
     verify_candidate_bytes
 done
 if [ ! -x .build/debug/LogicProMCP ]; then
@@ -89,9 +89,9 @@ if [ ! -x .build/debug/LogicProMCP ]; then
     exit 1
 fi
 for live_test in "${debug_live_tests[@]}"; do
-    LOGIC_PRO_MCP_RUN_LIVE_QA=1 swift test --no-parallel --filter "$live_test"
+    LOGIC_PRO_MCP_RUN_LIVE_QA=1 swift test --skip-build --no-parallel --filter "$live_test"
     verify_candidate_bytes
 done
-swift test --no-parallel
+swift test --skip-build --no-parallel
 verify_candidate_bytes
 trap - EXIT INT TERM
