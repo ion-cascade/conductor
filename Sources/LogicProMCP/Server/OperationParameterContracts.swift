@@ -688,6 +688,12 @@ extension OperationRegistry {
                     "row": .string("01: Kick 1 - C1"), "step": .int(1), "enabled": .bool(true),
                 ])])),
             ], required: [["address"], ["grid_snapshot"], ["changes"]]),
+            "project.export_score_musicxml": .init(params: [
+                "confirmed": .enforced(.boolean, .bool(true)),
+                "output_path": .enforced(.string, .string("/tmp/Score.musicxml")),
+                "project_path": .enforced(.string, .string("/tmp/Score.logicx")),
+                "track_name": .enforced(.string, .string("Studio Grand")),
+            ], required: [["confirmed"], ["output_path"], ["project_path"], ["track_name"]]),
             "project.set_live_loops_cell_playing": .init(params: [
                 "cell_ref": .enforced(.string, .string("cell_" + String(repeating: "0", count: 64))),
                 "grid_snapshot": .enforced(.string, .string("loops_" + String(repeating: "0", count: 64))),

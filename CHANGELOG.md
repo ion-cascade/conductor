@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.14.0] — 2026-11-17
+
+- Read the native Live Loops grid and start or stop one selected cell with activity and transport readback. ([#53](https://github.com/ion-cascade/conductor/issues/53))
+- Read notes and rests in the Score Editor, and export the bound single-part score as MusicXML with parsed written timing. ([#54](https://github.com/ion-cascade/conductor/issues/54))
+
 ## [1.13.0] — 2026-11-16
 
 - Read bar-aligned Chord Track events and change one standalone natural-root major or minor chord while checking the peer events. ([#50](https://github.com/ion-cascade/conductor/issues/50))

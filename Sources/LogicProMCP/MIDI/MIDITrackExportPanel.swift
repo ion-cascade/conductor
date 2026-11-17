@@ -233,7 +233,7 @@ final class MIDITrackExportPanel {
         return false
     }
 
-    private func recoverOwnedPanel(
+    func recoverOwnedPanel(
         _ panel: AXUIElement, app: AXUIElement, originalWindows: [AXUIElement]
     ) async -> Bool {
         func onlyOwnedWindowWasAdded() throws -> Bool {

@@ -251,6 +251,7 @@ struct OperationCatalogTests {
         .pluginsSetGainAutomationPoint: ["expected_current", "position", "value"],
         .projectExportStatus: ["delivery_id", "expected_settings", "output_root"],
         .projectSetPatternStepEnabled: ["address", "enabled", "expected_enabled"],
+        .projectExportScoreMusicXML: ["confirmed", "output_path", "project_path", "track_name"],
         .projectSetLiveLoopsCellPlaying: ["cell_ref", "grid_snapshot", "playing"],
         .projectSetPatternStepsEnabled: ["address", "changes", "grid_snapshot"],
         .projectSetChordQuality: ["end_bar", "expected_chord", "project_path", "quality", "start_bar"],

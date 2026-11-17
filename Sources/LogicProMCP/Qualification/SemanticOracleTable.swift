@@ -326,6 +326,8 @@ enum SemanticOracleTable {
     /// mutating spec, is DISJOINT from the covered set, and carries a reason —
     /// and remains separate from `conductorWriteQualificationCases`.
     static let structurallyUnverifiedMutatingOperationIDs: [OperationID: String] = [
+        .projectExportScoreMusicXML:
+            "The installed fixture compares native notes and the parsed MusicXML after reopening. The generic sweep has no independent score and file witness.",
         .projectSetLiveLoopsCellPlaying:
             "The installed fixture observes the native grid and transport through launch and stop. The generic sweep lacks a selected-cell and divider witness.",
         .projectSetPatternStepsEnabled:
@@ -577,6 +579,7 @@ enum SemanticOracleTable {
         projectGetPatternStep,
         projectCapturePatternGrid,
         projectReadLiveLoops,
+        projectReadScore,
         projectGetChordTrack,
         projectGetSessionPlayer,
         projectSearchBrowserPatches,

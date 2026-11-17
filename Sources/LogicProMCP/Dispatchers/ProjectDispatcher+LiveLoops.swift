@@ -64,14 +64,11 @@ extension ProjectDispatcher {
         guard let ready = ProjectLiveLoops.read(), ready.holdsSelection(as: first),
               ready.grid == first.grid, ready.action == first.action,
               let button = ready.control, let original = first.control, CFEqual(button, original),
-              await recordWriteBoundary(traceID, deadlineStage: "live_loops_cell_playback")
+              OperationTraceContext.claimDeadlineEffect("live_loops_cell_playback")
         else { return refuse(.staleSnapshot, "The selected cell or transport changed before the action.") }
-        guard let current = ProjectLiveLoops.read(), current.holdsSelection(as: ready),
-              current.grid == ready.grid, current.action == ready.action,
-              let currentButton = current.control, CFEqual(currentButton, button)
-        else { return response(nil, attempted: false, verified: false) }
 
-        _ = AXHelpers.performAction(currentButton, kAXPressAction)
+        _ = AXHelpers.performAction(button, kAXPressAction)
+        await recordClaimedWriteBoundary(traceID)
         let deadline = ContinuousClock.now + .seconds(9)
         let queuedState = playing ? "cancel playing" : "cancel stopping"
         var queued = false

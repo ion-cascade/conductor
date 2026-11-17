@@ -15,6 +15,15 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
 
+## 1.14 Live Loops and notation
+
+| Workflow | Scope on Logic Pro 13.0 |
+| --- | --- |
+| Live Loops | Read a bounded grid with numbered scenes and unique track names. Start or stop the selected looping Start/Stop cell with 1 Bar grid quantization and the transport already running. |
+| Score | Read visible pitches, positions and rests for one selected MIDI region on one staff. Export one part as MusicXML to a new filename and read back the written measures. |
+
+Capture to Arrange, scene writes and Score Editor mutations are separate qualification work.
+
 ## 1.13 Composition, Browser and drum patterns
 
 | Workflow | Verified scope on Logic Pro 13.0 |

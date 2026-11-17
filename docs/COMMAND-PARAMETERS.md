@@ -148,11 +148,13 @@ Each command's accepted parameters and the registry's policy words for it. "Clos
 | `open` | `confirmed`: boolean, `path`: scalar | `path` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `plan_session_repair` | `allow_create_aux`, `allow_replace_send`, `allow_stack_membership_change`, `digest`, `names`, `on_ambiguity`, `plan_id`, `policy`, `snapshot_id` | `plan_id` or `snapshot_id` and `policy` | closed | read_only | none | none | none | never_automatic | default_install |
 | `quit` | `confirmed`: boolean | none | closed | mutating | l3 | none | readback_required | never_automatic | default_install |
+| `read_live_loops` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `save` | none | none | closed | mutating | l1 | none | readback_required | never_automatic | default_install |
 | `save_as` | `confirmed`: boolean, `path`: scalar | `path` | closed | mutating | l2 | none | readback_required | never_automatic | default_install |
 | `scan_regions` | none | none | closed | read_only | none | none | none | never_automatic | default_install |
 | `search_browser_patches` | `project_path`: string, `query`: string, `track_name`: string | `project_path`; `track_name`; `query` | closed | read_only | none | none | none | never_automatic | default_install |
 | `set_chord_quality` | `end_bar`: integer, `expected_chord`: string, `project_path`: string, `quality`: string, `start_bar`: integer | `project_path`; `start_bar`; `end_bar`; `expected_chord`; `quality` | closed | mutating | none | none | readback_required | never_automatic | default_install |
+| `set_live_loops_cell_playing` | `cell_ref`: string, `grid_snapshot`: string, `playing`: boolean | `cell_ref`; `grid_snapshot`; `playing` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `set_pattern_step_enabled` | `address`: object, `enabled`: boolean, `expected_enabled`: boolean | `address`; `expected_enabled`; `enabled` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `set_pattern_steps_enabled` | `address`: object, `changes`: array, `grid_snapshot`: string | `address`; `grid_snapshot`; `changes` | closed | mutating | none | none | readback_required | never_automatic | default_install |
 | `set_region_fade` | `edge`: string (in, out), `expected_time_ms`: JSON number, `target_ref`: string, `time_ms`: JSON number | `target_ref`; `edge`; `expected_time_ms`; `time_ms` | closed | mutating | none | none | readback_required | never_automatic | default_install |

@@ -111,7 +111,7 @@ struct OperationRegistryCoverageTests {
         #expect(targetBearingIDs == expectedTargetBearingIDs)
         // The native project writes bind their own document and selected surface.
         let nativeProjectWrites: Set<OperationID> = [
-            .projectSetPatternStepsEnabled, .projectSetLiveLoopsCellPlaying, .projectSetChordQuality,
+            .projectSetPatternStepsEnabled, .projectSetLiveLoopsCellPlaying, .projectExportScoreMusicXML, .projectSetChordQuality,
             .projectSetSessionPlayerChordSource, .projectLoadBrowserPatch,
         ]
         let targetlessIDs = Set(targetless.map(\.id))

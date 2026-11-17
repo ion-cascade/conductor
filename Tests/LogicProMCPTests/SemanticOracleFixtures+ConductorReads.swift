@@ -9,7 +9,7 @@ extension SemanticOracleFixtures {
         .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified, .pluginsGetGainAutomation,
         .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep, .projectScanRegions,
         .tracksGetPanAutomation, .tracksGetVolumeAutomation, .projectGetRegionSmartTempo, .projectGetRegionGain, .projectGetRegionFade,
-        .projectCapturePatternGrid, .projectGetChordTrack, .projectGetSessionPlayer, .projectSearchBrowserPatches,
+        .projectReadScore, .projectReadLiveLoops, .projectCapturePatternGrid, .projectGetChordTrack, .projectGetSessionPlayer, .projectSearchBrowserPatches,
     ]
 
     static let conductorReads: [OperationID: SemanticOracleFixture] = [
@@ -35,6 +35,10 @@ extension SemanticOracleFixtures {
         ),
         .projectCapturePatternGrid: .init(
             response: #"{"operation":"project.capture_pattern_grid","state":"A","success":true,"verified":true,"write_attempted":false,"address":{"project_path":"/tmp/Pattern.logicx","track":"Drums","region_name":"Pattern","region_location":"1.1.1.1"},"grid_snapshot":"grid_fixture","cells":[{"row":"Kick","step":2,"enabled":true,"velocity":64}]}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
+        .projectReadScore: .init(
+            response: #"{"operation":"project.read_score","state":"A","success":true,"verified":true,"write_attempted":false,"native_score":{"project_path":"/tmp/Score.logicx","track_name":"Studio Grand","region_name":"MIDI","time_signature":"3/4","rest_count":1,"notes":[{"position":"1 bar","pitch":"C3"}]}}"#,
             readback: #"{"independent_readback":false}"#
         ),
         .projectReadLiveLoops: .init(

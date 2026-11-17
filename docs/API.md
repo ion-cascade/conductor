@@ -447,7 +447,7 @@ If status reports a resumable partial delivery, reopen the same saved project, r
 
 ### `logic_project`
 
-Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `get_pattern_step`, `set_pattern_step_enabled`, `capture_pattern_grid`, `set_pattern_steps_enabled`, `get_chord_track`, `set_chord_quality`, `get_session_player`, `set_session_player_chord_source`, `search_browser_patches`, `load_browser_patch`, `scan_regions`, `edit_region`, `get_region_gain`, `set_region_gain`, `get_region_fade`, `set_region_fade`, `export_plan`, `export_run`, `export_resume`, `export_status`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
+Common commands: `new`, `open`, `save`, `save_as`, `close`, `bounce`, `is_running`, `launch`, `quit`, `get_regions`, `get_pattern_step`, `set_pattern_step_enabled`, `capture_pattern_grid`, `set_pattern_steps_enabled`, `read_live_loops`, `set_live_loops_cell_playing`, `read_score`, `export_score_musicxml`, `get_chord_track`, `set_chord_quality`, `get_session_player`, `set_session_player_chord_source`, `search_browser_patches`, `load_browser_patch`, `scan_regions`, `edit_region`, `get_region_gain`, `set_region_gain`, `get_region_fade`, `set_region_fade`, `export_plan`, `export_run`, `export_resume`, `export_status`, `audit`, `cleanup_plan`, `inspect_session`, `plan_session_repair`, `apply_session_repair`, `cleanup_apply`.
 
 File-writing paths require confirmation. `save_as` verifies the resulting `.logicx` package. `audit` marks GM Device and External MIDI tracks with MIDI regions as export blockers. Use the read-only `export_plan` and confirmed `export_run` to produce audio. The standalone `bounce` command is unsupported.
 
@@ -468,6 +468,10 @@ Use the same stopped Step Sequencer with its On/Off mode and Step inspector visi
 Pass the address and snapshot to `set_pattern_steps_enabled` with one to four unique changes of the form `{"row":"01: Kick 1 - C1","step":2,"enabled":true}`. This command rereads the complete grid before changing a cell and compares every cell after the batch. A stale snapshot or missing address is refused before an edit. A State B response means you should recapture the grid before retrying.
 
 #### Edit a Chord Track or Keyboard Player region
+
+Show Live Loops in a saved Logic Pro 13 project with up to eight track rows and sixteen numbered scenes exposed by Logic. `read_live_loops` returns occupied and empty cell identities, the selected cell reference, row activity and transport state. To launch or stop a populated cell, select it in Logic, expose its Play/Stop control and start the transport. With the grid set to 1 Bar, pass `cell_ref`, `grid_snapshot` and the desired `playing` Boolean to `set_live_loops_cell_playing`. Capture the grid again before the next action.
+
+For notation, stop playback, select the only MIDI region in a saved one-track project and show Score. `read_score` reports the native pitch labels, positions, rest count and meter for one visible staff. `export_score_musicxml` takes its exact `project_path` and `track_name`, a new absolute `.musicxml` `output_path` in an existing folder, and `confirmed: true`. The returned `musicxml_score` reports written measure offsets and durations in MusicXML divisions. Existing outputs are protected.
 
 Show the Chord Track in a saved, stopped Logic Pro 13 project. `get_chord_track` reads an exposed lane of up to 32 chords across up to 16 groups with whole-bar starts and ends. Pass the returned `project_path`, `start_bar`, `end_bar` and `chord` as `expected_chord` to `set_chord_quality` with `quality` set to `major` or `minor`. The setter supports standalone chords with natural roots. It verifies both boundaries and every visible peer event after the edit. Readback also supports multi-event chord groups.
 

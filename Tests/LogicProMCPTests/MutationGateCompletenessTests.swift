@@ -36,7 +36,7 @@ struct MutationGateCompletenessTests {
         "logic_mixer": ["get_output_verified", "get_input_bus_verified", "get_send_destination_verified", "get_send_bypass_verified"],
         "logic_tracks": ["list_library", "resolve_path", "scan_library", "scan_plugin_presets", "get_volume_automation", "get_pan_automation"],
         "logic_midi": ["list_ports", "read_selected_region_events", "get_region_notes"],
-        "logic_project": ["audit", "cleanup_plan", "export_plan", "get_regions", "inspect_session", "plan_session_repair", "is_running", "export_status", "get_pattern_step", "capture_pattern_grid", "read_live_loops", "get_chord_track", "get_session_player", "search_browser_patches", "get_region_fade", "get_region_gain", "get_region_smart_tempo", "scan_regions"],
+        "logic_project": ["audit", "cleanup_plan", "export_plan", "get_regions", "inspect_session", "plan_session_repair", "is_running", "export_status", "get_pattern_step", "capture_pattern_grid", "read_live_loops", "read_score", "get_chord_track", "get_session_player", "search_browser_patches", "get_region_fade", "get_region_gain", "get_region_smart_tempo", "scan_regions"],
         "logic_system": [
             "clear_traces", "get_trace", "health", "help", "list_recent_traces", "permissions",
             "refresh_cache", "saga_preflight", "saga_status",

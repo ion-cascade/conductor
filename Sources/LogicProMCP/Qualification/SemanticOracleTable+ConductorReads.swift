@@ -109,6 +109,23 @@ extension SemanticOracleTable {
         reason: "The generic harness has no independent native drum-grid observation or selection-restoration witness."
     )
 
+    static let projectReadScore = receiptOnlyRead(
+        .projectReadScore, operation: "project.read_score",
+        constraints: [
+            .typedField(key: "native_score.project_path", type: .string),
+            .typedField(key: "native_score.track_name", type: .string),
+            .typedField(key: "native_score.region_name", type: .string),
+            .typedField(key: "native_score.time_signature", type: .string),
+            .integerMinimum(key: "native_score.rest_count", min: 0),
+            .nonEmptyArray(key: "native_score.notes"),
+            .arrayElements(key: "native_score.notes", constraints: [
+                .typedField(key: "position", type: .string),
+                .typedField(key: "pitch", type: .string),
+            ]),
+        ],
+        reason: "The generic harness has no independent Score Editor observation."
+    )
+
     static let projectReadLiveLoops = receiptOnlyRead(
         .projectReadLiveLoops, operation: "project.read_live_loops",
         constraints: [

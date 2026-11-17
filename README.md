@@ -37,6 +37,8 @@ Use the [compatibility matrix](docs/conductor/compatibility.md) to check the tes
 | Track automation | Create and edit supported Volume and absolute Pan points, move a Volume point, or shape a flat segment by inserting one control point. |
 | MIDI | Import and export track MIDI. Edit an existing note’s pitch, start, length and velocity, or change an existing Expression (CC11) event. |
 | Composition | Read whole-bar Chord Track events, change a supported chord quality, and change which chords a Keyboard Player region follows. |
+| Live Loops | Read a bounded grid and launch or stop one referenced, selected cell. |
+| Notation | Read one selected MIDI region in the Score Editor and export verified single-part MusicXML. |
 | Browser | Search visible instrument patches and load an exact result onto the selected software instrument track. |
 | Mixer and inserts | Adjust a referenced strip. Read Channel EQ, apply supported Compressor presets and sidechains, bypass occupied inserts, and edit qualified mono Gain levels and Gain automation. |
 | Render and delivery | Bounce an exact stereo PCM range, export selected aligned stems, verify a delivery receipt and resume unfinished outputs after reconnecting. |
