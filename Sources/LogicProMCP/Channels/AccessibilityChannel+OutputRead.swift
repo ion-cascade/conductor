@@ -849,7 +849,7 @@ extension AccessibilityChannel {
         let press = AXHelpers.performActionResult(slot, kAXPressAction as String, runtime: runtime.ax)
         if case .success = press { extras["popup_press_succeeded"] = true }
         else { extras["popup_press_succeeded"] = false }
-        let deadline = Date().addingTimeInterval(Double(timing.popupOpenTimeoutMs) / 1_000)
+        let deadline = runtime.pollingClock.now() + .milliseconds(timing.popupOpenTimeoutMs)
         defer { observingPopupFocus(nil) }
         if inputBusOnly, sendReplacement == nil, let app, let passiveMixerFocus,
            let popup = NativeOutputReadPopup.read(physical: physical, app: app, pid: pid, runtime: runtime),
@@ -870,8 +870,8 @@ extension AccessibilityChannel {
         repeat {
             opened = checkedOutputPopupMenus(in: physical.mixer, runtime: runtime.ax)
             if opened == nil || !(opened?.isEmpty ?? true) || !sourceOwned() { break }
-            if timing.pollIntervalMs > 0 { try? await Task.sleep(for: .milliseconds(timing.pollIntervalMs)) }
-        } while !Task.isCancelled && Date() < deadline
+            if timing.pollIntervalMs > 0 { try? await runtime.pollingClock.sleep(.milliseconds(timing.pollIntervalMs)) }
+        } while !Task.isCancelled && runtime.pollingClock.now() < deadline
         // Native input and neutral-output menus may be absent from Mixer AXChildren. This
         // read-only alternate discovery is scoped to our own just-issued press,
         // absent pre-existing AX/CG popups and the unchanged original source.
@@ -1293,7 +1293,7 @@ extension AccessibilityChannel {
                 // Cancel acknowledges the action before the native popup has
                 // necessarily disappeared. Observe its bounded settlement;
                 // never send a second action or turn an unreadable into absence.
-                let closeDeadline = Date().addingTimeInterval(Double(timing.popupCloseTimeoutMs) / 1_000)
+                let closeDeadline = runtime.pollingClock.now() + .milliseconds(timing.popupCloseTimeoutMs)
                 var closed = false
                 repeat {
                     guard !interrupted(), (try? SessionPopulationObservation.requireOwnedAcquisition()) != nil,
@@ -1302,9 +1302,9 @@ extension AccessibilityChannel {
                           menus.isEmpty || (menus.count == 1 && CFEqual(menus[0], root)),
                           let windows = runtime.onScreenWindowList() else { break }
                     closed = menus.isEmpty && LogicOnScreenWindows.popupMenuCount(windows, logicPID: pid) == 0
-                    if closed || Date() >= closeDeadline { break }
-                    if timing.pollIntervalMs > 0 { try? await Task.sleep(for: .milliseconds(timing.pollIntervalMs)) }
-                } while Date() < closeDeadline
+                    if closed || runtime.pollingClock.now() >= closeDeadline { break }
+                    if timing.pollIntervalMs > 0 { try? await runtime.pollingClock.sleep(.milliseconds(timing.pollIntervalMs)) }
+                } while runtime.pollingClock.now() < closeDeadline
                 extras["popup_menu_state"] = closed ? "closed" : "not_restored"
                 guard closed, writerContextCurrent(),
                       let finalControl = assignedControl(), assigned.matches(finalControl),
@@ -1654,7 +1654,7 @@ extension AccessibilityChannel {
             // Cancel can acknowledge before the native menu and its CG window disappear.
             // Observe only this acquired root (or absence), without another action or Help.
             // The ordinary source/document/focus checks below still decide publication.
-            let closeDeadline = Date().addingTimeInterval(Double(timing.popupCloseTimeoutMs) / 1_000)
+            let closeDeadline = runtime.pollingClock.now() + .milliseconds(timing.popupCloseTimeoutMs)
             repeat {
                 guard !interrupted(), runtime.logicProPID() == pid, runtime.focusedApplicationPID() == pid,
                       let menus = currentPopupMenus(),
@@ -1663,9 +1663,9 @@ extension AccessibilityChannel {
                 if OperationTraceContext.current != nil,
                    (try? SessionPopulationObservation.requireOwnedAcquisition()) == nil { break }
                 if menus.isEmpty && LogicOnScreenWindows.popupMenuCount(windows, logicPID: pid) == 0 { break }
-                if Date() >= closeDeadline { break }
-                if timing.pollIntervalMs > 0 { try? await Task.sleep(for: .milliseconds(timing.pollIntervalMs)) }
-            } while Date() < closeDeadline
+                if runtime.pollingClock.now() >= closeDeadline { break }
+                if timing.pollIntervalMs > 0 { try? await runtime.pollingClock.sleep(.milliseconds(timing.pollIntervalMs)) }
+            } while runtime.pollingClock.now() < closeDeadline
         }
         if interrupted() { return await cancelledReading(priorCancelSucceeded: cancelSucceeded) }
         // Absence in the held Mixer's complete non-Help census prevents reading

@@ -394,7 +394,7 @@ extension AccessibilityChannel {
             }
         }
         _ = AXHelpers.performAction(slotButton, kAXPressAction, runtime: runtime.ax)
-        var opened = await newPopupMenus(in: mixer, excluding: menusBefore, timing: timing, runtime: runtime.ax)
+        var opened = await newPopupMenus(in: mixer, excluding: menusBefore, timing: timing, runtime: runtime)
         if before == .noOutput, opened.isEmpty, let physical,
            let app = AXLogicProElements.appRoot(runtime: runtime), physical.currentIndex(runtime: runtime) == index,
            let native = NativeOutputReadPopup.read(physical: physical, app: app, pid: logicPID, runtime: runtime),
@@ -534,12 +534,10 @@ extension AccessibilityChannel {
         var populationAfter: [AXUIElement]?
         var changedRenewal: OriginalHeaderSourceRenewal?
         var attemptedAssociation = false
-        let startedReadback = Date()
-        let readbackSeconds = Double(timing.readbackTimeoutMs) / 1000.0
-        let redrawSettle = redrawWitness != nil && readbackSeconds > 0 ? 1.5 : 0
-        let deadline = startedReadback.addingTimeInterval(readbackSeconds + redrawSettle)
-        let associationReadbackStart = startedReadback.addingTimeInterval(
-            min(0.5, Double(timing.readbackTimeoutMs) / 2000.0))
+        let startedReadback = runtime.pollingClock.now()
+        let redrawSettle = redrawWitness != nil && timing.readbackTimeoutMs > 0 ? 1_500 : 0
+        let deadline = startedReadback + .milliseconds(timing.readbackTimeoutMs + redrawSettle)
+        let associationReadbackStart = startedReadback + min(.milliseconds(500), .milliseconds(timing.readbackTimeoutMs) / 2)
         repeat {
             let enumeration = (physical?.mixer ?? AXLogicProElements.getMixerArea(runtime: runtime))
                 .flatMap { AXLogicProElements.stripEnumeration(in: $0, runtime: runtime.ax) }
@@ -570,7 +568,7 @@ extension AccessibilityChannel {
                 extras["source_index_after"] = renewed.index
             }
             if after != destination, !attemptedAssociation, let physical, let outputAssociation,
-               Date() >= associationReadbackStart, enumeration?.strips.count == strips.count {
+               runtime.pollingClock.now() >= associationReadbackStart, enumeration?.strips.count == strips.count {
                 let currentIndex = physical.currentIndex(runtime: runtime)
                 let retired = afterLabel == nil && currentIndex == nil
                 // A No Output transition can commit while the exact surviving
@@ -599,8 +597,8 @@ extension AccessibilityChannel {
                 }
             }
             if after == destination { break }
-            if timing.pollIntervalMs > 0 { try? await Task.sleep(for: .milliseconds(timing.pollIntervalMs)) }
-        } while Date() < deadline
+            if timing.pollIntervalMs > 0 { try? await runtime.pollingClock.sleep(.milliseconds(timing.pollIntervalMs)) }
+        } while runtime.pollingClock.now() < deadline
         extras["after"] = after?.json ?? NSNull()
         extras["verify_source"] = "ax_output_slot"
         extras["changed"] = after.map { $0 != before } ?? NSNull()
@@ -1648,16 +1646,16 @@ extension AccessibilityChannel {
         in mixer: AXUIElement,
         excluding before: [AXUIElement],
         timing: OutputAssignmentTiming,
-        runtime: AXHelpers.Runtime
+        runtime: AXLogicProElements.Runtime
     ) async -> [AXUIElement] {
-        let deadline = Date().addingTimeInterval(Double(timing.popupOpenTimeoutMs) / 1000.0)
+        let deadline = runtime.pollingClock.now() + .milliseconds(timing.popupOpenTimeoutMs)
         repeat {
-            let fresh = popupMenus(in: mixer, runtime: runtime).filter { menu in
+            let fresh = popupMenus(in: mixer, runtime: runtime.ax).filter { menu in
                 !before.contains { CFEqual($0, menu) }
             }
             if !fresh.isEmpty { return fresh }
-            if timing.pollIntervalMs > 0 { try? await Task.sleep(for: .milliseconds(timing.pollIntervalMs)) }
-        } while Date() < deadline
+            if timing.pollIntervalMs > 0 { try? await runtime.pollingClock.sleep(.milliseconds(timing.pollIntervalMs)) }
+        } while runtime.pollingClock.now() < deadline
         return []
     }
 
@@ -1673,14 +1671,14 @@ extension AccessibilityChannel {
         permittingCleanup: () -> Bool = { true }
     ) async -> [String: Any] {
         if waitForSelfClose {
-            let deadline = Date().addingTimeInterval(Double(timing.popupCloseTimeoutMs) / 1000.0)
+            let deadline = runtime.pollingClock.now() + .milliseconds(timing.popupCloseTimeoutMs)
             repeat {
                 if let pid = runtime.logicProPID(), let windows = runtime.onScreenWindowList(),
                    LogicOnScreenWindows.popupMenuCount(windows, logicPID: pid) == 0 {
                     break
                 }
-                if timing.pollIntervalMs > 0 { try? await Task.sleep(for: .milliseconds(timing.pollIntervalMs)) }
-            } while Date() < deadline
+                if timing.pollIntervalMs > 0 { try? await runtime.pollingClock.sleep(.milliseconds(timing.pollIntervalMs)) }
+            } while runtime.pollingClock.now() < deadline
         }
         guard permittingCleanup() else {
             // A self-closed popup needs no cleanup authority or action. The

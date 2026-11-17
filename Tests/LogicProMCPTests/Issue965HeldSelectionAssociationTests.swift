@@ -633,6 +633,7 @@ struct Issue965HeldSelectionAssociationTests {
     }
 
     private final class Fixture: @unchecked Sendable {
+        var pollingClock = AXPollingClock.continuous
         let builder = FakeAXRuntimeBuilder()
         let app: AXUIElement
         let window: AXUIElement
@@ -1586,7 +1587,7 @@ struct Issue965HeldSelectionAssociationTests {
                         kCGWindowLayer as String: LogicOnScreenWindows.popupMenuLevel,
                         kCGWindowBounds as String: frame.dictionaryRepresentation]]
                 }, postPopupMenuEscape: { Issue.record("no Escape") },
-                focusedApplicationPID: { 4242 })
+                focusedApplicationPID: { 4242 }, pollingClock: pollingClock)
             return logic
         }
 
@@ -2919,6 +2920,7 @@ struct Issue965HeldSelectionAssociationTests {
             : outputMode.hasPrefix("return_late_") ? String(outputMode.dropFirst("return_".count)) : outputMode
         let destinationLeafLabel = noOutput ? "No Output" : "Output 3-4"
                 let f = try fixture ?? Fixture(fourTracks: busReplacement), cache = StateCache(), registry = TargetRegistry()
+                f.pollingClock = AXTestPollingClock().clock
                 @Sendable func mixerRows() -> [AXUIElement] {
                     [f.routingOtherReplacement ?? f.strips[0], f.routingReplacement ?? f.strips[1]]
                         + Array(f.strips.dropFirst(2))

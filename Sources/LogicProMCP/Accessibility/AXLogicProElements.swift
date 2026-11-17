@@ -7,6 +7,7 @@ import Foundation
 enum AXLogicProElements {
     struct Runtime: @unchecked Sendable {
         let logicProPID: @Sendable () -> pid_t?
+        let pollingClock: AXPollingClock
         let ax: AXHelpers.Runtime
         let executeAppleScript: @Sendable (String) async -> ChannelResult
         /// A timeout-aware variant for routes whose bounded UI protocol needs more than the
@@ -45,9 +46,11 @@ enum AXLogicProElements {
             focusedApplicationPID: @escaping @Sendable () -> pid_t? = { nil },
             activateLogicPro: @escaping @Sendable () -> Bool = { false },
             observeFrontmost: (@Sendable () -> ProcessUtils.KeyboardOwnershipObservation)? = nil,
-            observeHost: @escaping @Sendable (pid_t) -> ProcessUtils.LogicHostObservation? = { _ in nil }
+            observeHost: @escaping @Sendable (pid_t) -> ProcessUtils.LogicHostObservation? = { _ in nil },
+            pollingClock: AXPollingClock = .continuous
         ) {
             self.logicProPID = logicProPID
+            self.pollingClock = pollingClock
             self.ax = ax
             self.executeAppleScript = executeAppleScript
             self.executeAppleScriptWithTimeout = executeAppleScriptWithTimeout ?? { script, _ in
