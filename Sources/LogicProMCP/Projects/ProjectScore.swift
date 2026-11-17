@@ -36,12 +36,19 @@ struct ProjectScore {
         _ = runtime.onScreenWindowList()
         let ax = runtime.ax
         guard let pid = runtime.logicProPID(), runtime.observeHost(pid)?.logicVersion?.hasPrefix("13.") == true,
-              runtime.focusedApplicationPID() == pid, let app = AXLogicProElements.appRoot(runtime: runtime),
-              let window: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: ax),
-              stoppedDocument(window, app: app, runtime: runtime),
+              let app = AXLogicProElements.appRoot(runtime: runtime)
+        else { return unavailable("logic_13_host") }
+        guard runtime.focusedApplicationPID() == pid else { return unavailable("logic_focus") }
+        guard case .found(let window) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: runtime),
               case .success(let document?) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
               let url = URL(string: document), url.isFileURL, url.pathExtension.lowercased() == "logicx"
-        else { return unavailable("focused_stopped_document") }
+        else { return unavailable("saved_document") }
+        guard let windowNodes = bounded(window, depth: 3, ax: ax),
+              let play = toolbarSwitch("controlBar/playButton", nodes: windowNodes, runtime: ax),
+              let record = toolbarSwitch("controlBar/recordButton", nodes: windowNodes, runtime: ax)
+        else { return unavailable("native_transport_switches") }
+        guard stoppedDocument(window, app: app, pid: pid, play: play, record: record, runtime: runtime)
+        else { return unavailable("stopped_document_custody") }
         guard case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(in: window, runtime: runtime),
               headers.count == 1, let header = headers.first,
               let track = try? AXValueExtractors.extractTrackNameResult(from: header, runtime: ax).get(),
@@ -62,8 +69,7 @@ struct ProjectScore {
               let score = onlyGroup(view, named: "Score contents", ax: ax),
               let objects = bounded(score, depth: 4, ax: ax)
         else { return unavailable("score_surface") }
-        guard let windowControls = bounded(window, depth: 3, ax: ax),
-              let display = onlyGroup(windowControls, named: "Transport Display", ax: ax)
+        guard let display = onlyGroup(windowNodes, named: "Transport Display", ax: ax)
         else { return unavailable("transport_display") }
 
         // Logic publishes the LCD separately from the transport button toolbar.
@@ -95,7 +101,7 @@ struct ProjectScore {
             }
         }
         guard !notes.isEmpty, notes.count + rests <= 256,
-              stoppedDocument(window, app: app, runtime: runtime)
+              stoppedDocument(window, app: app, pid: pid, play: play, record: record, runtime: runtime)
         else { return unavailable("score_notes_or_custody") }
         return .init(readback: .init(project_path: url.path, track_name: track, region_name: regionName,
                                     time_signature: meter, notes: notes, rest_count: rests),
@@ -108,20 +114,29 @@ struct ProjectScore {
         return nil
     }
 
+    private static func toolbarSwitch(_ id: String, nodes: [AXUIElement], runtime: AXHelpers.Runtime) -> AXUIElement? {
+        let matches = nodes.filter {
+            AXHelpers.getRole($0, runtime: runtime) == kAXCheckBoxRole && AXHelpers.getIdentifier($0, runtime: runtime) == id
+        }
+        return matches.count == 1 ? matches.first : nil
+    }
+
     private static func stoppedDocument(
-        _ window: AXUIElement, app: AXUIElement, runtime: AXLogicProElements.Runtime
+        _ window: AXUIElement, app: AXUIElement, pid: pid_t, play: AXUIElement, record: AXUIElement,
+        runtime: AXLogicProElements.Runtime
     ) -> Bool {
         let ax = runtime.ax
-        guard !Task.isCancelled, let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
+        guard !Task.isCancelled, runtime.logicProPID() == pid, runtime.focusedApplicationPID() == pid,
               let windows: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: ax),
               let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: ax),
               case .success(let children) = AXHelpers.childrenResult(window, runtime: ax),
-              let activity = try? AXLogicProElements.observedTransportActivity(in: window, runtime: runtime, checking: {})
+              let playing: NSNumber = AXHelpers.getAttribute(play, kAXValueAttribute, runtime: ax),
+              let recording: NSNumber = AXHelpers.getAttribute(record, kAXValueAttribute, runtime: ax)
         else { return false }
         let documents = windows.filter { AXHelpers.getRole($0, runtime: ax) != kAXHelpTagRole }
         return documents.count == 1 && CFEqual(documents[0], window) && CFEqual(focus, window)
             && !children.contains { AXHelpers.getRole($0, runtime: ax) == kAXSheetRole }
-            && !activity.isPlaying && !activity.isRecording
+            && playing.intValue == 0 && recording.intValue == 0
     }
 
     private static func onlyGroup(_ items: [AXUIElement], named name: String, ax: AXHelpers.Runtime) -> AXUIElement? {
