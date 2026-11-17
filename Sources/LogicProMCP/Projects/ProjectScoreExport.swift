@@ -53,8 +53,11 @@ struct ProjectScoreExport {
         else { throw Failure.nativeUnavailable }
 
         var ownedPanel: AXUIElement?
+        let keyboard = MIDITrackExportPanel.Keyboard.withFocus { _, pid in
+            pid == source.pid && holdsProject()
+        }
         let writer = MIDITrackExportPanel(window: source.window, document: source.document, runtime: runtime,
-                                         permittingAction: { holdsProject() })
+                                         keyboard: keyboard, permittingAction: { holdsProject() })
         do {
             try Task.checkCancellation()
             guard try Self.vacant(output), holdsProject(), focused(source.window),
@@ -91,7 +94,7 @@ struct ProjectScoreExport {
         guard let final = ProjectScore.read(runtime: runtime), final.holdsSameScore(as: source),
               let entries = try? fm.contentsOfDirectory(at: privateDirectory, includingPropertiesForKeys: nil),
               entries.count == 1, let file = entries.first,
-              ["Score.musicxml", "Score.musicxml.xml", "Score.xml"].contains(file.lastPathComponent),
+              ["xml", "musicxml"].contains(file.pathExtension.lowercased()),
               let metadata = try? fm.attributesOfItem(atPath: file.path),
               metadata[.type] as? FileAttributeType == .typeRegular,
               let size = metadata[.size] as? NSNumber, (1...ProjectMusicXML.maximumBytes).contains(size.intValue),
@@ -125,7 +128,7 @@ struct ProjectScoreExport {
     }
 
     private func holdsProject() -> Bool {
-        runtime.logicProPID() == source.pid && runtime.focusedApplicationPID() == source.pid
+        runtime.logicProPID() == source.pid && ProjectScore.foreground(source.pid, runtime: runtime)
             && windows()?.contains(where: { CFEqual($0, source.window) }) == true
             && (try? AXLogicProElements.projectPickerDocumentRead(source.window, runtime: runtime).get()) == source.document
     }

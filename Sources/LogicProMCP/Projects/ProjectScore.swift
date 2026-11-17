@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 import Foundation
 
@@ -38,7 +39,7 @@ struct ProjectScore {
         guard let pid = runtime.logicProPID(), runtime.observeHost(pid)?.logicVersion?.hasPrefix("13.") == true,
               let app = AXLogicProElements.appRoot(runtime: runtime)
         else { return unavailable("logic_13_host") }
-        guard runtime.focusedApplicationPID() == pid else { return unavailable("logic_focus") }
+        guard foreground(pid, runtime: runtime) else { return unavailable("logic_focus") }
         guard case .found(let window) = AXLogicProElements.arrangeWindowVerifiedRead(runtime: runtime),
               case .success(let document?) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
               let url = URL(string: document), url.isFileURL, url.pathExtension.lowercased() == "logicx"
@@ -114,6 +115,16 @@ struct ProjectScore {
         return nil
     }
 
+    static func foreground(_ pid: pid_t, runtime: AXLogicProElements.Runtime) -> Bool {
+        let ownership = ProcessUtils.keyboardOwnershipObservation(
+            windowList: runtime.onScreenWindowList,
+            focusedPID: runtime.focusedApplicationPID,
+            bundleIDForPID: ProcessUtils.bundleIDForPID
+        )
+        return ownership.isReady && ownership.keyboardOwnerPID == pid
+            && NSRunningApplication(processIdentifier: pid)?.isActive == true
+    }
+
     private static func toolbarSwitch(_ id: String, nodes: [AXUIElement], runtime: AXHelpers.Runtime) -> AXUIElement? {
         let matches = nodes.filter {
             AXHelpers.getRole($0, runtime: runtime) == kAXCheckBoxRole && AXHelpers.getIdentifier($0, runtime: runtime) == id
@@ -126,7 +137,7 @@ struct ProjectScore {
         runtime: AXLogicProElements.Runtime
     ) -> Bool {
         let ax = runtime.ax
-        guard !Task.isCancelled, runtime.logicProPID() == pid, runtime.focusedApplicationPID() == pid,
+        guard !Task.isCancelled, runtime.logicProPID() == pid, foreground(pid, runtime: runtime),
               let windows: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: ax),
               let focus: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: ax),
               case .success(let children) = AXHelpers.childrenResult(window, runtime: ax),

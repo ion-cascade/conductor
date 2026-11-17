@@ -9,36 +9,41 @@ final class MIDITrackExportPanel {
     struct Keyboard {
         var post: @MainActor (CGKeyCode, CGEventFlags) -> Bool
 
-        static let production = Keyboard(post: { key, flags in
-            let keys = CGEventChannel.Runtime.production
-            guard keys.canPostEvents(), keys.isLogicFrontmost(),
-                  let pid = keys.logicProPID(), keys.focusedApplicationPID() == pid else { return false }
-            if key == 5 {
-                // No input-source selection. Refuse an unverified command key
-                // map; the subsequent GoToWindow observation proves delivery.
-                guard Keyboard.goToFolderKeyIsMapped(using: keys) else { return false }
-            }
-            // This AppKit Save-panel route did not receive postToPid even
-            // when that API returned true. Use the foreground event route only
-            // after the caller checks the exact owned panel's keyboard focus.
-            guard let source = CGEventSource(stateID: .hidSystemState) else { return false }
-            var events: [CGEvent] = []
-            for spec in CGEventChannel.keyEventSequence(keyCode: key, flags: flags) {
-                let event: CGEvent?
-                switch spec.kind {
-                case .keyDown, .keyUp:
-                    event = CGEvent(keyboardEventSource: source, virtualKey: spec.keyCode, keyDown: spec.kind == .keyDown)
-                case .flagsChanged:
-                    event = CGEvent(source: source); event?.type = .flagsChanged
+        static let production = withFocus { keys, pid in
+            keys.isLogicFrontmost() && keys.focusedApplicationPID() == pid
+        }
+
+        static func withFocus(_ focus: @escaping @MainActor (CGEventChannel.Runtime, pid_t) -> Bool) -> Self {
+            Keyboard(post: { key, flags in
+                let keys = CGEventChannel.Runtime.production
+                guard keys.canPostEvents(), let pid = keys.logicProPID(), focus(keys, pid) else { return false }
+                if key == 5 {
+                    // No input-source selection. Refuse an unverified command key
+                    // map; the subsequent GoToWindow observation proves delivery.
+                    guard Keyboard.goToFolderKeyIsMapped(using: keys) else { return false }
                 }
-                guard let event else { return false }
-                event.flags = spec.flags; events.append(event)
-            }
-            guard keys.isLogicFrontmost(), keys.focusedApplicationPID() == pid else { return false }
-            if key == 5 && !Keyboard.goToFolderKeyIsMapped(using: keys) { return false }
-            for event in events { event.post(tap: .cghidEventTap) }
-            return true
-        })
+                // This AppKit Save-panel route did not receive postToPid even
+                // when that API returned true. Use the foreground event route only
+                // after the caller checks the exact owned panel's keyboard focus.
+                guard let source = CGEventSource(stateID: .hidSystemState) else { return false }
+                var events: [CGEvent] = []
+                for spec in CGEventChannel.keyEventSequence(keyCode: key, flags: flags) {
+                    let event: CGEvent?
+                    switch spec.kind {
+                    case .keyDown, .keyUp:
+                        event = CGEvent(keyboardEventSource: source, virtualKey: spec.keyCode, keyDown: spec.kind == .keyDown)
+                    case .flagsChanged:
+                        event = CGEvent(source: source); event?.type = .flagsChanged
+                    }
+                    guard let event else { return false }
+                    event.flags = spec.flags; events.append(event)
+                }
+                guard focus(keys, pid) else { return false }
+                if key == 5 && !Keyboard.goToFolderKeyIsMapped(using: keys) { return false }
+                for event in events { event.post(tap: .cghidEventTap) }
+                return true
+            })
+        }
 
         static func goToFolderKeyIsMapped(using keys: CGEventChannel.Runtime) -> Bool {
             guard let layout = keys.asciiCapableLayoutID(), keys.layoutIsEnabled(layout) else { return false }

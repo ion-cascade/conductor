@@ -59,6 +59,7 @@ extension ProjectDispatcher {
             }
             return success(source.readback, score: exported, output: output)
         } catch {
+            Log.debug("Score MusicXML export unavailable: \(error)", subsystem: "project")
             if !attempted {
                 return refuse(.unsupportedState, "The bound Score as MusicXML command was unavailable.")
             }
