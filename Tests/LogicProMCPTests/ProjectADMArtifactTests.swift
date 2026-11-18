@@ -12,7 +12,20 @@ struct ProjectADMArtifactTests {
         #expect(parsed.objects[1].channels == [11])
     }
 
-    @Test(arguments: ["duplicate_track", "missing_uid", "wrong_depth", "truncated", "external_xml", "oversized_chunk"])
+    @Test func readsRF64LengthsWithoutTreatingSentinelsAsPCMBytes() throws {
+        let riff = fixture()
+        let content = riff.dropFirst(12)
+        let fileSize = riff.count + 36
+        let ds64 = number(UInt64(fileSize - 8), 8) + number(4 * 33, 8) + number(4, 8) + number(0, 4)
+        var rf64 = Data("RF64".utf8) + number(UInt64(UInt32.max), 4) + Data("WAVE".utf8)
+        rf64 += chunk("ds64", ds64) + content
+        let dataRange = try #require(rf64.range(of: Data("data".utf8)))
+        rf64.replaceSubrange(dataRange.upperBound..<(dataRange.upperBound + 4), with: number(UInt64(UInt32.max), 4))
+        let parsed = try inspect(rf64)
+        #expect(parsed.frames == 4 && parsed.channelMapping.count == 11)
+    }
+
+    @Test(arguments: ["duplicate_track", "missing_uid", "wrong_depth", "truncated", "external_xml", "oversized_chunk", "crosswired_stream"])
     func refusesUnattributableOrIncompleteArtifacts(_ fault: String) throws {
         var data = fixture(fault: fault)
         if fault == "truncated" { data.removeLast() }
@@ -74,7 +87,11 @@ struct ProjectADMArtifactTests {
             <audioPackFormat audioPackFormatID="AP_00010017">\(bedChannels)</audioPackFormat>
             </audioFormatExtended></format></coreMetadata></ebuCoreMain>
             """
-        let body = chunk("fmt ", format) + chunk("chna", chna) + chunk("axml", Data(xml.utf8))
+        let xmlBytes = fault == "crosswired_stream"
+            ? xml.replacingOccurrences(of: "<audioTrackFormatIDRef>AT_0000000B_01</audioTrackFormatIDRef>",
+                                       with: "<audioTrackFormatIDRef>AT_00000001_01</audioTrackFormatIDRef>")
+            : xml
+        let body = chunk("fmt ", format) + chunk("chna", chna) + chunk("axml", Data(xmlBytes.utf8))
             + chunk("data", Data(repeating: 0, count: 4 * 33))
         return Data("RIFF".utf8) + number(UInt64(body.count + 4), 4) + Data("WAVE".utf8) + body
     }
