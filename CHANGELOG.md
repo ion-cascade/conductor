@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.15.0] — 2026-11-18
+
+- Add an explicit 48 kHz, 24-bit WAVE 5.1 bounce profile with native layout readback and six-channel artifact checks.
+- Export a bounded Dolby Atmos ADM BWF project with a 7.1.2 bed and one mono object, checking native settings, channel references, object names and the expected frame count.
+- Retain unverified ADM exports in a private staging directory and publish verified files without replacing an existing destination.
+
 ## [1.14.1] — 2026-11-17
 
 - Use monotonic deadlines when polling Logic's Mixer output menus and readback.
