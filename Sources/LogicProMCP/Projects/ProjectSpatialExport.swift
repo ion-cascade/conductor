@@ -193,7 +193,10 @@ struct ProjectSpatialExport {
             guard nodes.count <= 600 else { throw Failure.unavailable("panel_census_limit") }
             if depth == 4 { continue }
             switch AXHelpers.childrenResult(node, runtime: runtime.ax) {
-            case .success(let children): nodes += children.map { ($0, depth + 1) }
+            case .success(let children):
+                for child in children where !nodes.contains(where: { CFEqual($0.0, child) }) {
+                    nodes.append((child, depth + 1))
+                }
             case .failure(let error) where error.isDefinitiveAbsence: break
             case .failure: throw Failure.unavailable("incomplete_panel_census")
             }
