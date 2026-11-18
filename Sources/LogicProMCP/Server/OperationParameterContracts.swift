@@ -688,6 +688,14 @@ extension OperationRegistry {
                     "row": .string("01: Kick 1 - C1"), "step": .int(1), "enabled": .bool(true),
                 ])])),
             ], required: [["address"], ["grid_snapshot"], ["changes"]]),
+            "project.export_adm_bwf": .init(params: [
+                "confirmed": .enforced(.boolean, .bool(true)),
+                "output_path": .enforced(.string, .string("/tmp/Master.wav")),
+                "project_path": .enforced(.string, .string("/tmp/Spatial.logicx")),
+                "bed_name": .enforced(.string, .string("Bed")),
+                "object_name": .enforced(.string, .string("Object")),
+                "expected_frames": .enforced(.integer, .int(192000)),
+            ], required: [["bed_name"], ["confirmed"], ["expected_frames"], ["object_name"], ["output_path"], ["project_path"]]),
             "project.export_score_musicxml": .init(params: [
                 "confirmed": .enforced(.boolean, .bool(true)),
                 "output_path": .enforced(.string, .string("/tmp/Score.musicxml")),

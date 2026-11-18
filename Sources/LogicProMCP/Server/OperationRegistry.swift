@@ -102,6 +102,7 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case projectSetPatternStepEnabled = "project.set_pattern_step_enabled"
     case projectCapturePatternGrid = "project.capture_pattern_grid"
     case projectReadScore = "project.read_score"
+    case projectExportADMBWF = "project.export_adm_bwf"
     case projectExportScoreMusicXML = "project.export_score_musicxml"
     case projectReadLiveLoops = "project.read_live_loops"
     case projectSetLiveLoopsCellPlaying = "project.set_live_loops_cell_playing"
@@ -401,7 +402,7 @@ enum OperationRegistry {
         ToolID.logicProject.rawValue: [
             "project.new", "project.open", "project.save", "project.save_as", "project.close",
             "project.bounce", "project.is_running", "project.launch", "project.quit",
-            "project.get_regions", "project.get_pattern_step", "project.set_pattern_step_enabled", "project.capture_pattern_grid", "project.read_live_loops", "project.set_live_loops_cell_playing", "project.read_score", "project.export_score_musicxml", "project.search_browser_patches", "project.load_browser_patch", "project.get_chord_track", "project.set_chord_quality", "project.get_session_player", "project.set_session_player_chord_source", "project.set_pattern_steps_enabled", "project.scan_regions", "project.edit_region", "project.get_region_smart_tempo", "project.get_region_gain", "project.set_region_gain", "project.get_region_fade", "project.set_region_fade", "project.export_plan", "project.export_run",
+            "project.get_regions", "project.get_pattern_step", "project.set_pattern_step_enabled", "project.capture_pattern_grid", "project.read_live_loops", "project.set_live_loops_cell_playing", "project.read_score", "project.export_score_musicxml", "project.export_adm_bwf", "project.search_browser_patches", "project.load_browser_patch", "project.get_chord_track", "project.set_chord_quality", "project.get_session_player", "project.set_session_player_chord_source", "project.set_pattern_steps_enabled", "project.scan_regions", "project.edit_region", "project.get_region_smart_tempo", "project.get_region_gain", "project.set_region_gain", "project.get_region_fade", "project.set_region_fade", "project.export_plan", "project.export_run",
             "project.export_resume", "project.export_status", "project.audit", "project.cleanup_plan",
             "project.inspect_session", "project.plan_session_repair", "project.apply_session_repair", "project.cleanup_apply",
         ],
@@ -462,7 +463,7 @@ enum OperationRegistry {
         ],
         ToolID.logicProject.rawValue: [
             "new", "open", "save", "save_as", "close", "bounce", "is_running", "launch",
-            "quit", "get_regions", "get_pattern_step", "set_pattern_step_enabled", "capture_pattern_grid", "read_live_loops", "set_live_loops_cell_playing", "read_score", "export_score_musicxml", "search_browser_patches", "load_browser_patch", "get_chord_track", "set_chord_quality", "get_session_player", "set_session_player_chord_source", "set_pattern_steps_enabled", "scan_regions", "edit_region", "get_region_smart_tempo", "get_region_gain", "set_region_gain", "get_region_fade", "set_region_fade", "export_plan", "export_run", "export_resume", "export_status", "audit",
+            "quit", "get_regions", "get_pattern_step", "set_pattern_step_enabled", "capture_pattern_grid", "read_live_loops", "set_live_loops_cell_playing", "read_score", "export_score_musicxml", "export_adm_bwf", "search_browser_patches", "load_browser_patch", "get_chord_track", "set_chord_quality", "get_session_player", "set_session_player_chord_source", "set_pattern_steps_enabled", "scan_regions", "edit_region", "get_region_smart_tempo", "get_region_gain", "set_region_gain", "get_region_fade", "set_region_fade", "export_plan", "export_run", "export_resume", "export_status", "audit",
             "cleanup_plan", "inspect_session", "plan_session_repair", "apply_session_repair", "cleanup_apply",
         ],
         ToolID.logicMidi.rawValue: [
@@ -980,6 +981,7 @@ enum OperationRegistry {
         (.projectCapturePatternGrid, "capture_pattern_grid", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.long, []),
         (.projectSetPatternStepsEnabled, "set_pattern_steps_enabled", Mutability.mutating, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.long, ["address", "grid_snapshot", "changes"]),
         (.projectReadScore, "read_score", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.medium, []),
+        (.projectExportADMBWF, "export_adm_bwf", Mutability.mutating, ConfirmationPolicy.l2, VerificationPolicy.readbackRequired, DeadlineClass.long, ["bed_name", "confirmed", "expected_frames", "object_name", "output_path", "project_path"]),
         (.projectExportScoreMusicXML, "export_score_musicxml", Mutability.mutating, ConfirmationPolicy.l2, VerificationPolicy.readbackRequired, DeadlineClass.long, ["confirmed", "output_path", "project_path", "track_name"]),
         (.projectReadLiveLoops, "read_live_loops", Mutability.readOnly, ConfirmationPolicy.none, VerificationPolicy.none, DeadlineClass.medium, []),
         (.projectSetLiveLoopsCellPlaying, "set_live_loops_cell_playing", Mutability.mutating, ConfirmationPolicy.none, VerificationPolicy.readbackRequired, DeadlineClass.long, ["cell_ref", "grid_snapshot", "playing"]),

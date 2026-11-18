@@ -678,7 +678,7 @@ extension OperationTraceTests {
         )
         // These project commands use direct native access outside ChannelRouter.
         let directNativeWrites: Set<OperationID> = [
-            .projectSetPatternStepEnabled, .projectSetPatternStepsEnabled, .projectSetLiveLoopsCellPlaying, .projectExportScoreMusicXML, .projectSetChordQuality,
+            .projectSetPatternStepEnabled, .projectSetPatternStepsEnabled, .projectSetLiveLoopsCellPlaying, .projectExportADMBWF, .projectExportScoreMusicXML, .projectSetChordQuality,
             .projectSetSessionPlayerChordSource, .projectLoadBrowserPatch,
         ]
         let newRoutedWrites = Set(additionalWriteCensusRoutes.compactMap { id, _ in
@@ -1033,6 +1033,7 @@ let additionalWriteCensusRoutes: [(OperationID, String)] = [
     (.pluginsSetGainAutomationPoint, "plugin.set_gain_automation_point"),
     (.projectSetRegionGain, "region.set_gain"), (.projectSetRegionFade, "region.set_fade"),
     (.projectEditRegion, "region.edit_by_reference"), (.projectSetPatternStepEnabled, "project.set_pattern_step_enabled"),
+    (.projectExportADMBWF, "project.export_adm_bwf"),
     (.projectExportScoreMusicXML, "project.export_score_musicxml"),
     (.projectSetLiveLoopsCellPlaying, "project.set_live_loops_cell_playing"),
     (.projectSetPatternStepsEnabled, "project.set_pattern_steps_enabled"), (.projectSetChordQuality, "project.set_chord_quality"),
