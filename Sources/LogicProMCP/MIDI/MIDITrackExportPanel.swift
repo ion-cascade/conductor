@@ -342,10 +342,17 @@ final class MIDITrackExportPanel {
     }
 
     private func label(_ labels: AXLocalePolicy.LabelSet, role: String, in root: AXUIElement) throws -> AXUIElement {
-        guard case .success(let census) = AXLocalePolicy.censusDescendantResult(of: root, role: role,
-                matching: labels, mode: .exactStrict, maxDepth: 8, runtime: runtime.ax),
-              census.candidates == 1, let element = census.element else { throw Failure.unavailable("menu_label_unavailable_or_ambiguous") }
-        return element
+        let observed = AXLocalePolicy.censusDescendantResult(of: root, role: role,
+                matching: labels, mode: .exactStrict, maxDepth: 8, runtime: runtime.ax)
+        switch observed {
+        case .success(let census) where census.candidates == 1:
+            if let element = census.element { return element }
+        case .success(let census):
+            Log.debug("MIDI menu label \(labels.canonical) role \(role): \(census.candidates) candidates", subsystem: "midi")
+        case .failure(let error):
+            Log.debug("MIDI menu label \(labels.canonical) role \(role): read failure \(error)", subsystem: "midi")
+        }
+        throw Failure.unavailable("menu_label_unavailable_or_ambiguous")
     }
 
     private func descendants(
@@ -439,13 +446,21 @@ final class MIDITrackExportPanel {
             var relationship = FileManager.URLRelationship.other
             do {
                 try FileManager.default.getRelationship(&relationship, ofDirectoryAt: selected, toItemAt: destination)
-            } catch { return false }
+            } catch {
+                Log.debug("MIDI directory relationship failed: selected=\(selected.absoluteString) destination=\(destination.absoluteString) error=\(error)", subsystem: "midi")
+                return false
+            }
             switch relationship {
             case .same: sawDestination = true
             case .contains: break
-            case .other: return false
+            case .other:
+                Log.debug("MIDI directory unrelated: selected=\(selected.absoluteString) destination=\(destination.absoluteString)", subsystem: "midi")
+                return false
             @unknown default: return false
             }
+        }
+        if !sawDestination {
+            Log.debug("MIDI directory not selected: destination=\(destination.absoluteString) columns=\(lists.count) selected=\(selectedDirectories.map(\.absoluteString))", subsystem: "midi")
         }
         return sawDestination
     }
