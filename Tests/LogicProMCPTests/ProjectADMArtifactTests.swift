@@ -19,7 +19,7 @@ struct ProjectADMArtifactTests {
         let ds64 = number(UInt64(fileSize - 8), 8) + number(4 * 33, 8) + number(4, 8) + number(0, 4)
         var rf64 = Data("RF64".utf8) + number(UInt64(UInt32.max), 4) + Data("WAVE".utf8)
         rf64 += chunk("ds64", ds64) + content
-        let dataRange = try #require(rf64.range(of: Data("data".utf8)))
+        let dataRange = try #require(rf64.range(of: Data("data".utf8), options: .backwards))
         rf64.replaceSubrange(dataRange.upperBound..<(dataRange.upperBound + 4), with: number(UInt64(UInt32.max), 4))
         let parsed = try inspect(rf64)
         #expect(parsed.frames == 4 && parsed.channelMapping.count == 11)

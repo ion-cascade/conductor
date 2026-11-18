@@ -553,7 +553,7 @@ enum WorkflowSkillCatalog {
             "export_plan", "export_run", "export_resume",
             "audit", "cleanup_plan", "inspect_session", "plan_session_repair", "apply_session_repair", "cleanup_apply", "launch", "quit",
             "edit_region", "export_status", "get_pattern_step",
-            "capture_pattern_grid", "set_pattern_steps_enabled", "read_live_loops", "set_live_loops_cell_playing", "read_score", "export_score_musicxml",
+            "capture_pattern_grid", "set_pattern_steps_enabled", "read_live_loops", "set_live_loops_cell_playing", "read_score", "export_score_musicxml", "export_adm_bwf",
             "get_chord_track", "set_chord_quality", "get_session_player", "set_session_player_chord_source",
             "search_browser_patches", "load_browser_patch",
             "get_region_fade", "get_region_gain", "get_region_smart_tempo",
