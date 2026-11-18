@@ -28,7 +28,7 @@ Qualification uses separate synthetic channel-identification signals and an inde
 
 Other layouts, sample rates, bit depths, multiple objects, selected-range ADM exports and spatial project configuration are outside this profile. Configure the project in Logic before exporting. Omitting `channel_layout` retains the stereo bounce profile. Typed PCM bounce resume continues to refuse reuse when original settings provenance is unavailable and preserves existing bytes. Selected-stem delivery retains its separately qualified resume behavior.
 
-[Surround and ADM parameters](../API.md#surround-and-spatial-delivery)
+[Surround and ADM parameters](../API.md#spatial-delivery)
 
 ## 1.14 Live Loops and notation
 
