@@ -48,11 +48,11 @@ struct ProjectSpatialExport {
             guard AXHelpers.performAction(file, kAXPressAction, runtime: runtime.ax),
                   AXHelpers.performAction(projectSettings, kAXPressAction, runtime: runtime.ax),
                   let audio = menu(["File", "Project Settings", "Audio…"]),
-                  AXHelpers.performAction(audio, kAXPickAction, runtime: runtime.ax)
+                  AXHelpers.performAction(audio, kAXPressAction, runtime: runtime.ax)
             else { throw Failure.unavailable("project_settings_audio") }
             let panel = try await wait {
                 guard let windows = windows(), windows.count <= 2 else { throw Failure.unavailable("settings_window_population") }
-                return windows.first { !CFEqual($0, window) && AXHelpers.getTitle($0, runtime: runtime.ax) == title + " - Project Settings" }
+                return windows.first { !CFEqual($0, window) && AXHelpers.getTitle($0, runtime: runtime.ax) == title + " - Project Settings" && focused($0) }
             }
             owned = panel
             guard focused(panel) else { throw Failure.unavailable("settings_focus") }
@@ -96,7 +96,7 @@ struct ProjectSpatialExport {
                   enabled(command), holdsProject(), focused(window),
                   OperationTraceContext.claimDeadlineEffect("spatial_export_panel", rejectTaskCancellationWithoutContext: true)
             else { throw Failure.unavailable("adm_menu_unavailable") }
-            _ = AXHelpers.performAction(command, kAXPickAction, runtime: runtime.ax)
+            _ = AXHelpers.performAction(command, kAXPressAction, runtime: runtime.ax)
             await didWrite()
             let acquired = try await wait {
                 guard let windows = windows(), windows.count <= 2 else { throw Failure.unavailable("export_window_population") }
@@ -192,9 +192,11 @@ struct ProjectSpatialExport {
             cursor += 1
             guard nodes.count <= 600 else { throw Failure.unavailable("panel_census_limit") }
             if depth == 4 { continue }
-            guard case .success(let children) = AXHelpers.childrenResult(node, runtime: runtime.ax)
-            else { throw Failure.unavailable("incomplete_panel_census") }
-            nodes += children.map { ($0, depth + 1) }
+            switch AXHelpers.childrenResult(node, runtime: runtime.ax) {
+            case .success(let children): nodes += children.map { ($0, depth + 1) }
+            case .failure(let error) where error.isDefinitiveAbsence: break
+            case .failure: throw Failure.unavailable("incomplete_panel_census")
+            }
         }
         return nodes.map(\.0)
     }

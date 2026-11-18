@@ -26,7 +26,10 @@ extension ProjectDispatcher {
         }
         let settings: ProjectSpatialExport.Settings
         do { settings = try await source.settings() }
-        catch { return refuse(.readbackUnavailable, "The bound Audio project settings could not be read and closed.") }
+        catch {
+            Log.debug("Spatial settings unavailable: \(error)", subsystem: "project")
+            return refuse(.readbackUnavailable, "The bound Audio project settings could not be read and closed.")
+        }
         guard settings.spatialAudio == "Dolby Atmos", settings.surround == "7.1.2", settings.sampleRate == "48 kHz" else {
             return refuse(.unsupportedState, "The qualified ADM profile requires Dolby Atmos, a 7.1.2 bed, and 48 kHz.")
         }
