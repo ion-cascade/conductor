@@ -425,7 +425,10 @@ struct ProjectLogic13Bounce {
     }
 
     private func holdsProject() -> Bool {
-        guard runtime.focusedApplicationPID() == pid, windows()?.contains(window) == true,
+        // AppKit can move focus into its Go to Folder sheet before the
+        // system-wide AX read has caught up. Refresh the owning window list.
+        guard runtime.onScreenWindowList() != nil, runtime.focusedApplicationPID() == pid,
+              windows()?.contains(window) == true,
               case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime)
         else { return false }
         return current == document
