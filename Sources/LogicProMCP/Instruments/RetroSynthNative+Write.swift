@@ -2,6 +2,12 @@ import ApplicationServices
 import Foundation
 
 extension RetroSynthNative {
+    private func parameterText(_ label: String) throws -> String {
+        let current = try row(label)
+        let state = try RetroSynthSnapshot.Row(label: label, controls: controls(current).map(controlState))
+        return try RetroSynthSnapshot(preset: "", rows: [state]).text(label)
+    }
+
     /// All callbacks that record a write run after the synchronous native effect.
     /// The first-effect precondition is renewed immediately before that effect.
     func set(parameter: RetroSynthProfile.Parameter, choice: RetroSynthProfile.Choice,

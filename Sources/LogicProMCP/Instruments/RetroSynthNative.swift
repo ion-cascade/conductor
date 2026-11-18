@@ -249,12 +249,6 @@ final class RetroSynthNative {
         return after
     }
 
-    func parameterText(_ label: String) throws -> String {
-        let current = try row(label)
-        let state = try RetroSynthSnapshot.Row(label: label, controls: controls(current).map(controlState))
-        return try RetroSynthSnapshot(preset: "", rows: [state]).text(label)
-    }
-
     func scalar(_ label: String) throws -> (control: AXUIElement, position: Int, display: String) {
         let row = try row(label)
         let native = try controls(row)

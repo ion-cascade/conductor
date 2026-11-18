@@ -818,6 +818,7 @@ struct OperationRegistryTests {
         ("logic_project", "export_score_musicxml", .l2),
         ("logic_project", "export_adm_bwf", .l2),
         ("logic_project", "export_resume", .l2),
+        ("logic_plugins", "initialize_retro_synth", .l2),
         ("logic_mixer", "insert_plugin", .l2),
         ("logic_system", "clear_traces", .l2),
         ("logic_tracks", "sort_verified", .l2),

@@ -113,6 +113,20 @@ struct PluginsDispatcher: OperationTraceDispatching {
         // dispatch chokepoint.
         liveTrackNames: (@Sendable () -> [Int: String]?)? = nil
     ) async -> CallTool.Result {
+        // The instrument surface validates its strict typed input before live
+        // reference resolution. Its child resolver then verifies both project
+        // and physical track; no bare-index compatibility path is admitted.
+        if ["get_retro_synth_state", "initialize_retro_synth", "set_retro_synth_parameter"].contains(command) {
+            let writing = command != "get_retro_synth_state"
+            let traceID = writing ? await startTraceIfEnabled(command: command) : nil
+            let result = await withWriteBoundaryArmed(traceID) {
+                await retroSynth(command: command, params: params, cache: cache,
+                    targetRegistry: targetRegistry, gate: verifiedGate,
+                    liveTrackNames: liveTrackNames, traceID: traceID)
+            }
+            return await finalizeTrace(result, traceID: traceID)
+        }
+
         if let projectFailure = await TargetRefResolver.validateProjectReference(
             params,
             targetRegistry: targetRegistry,
@@ -132,16 +146,6 @@ struct PluginsDispatcher: OperationTraceDispatching {
         }
 
         switch command {
-        case "get_retro_synth_state", "initialize_retro_synth", "set_retro_synth_parameter":
-            let writing = command != "get_retro_synth_state"
-            let traceID = writing ? await startTraceIfEnabled(command: command) : nil
-            let result = await withWriteBoundaryArmed(traceID) {
-                await retroSynth(command: command, params: params, cache: cache,
-                    targetRegistry: targetRegistry, gate: verifiedGate,
-                    liveTrackNames: liveTrackNames, traceID: traceID)
-            }
-            return await finalizeTrace(result, traceID: traceID)
-
         case "get_gain_automation", "set_gain_automation_point":
             let operation = "logic_plugins.\(command)"
             let routed = "plugin.\(command)"
