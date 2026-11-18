@@ -1,5 +1,4 @@
 import Foundation
-import FoundationXML
 
 /// A bounded ADM BWF inspection. Channel attribution follows CHNA track UIDs
 /// and their AXML object membership, independently of the output filename.
@@ -46,7 +45,9 @@ struct ProjectADMArtifact: Codable, Sendable {
             if tag == "ds64" {
                 guard container != "RIFF", chunks[tag] == nil, length >= 28, length <= 1_048_576 else { throw Failure.invalid }
                 let body = try bytes(file, count: Int(length))
-                riffSize = integer(body, 0, 8) + 8
+                let declaredSize = integer(body, 0, 8)
+                guard declaredSize <= size - 8 else { throw Failure.invalid }
+                riffSize = declaredSize + 8
                 extendedDataSize = integer(body, 8, 8)
                 chunks[tag] = body
             } else if ["fmt ", "axml", "chna"].contains(tag) {
@@ -168,7 +169,6 @@ private final class ADMXML: NSObject, XMLParserDelegate {
     func parser(_ parser: XMLParser, foundCharacters string: String) { stack.last?.text += string }
 
     func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {
-        stack.last?.text = stack.last?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        _ = stack.popLast()
+        if let node = stack.popLast() { node.text = node.text.trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 }
