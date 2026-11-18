@@ -125,10 +125,17 @@ struct ProjectSpatialExport {
                 else { throw Failure.unavailable("adm_save_scope") }
             }
             panel = nil
+            var previous: (UInt64, Date)?
             for _ in 0..<240 {
                 try Task.checkCancellation()
                 guard holdsProject() else { throw Failure.unavailable("adm_project_changed") }
-                if (try? ProjectADMArtifact.read(output)) != nil { return }
+                if let metadata = try? FileManager.default.attributesOfItem(atPath: output.path),
+                   metadata[.type] as? FileAttributeType == .typeRegular,
+                   let size = metadata[.size] as? NSNumber, let modified = metadata[.modificationDate] as? Date {
+                    let current = (size.uint64Value, modified)
+                    if let previous, current == previous, (try? ProjectADMArtifact.read(output)) != nil { return }
+                    previous = current
+                }
                 try await Task.sleep(for: .milliseconds(250))
             }
             throw Failure.unavailable("adm_artifact_incomplete")

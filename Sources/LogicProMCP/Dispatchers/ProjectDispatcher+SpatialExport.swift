@@ -44,7 +44,7 @@ extension ProjectDispatcher {
                 await recordClaimedWriteBoundary(traceID)
             }
             let artifact = try ProjectADMArtifact.read(stage)
-            guard source.holdsProject(), artifact.frames == expectedFrames, artifact.channels == 11,
+            guard source.holdsProject(), try await source.settings() == settings, artifact.frames == expectedFrames, artifact.channels == 11,
                   artifact.objects.count == 2,
                   let bed = artifact.objects.first(where: { $0.name == bedName }),
                   let object = artifact.objects.first(where: { $0.name == objectName }),
@@ -52,6 +52,7 @@ extension ProjectDispatcher {
                   bed.packReferences.allSatisfy({ $0.hasPrefix("AP_0001") }),
                   object.packReferences.allSatisfy({ $0.hasPrefix("AP_0003") })
             else { throw ProjectSpatialExport.Failure.unavailable("adm_profile_readback_mismatch") }
+            try Task.checkCancellation()
             // Publishing a link preserves an existing file even if it appeared during export.
             try fm.linkItem(at: stage, to: output)
             try? fm.removeItem(at: directory)
