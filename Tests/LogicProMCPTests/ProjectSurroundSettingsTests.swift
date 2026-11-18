@@ -10,7 +10,8 @@ struct ProjectSurroundSettingsTests {
     }
 
     @Test func explicitSurroundProfileRequiresSixChannelsAndRoundTrips() throws {
-        let parsed = try #require(ProjectPCMBounceSettings.parse(.object(settings), artifacts: ["bounce"]))
+        let requested = try ProjectPCMBounceSettings.parse(.object(settings), artifacts: ["bounce"])
+        let parsed = try #require(requested)
         #expect(parsed.channelCount == 6 && parsed.channelLayout == "5.1")
         let readback = try JSONDecoder().decode(ProjectPCMBounceSettings.self, from: JSONEncoder().encode(parsed))
         #expect(readback == parsed)
