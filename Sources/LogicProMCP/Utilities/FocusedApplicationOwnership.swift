@@ -31,12 +31,22 @@ enum FocusedApplicationOwnership {
         guard let application = runtime.focusedApplication(),
               let rawPID = runtime.elementPID(application), rawPID > 0 else { return nil }
         guard runtime.bundleID(rawPID) == panelServiceBundle else { return rawPID }
+        func refused(_ reason: String) -> pid_t {
+            Log.debug("Hosted Go to Folder focus unresolved: \(reason); service PID \(rawPID)", subsystem: "process")
+            return rawPID
+        }
         let ax = runtime.ax
-        guard let field: AXUIElement = AXHelpers.getAttribute(application, kAXFocusedUIElementAttribute, runtime: ax),
-              AXHelpers.getRole(field, runtime: ax) == kAXTextFieldRole,
-              AXHelpers.getIdentifier(field, runtime: ax) == "PathTextField",
-              let hostPID = runtime.elementPID(field), hostPID > 0, hostPID != rawPID,
-              let hostBundle = runtime.bundleID(hostPID), hostBundle != panelServiceBundle else { return rawPID }
+        guard let field: AXUIElement = AXHelpers.getAttribute(application, kAXFocusedUIElementAttribute, runtime: ax) else {
+            return refused("focused_control_unreadable")
+        }
+        let fieldRole = AXHelpers.getRole(field, runtime: ax)
+        let fieldIdentifier = AXHelpers.getIdentifier(field, runtime: ax)
+        let observedPID = runtime.elementPID(field)
+        guard fieldRole == kAXTextFieldRole, fieldIdentifier == "PathTextField",
+              let hostPID = observedPID, hostPID > 0, hostPID != rawPID,
+              let hostBundle = runtime.bundleID(hostPID), hostBundle != panelServiceBundle else {
+            return refused("field role=\(fieldRole ?? "unread") identifier=\(fieldIdentifier ?? "unread") pid=\(observedPID ?? 0)")
+        }
         let host = ax.axApp(hostPID)
         var current = field
         var visited: [AXUIElement] = []
@@ -45,16 +55,16 @@ enum FocusedApplicationOwnership {
         for _ in 0..<12 {
             guard !visited.contains(where: { CFEqual($0, current) }),
                   let role = AXHelpers.getRole(current, runtime: ax),
-                  runtime.elementPID(current) == hostPID else { return rawPID }
+                  runtime.elementPID(current) == hostPID else { return refused("ancestor_identity_\(visited.count)") }
             visited.append(current)
             if role == kAXSheetRole {
                 guard !sawFolderSheet, !sawSavePanel,
-                      AXHelpers.getIdentifier(current, runtime: ax) == "GoToWindow" else { return rawPID }
+                      AXHelpers.getIdentifier(current, runtime: ax) == "GoToWindow" else { return refused("folder_sheet") }
                 sawFolderSheet = true
             }
             if role == kAXWindowRole {
                 guard sawFolderSheet, !sawSavePanel,
-                      AXHelpers.getIdentifier(current, runtime: ax) == "save-panel" else { return rawPID }
+                      AXHelpers.getIdentifier(current, runtime: ax) == "save-panel" else { return refused("save_panel") }
                 sawSavePanel = true
             }
             if role == kAXApplicationRole {
@@ -64,13 +74,13 @@ enum FocusedApplicationOwnership {
                       let serviceFocus: AXUIElement = AXHelpers.getAttribute(application, kAXFocusedUIElementAttribute, runtime: ax),
                       CFEqual(hostFocus, field), CFEqual(serviceFocus, field),
                       let freshApplication = runtime.focusedApplication(),
-                      CFEqual(freshApplication, application) || CFEqual(freshApplication, host) else { return rawPID }
+                      CFEqual(freshApplication, application) || CFEqual(freshApplication, host) else { return refused("host_or_focus_bookend") }
                 Log.debug("Hosted Go to Folder focus bound to host PID \(hostPID) from service PID \(rawPID)", subsystem: "process")
                 return hostPID
             }
-            guard let parent: AXUIElement = AXHelpers.getAttribute(current, kAXParentAttribute, runtime: ax) else { return rawPID }
+            guard let parent: AXUIElement = AXHelpers.getAttribute(current, kAXParentAttribute, runtime: ax) else { return refused("ancestor_parent_\(visited.count)") }
             current = parent
         }
-        return rawPID
+        return refused("ancestor_depth")
     }
 }

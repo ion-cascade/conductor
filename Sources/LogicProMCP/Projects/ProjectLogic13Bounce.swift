@@ -442,6 +442,9 @@ struct ProjectLogic13Bounce {
             bundleIDForPID: ProcessUtils.bundleIDForPID)
         guard ownership.isReady, ownership.keyboardOwnerPID == pid else {
             Log.debug("PCM bounce project custody: keyboard \(ownership.diagnostic)", subsystem: "project")
+            if let focused = ownership.focusedApplicationPID {
+                Log.debug("PCM bounce focused process bundle: \(ProcessUtils.bundleIDForPID(focused) ?? "unread")", subsystem: "project")
+            }
             return false
         }
         guard windows()?.contains(window) == true else {

@@ -6,7 +6,7 @@ Open a saved disposable project, load Retro Synth on one uniquely named software
 
 ## Start with a native setting
 
-Read `logic://project/info` and `logic://tracks` for the current `project_ref` and the track's `target_ref`. Both references must belong to this server session and the current saved project.
+Read `logic://project/info` and `logic://tracks` for the current `project_ref` and the selected row's `track_ref`. Pass that `track_ref` value as `target_ref` in the commands below. Both references must belong to this server session and the current saved project.
 
 `logic_plugins.initialize_retro_synth` calls Logic's **Initialize Setting**. It replaces the current sound, so use it deliberately on your test track:
 
@@ -15,7 +15,7 @@ Read `logic://project/info` and `logic://tracks` for the current `project_ref` a
   "command": "initialize_retro_synth",
   "params": {
     "project_ref": "<current project_ref>",
-    "target_ref": "<Retro Synth track target_ref>",
+    "target_ref": "<track_ref from the selected row>",
     "confirmed": true
   }
 }
@@ -30,7 +30,7 @@ This verifies the complete initialized Controls table rather than treating the p
   "command": "get_retro_synth_state",
   "params": {
     "project_ref": "<current project_ref>",
-    "target_ref": "<track target_ref>",
+    "target_ref": "<track_ref from the selected row>",
     "options_for": "amp_attack"
   }
 }
@@ -43,7 +43,7 @@ The response includes 21 parameters, their native display and units, an `instrum
   "command": "set_retro_synth_parameter",
   "params": {
     "project_ref": "<current project_ref>",
-    "target_ref": "<track target_ref>",
+    "target_ref": "<track_ref from the selected row>",
     "instrument_ref": "<instrument_ref from the read>",
     "expected_snapshot": "<snapshot_hash from the read>",
     "param": "amp_attack",
