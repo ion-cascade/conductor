@@ -693,3 +693,11 @@ A few command tokens are recognised by the dispatchers but are deliberately **no
 State C errors use stable machine-readable strings such as `invalid_params`, `not_implemented`, `command_not_exposed`, `index_out_of_range`, `element_not_found`, `readback_mismatch`, `port_unavailable`, `channels_exhausted`, `unsupported_param_readback`, and `confirmation_required`.
 
 Clients should branch on `state`, `verified`, `error`, and `retry_safe`; do not parse human prose as the contract.
+
+## Spatial delivery
+
+`logic_project.export_adm_bwf` takes `project_path`, a new absolute `output_path` ending in `.wav`, exact `bed_name` and `object_name` strings, positive `expected_frames`, and `confirmed:true`. The bounded profile uses a saved, stopped Logic Pro 13 project at 48 kHz with Dolby Atmos and a 7.1.2 bed. The export covers the native Project range. The caller supplies the expected exported frame count, including any project tail.
+
+Conductor reads and closes the bound Audio project settings, then uses the native Spatial Audio save panel with Dolby Atmos ADM BWF and Project selected. It stages the file in a private directory beside the destination. State A requires stable complete 24-bit PCM, ten bed channels and one mono object, agreeing CHNA and AXML track references, the requested names and frame count, and a fresh matching project settings read. A link publishes the verified file without replacing an existing destination. An indeterminate export returns State B with its retained staging directory.
+
+For an ordinary 5.1 surround project, `bounce_settings.channel_layout:"5.1"` extends the existing confirmed `export_run` bounce path. This profile requires 48 kHz, 24-bit WAVE, native Surround Format 5.1 (ITU 775), and Spatial Audio Off. The driver selects Surround Bounce and Interleaved and verifies six decoded PCM channels. The existing optional musical range controls still apply. Earlier stereo receipts decode with their two-channel requirement. Spatial ADM delivery uses its dedicated command and artifact validation.
