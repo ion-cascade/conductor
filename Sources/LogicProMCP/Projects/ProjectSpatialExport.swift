@@ -185,15 +185,18 @@ struct ProjectSpatialExport {
     }
 
     private func descendants(_ root: AXUIElement) throws -> [AXUIElement] {
-        var nodes = [root]
+        var nodes = [(root, 0)]
         var cursor = 0
         while cursor < nodes.count {
-            guard nodes.count < 600, case .success(let children) = AXHelpers.childrenResult(nodes[cursor], runtime: runtime.ax)
-            else { throw Failure.unavailable("incomplete_panel_census") }
-            nodes += children
+            let (node, depth) = nodes[cursor]
             cursor += 1
+            guard nodes.count <= 600 else { throw Failure.unavailable("panel_census_limit") }
+            if depth == 4 { continue }
+            guard case .success(let children) = AXHelpers.childrenResult(node, runtime: runtime.ax)
+            else { throw Failure.unavailable("incomplete_panel_census") }
+            nodes += children.map { ($0, depth + 1) }
         }
-        return nodes
+        return nodes.map(\.0)
     }
 
     private func wait(_ read: () throws -> AXUIElement?) async throws -> AXUIElement {
