@@ -99,6 +99,8 @@ struct ProjectLogic13Bounce {
             return true
         }
         var owned: AXUIElement?
+        var saveWriter: MIDITrackExportPanel?
+        var originalWindows: [AXUIElement] = []
         var saveStage = "settings"
         var fired = false
         do {
@@ -110,6 +112,7 @@ struct ProjectLogic13Bounce {
                   destinationAvailable(),
                   let original = windows(), original.filter({ CFEqual($0, window) }).count == 1
             else { throw Failure.unavailable("project_focus_permissions_or_destination") }
+            originalWindows = original.filter { role($0) != kAXHelpTagRole }
             guard let item = AXLogicProElements.menuItem(path: ["File", "Bounce", "Project or Section…"], runtime: runtime),
                   enabled(item), holdsProject(), focused(window)
             else { throw Failure.unavailable("bounce_menu") }
@@ -137,6 +140,7 @@ struct ProjectLogic13Bounce {
             let writer = MIDITrackExportPanel(window: window, document: document, runtime: runtime, permittingAction: {
                 holdsProject()
             })
+            saveWriter = writer
             try await writer.saveOpenedPanel(panel, to: destination, stage: &saveStage) {
                 guard self.holdsProject(), self.focused(panel), self.text(panel, kAXTitleAttribute) == self.title, destinationAvailable(),
                       OperationTraceContext.claimDeadlineEffect("pcm_bounce_save") else {
@@ -150,7 +154,13 @@ struct ProjectLogic13Bounce {
             }
             return .success(output, observedRange: settings.range)
         } catch {
-            if let owned { cancelIfOwned(owned) }
+            if let owned {
+                if let saveWriter {
+                    _ = await saveWriter.recoverOwnedPanel(owned, app: app, originalWindows: originalWindows)
+                } else {
+                    cancelIfOwned(owned)
+                }
+            }
             let detail: String
             switch error {
             case Failure.unavailable(let reason): detail = reason
