@@ -10,6 +10,14 @@ struct ProjectADMArtifact: Codable, Sendable {
         let channels: [Int]
     }
 
+    struct Channel: Codable, Sendable {
+        let index: Int
+        let trackUID: String
+        let channelFormat: String
+        let name: String
+    }
+
+    let channelMapping: [Channel]
     let sampleRate: Int
     let bitDepth: Int
     let channels: Int
@@ -88,6 +96,20 @@ struct ProjectADMArtifact: Codable, Sendable {
                   node.children.filter({ $0.name == "audioPackFormatIDRef" }).map(\.text) == [record.pack]
             else { throw Failure.invalid }
         }
+        var mapping: [Channel] = []
+        for (uid, record) in uids {
+            let track = try xml.unique("audioTrackFormat", attribute: "audioTrackFormatID", value: record.track)
+            let streamReference = try track.reference("audioStreamFormatIDRef")
+            let stream = try xml.unique("audioStreamFormat", attribute: "audioStreamFormatID", value: streamReference)
+            guard try stream.reference("audioTrackFormatIDRef") == record.track,
+                  try stream.reference("audioPackFormatIDRef") == record.pack else { throw Failure.invalid }
+            let channelReference = try stream.reference("audioChannelFormatIDRef")
+            let channel = try xml.unique("audioChannelFormat", attribute: "audioChannelFormatID", value: channelReference)
+            let pack = try xml.unique("audioPackFormat", attribute: "audioPackFormatID", value: record.pack)
+            guard pack.children.filter({ $0.name == "audioChannelFormatIDRef" }).map(\.text).contains(channelReference),
+                  let name = channel.attributes["audioChannelFormatName"], !name.isEmpty else { throw Failure.invalid }
+            mapping.append(Channel(index: record.index, trackUID: uid, channelFormat: channelReference, name: name))
+        }
         let objectNodes = xml.nodes(named: "audioObject")
         var seenChannels = Set<Int>()
         let objects = try objectNodes.map { node -> Object in
@@ -107,7 +129,7 @@ struct ProjectADMArtifact: Codable, Sendable {
               Set(objects.map(\.id)).count == objects.count,
               Set(xml.nodes(named: "audioTrackUID").compactMap { $0.attributes["UID"] }) == Set(uids.keys)
         else { throw Failure.invalid }
-        return Self(sampleRate: rate, bitDepth: depth, channels: channels, frames: dataSize / UInt64(align), objects: objects)
+        return Self(channelMapping: mapping.sorted { $0.index < $1.index }, sampleRate: rate, bitDepth: depth, channels: channels, frames: dataSize / UInt64(align), objects: objects)
     }
 
     enum Failure: Error { case invalid }
@@ -146,6 +168,12 @@ private final class ADMXML: NSObject, XMLParserDelegate {
         let attributes: [String: String]
         var text = ""
         var children: [Node] = []
+        func reference(_ name: String) throws -> String {
+            let values = children.filter { $0.name == name }.map(\.text)
+            guard values.count == 1, let value = values.first, !value.isEmpty else { throw ProjectADMArtifact.Failure.invalid }
+            return value
+        }
+
         init(_ name: String, _ attributes: [String: String]) {
             self.name = name
             self.attributes = attributes
@@ -166,6 +194,12 @@ private final class ADMXML: NSObject, XMLParserDelegate {
         guard parser.parse(), document.stack.isEmpty,
               document.nodes(named: "audioFormatExtended").count == 1 else { throw ProjectADMArtifact.Failure.invalid }
         return document
+    }
+
+    func unique(_ name: String, attribute: String, value: String) throws -> Node {
+        let matches = nodes(named: name).filter { $0.attributes[attribute] == value }
+        guard matches.count == 1, let result = matches.first else { throw ProjectADMArtifact.Failure.invalid }
+        return result
     }
 
     func nodes(named name: String) -> [Node] { all.filter { $0.name == name } }

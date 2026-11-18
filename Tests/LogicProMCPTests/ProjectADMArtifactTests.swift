@@ -41,6 +41,8 @@ struct ProjectADMArtifactTests {
         var chna = number(11, 2) + number(11, 2)
         var trackUIDs = ""
         var bedRefs = ""
+        var formats = ""
+        var bedChannels = ""
         for index in 1...11 {
             let uid = String(format: "ATU_%08X", index)
             let trackRef = String(format: "AT_%08X_01", index)
@@ -48,6 +50,16 @@ struct ProjectADMArtifactTests {
             chna += number(UInt64(fault == "duplicate_track" && index == 11 ? 10 : index), 2)
             chna += Data(uid.utf8) + Data(trackRef.utf8) + Data(pack.utf8) + Data([0])
             trackUIDs += "<audioTrackUID UID=\"\(uid)\"><audioTrackFormatIDRef>\(trackRef)</audioTrackFormatIDRef><audioPackFormatIDRef>\(pack)</audioPackFormatIDRef></audioTrackUID>"
+            let streamRef = String(format: "AS_%08X", index)
+            let channelRef = String(format: "AC_%08X", index)
+            formats += "<audioTrackFormat audioTrackFormatID=\"\(trackRef)\"><audioStreamFormatIDRef>\(streamRef)</audioStreamFormatIDRef></audioTrackFormat>"
+            formats += "<audioStreamFormat audioStreamFormatID=\"\(streamRef)\"><audioChannelFormatIDRef>\(channelRef)</audioChannelFormatIDRef><audioPackFormatIDRef>\(pack)</audioPackFormatIDRef><audioTrackFormatIDRef>\(trackRef)</audioTrackFormatIDRef></audioStreamFormat>"
+            formats += "<audioChannelFormat audioChannelFormatID=\"\(channelRef)\" audioChannelFormatName=\"Channel \(index)\"/>"
+            if index == 11 {
+                formats += "<audioPackFormat audioPackFormatID=\"\(pack)\"><audioChannelFormatIDRef>\(channelRef)</audioChannelFormatIDRef></audioPackFormat>"
+            } else {
+                bedChannels += "<audioChannelFormatIDRef>\(channelRef)</audioChannelFormatIDRef>"
+            }
             if index <= 10 { bedRefs += "<audioTrackUIDRef>\(uid)</audioTrackUIDRef>" }
         }
         let objectUID = fault == "missing_uid" ? "ATU_000000FF" : "ATU_0000000B"
@@ -58,6 +70,8 @@ struct ProjectADMArtifactTests {
             <audioObject audioObjectID="AO_1001" audioObjectName="Bed"><audioPackFormatIDRef>AP_00010017</audioPackFormatIDRef>\(bedRefs)</audioObject>
             <audioObject audioObjectID="AO_1002" audioObjectName="Conductor Object"><audioPackFormatIDRef>AP_00031001</audioPackFormatIDRef><audioTrackUIDRef>\(objectUID)</audioTrackUIDRef></audioObject>
             \(trackUIDs)
+            \(formats)
+            <audioPackFormat audioPackFormatID="AP_00010017">\(bedChannels)</audioPackFormat>
             </audioFormatExtended></format></coreMetadata></ebuCoreMain>
             """
         let body = chunk("fmt ", format) + chunk("chna", chna) + chunk("axml", Data(xml.utf8))
