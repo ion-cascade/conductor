@@ -435,9 +435,12 @@ struct ProjectLogic13Bounce {
     }
 
     private func holdsProject() -> Bool {
-        // AppKit can move focus into its Go to Folder sheet before the
-        // system-wide AX read has caught up. Refresh the owning window list.
-        guard runtime.onScreenWindowList() != nil, runtime.focusedApplicationPID() == pid,
+        // Pair the window-server owner with the AX focus reading across
+        // AppKit's Save-panel sheets, using the existing keyboard gate.
+        let ownership = ProcessUtils.keyboardOwnershipObservation(
+            windowList: runtime.onScreenWindowList, focusedPID: runtime.focusedApplicationPID,
+            bundleIDForPID: ProcessUtils.bundleIDForPID)
+        guard ownership.isReady, ownership.keyboardOwnerPID == pid,
               windows()?.contains(window) == true,
               case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime)
         else { return false }
