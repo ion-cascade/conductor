@@ -29,6 +29,8 @@ Three conditions, all of them required, because each one alone is far too broad:
   2. Apple ships it — a string absent from the corpus is not a label this rule can reason about
   3. Apple TRANSLATES it — the same key holds a different value in another locale
 
+A single immutable direct AXHelpers.getIdentifier binding is programmatic identity, not localized text. Its spelling grants no exemption to a label read of the same bytes; ambiguous bindings stay in the text census. Apple documents this distinction at https://developer.apple.com/videos/play/wwdc2025/344/ (5:26).
+
 Condition 3 is what separates a real finding from noise. `Audio Units`, `Terminal`, `Alchemy`,
 `ES1`, `4/4` and `MIDI` are all in the corpus and all identical in every locale: matching them by
 literal is safe, and refusing them would make this guard wrong far more often than right. 192
@@ -173,8 +175,25 @@ _AX_READ = re.compile(
 
 
 def ax_backed_names(source: str) -> set:
-    """Variables in this file that are assigned from an AX accessor."""
-    return {m.group(1) for m in _AX_READ.finditer(source)}
+    """Variables carrying potentially localized AX text, excluding proven IDs.
+
+    AppKit's accessibilityIdentifier is programmatic identity, not a label:
+    https://developer.apple.com/videos/play/wwdc2025/344/ (5:26).
+    Keep this exemption about the producer, never the spelling of an ID. Only
+    one immutable direct binding qualifies; shadowing, reassignment, annotations
+    elsewhere or a derived expression stay in the conservative text census.
+    """
+    backed = {m.group(1) for m in _AX_READ.finditer(source)}
+    for match in re.finditer(
+        r"(?m)^[ \t]*let\s+(\w+)\s*=\s*AXHelpers\.getIdentifier\([^\n]*\)[ \t]*$", source
+    ):
+        name = match.group(1)
+        bindings = list(re.finditer(r"(?<![\w.])" + re.escape(name)
+                                   + r"(?:\s*:[^=\n]+)?\s*=(?!=)", source))
+        annotations = list(re.finditer(r"\b" + re.escape(name) + r"\s*:", source))
+        if len(bindings) == 1 and not annotations:
+            backed.discard(name)
+    return backed
 
 
 #: A String constant whose initializer is ONE literal: `static let N = "…"`, `let N: String = "…"`

@@ -28,6 +28,25 @@ class TracingAReadingToTheAccessibilityAPI(unittest.TestCase):
         source = 'let title = AXHelpers.getTitle(cb, runtime: r)\nif title == "Stop" { }'
         self.assertIn("title", guard.ax_backed_names(source))
 
+    def test_programmatic_identity_is_not_localized_text(self):
+        for name in ("fieldIdentifier", "name", "raw", "title"):
+            source = f'let {name} = AXHelpers.getIdentifier(field, runtime: ax)\nif {name} == "PathTextField" {{ }}'
+            self.assertNotIn(name, guard.ax_backed_names(source))
+
+    def test_identifier_spelling_never_exempts_a_label_read(self):
+        source = 'let fieldIdentifier = AXHelpers.getTitle(field, runtime: ax)\nif fieldIdentifier == "PathTextField" { }'
+        self.assertIn("fieldIdentifier", guard.ax_backed_names(source))
+
+    def test_ambiguous_or_derived_identifier_bindings_remain_conservative(self):
+        for source in (
+            'var raw = AXHelpers.getIdentifier(field)\nraw = other',
+            'let raw = AXHelpers.getIdentifier(field)\nlet raw = AXHelpers.getTitle(other)',
+            'let raw = AXHelpers.getIdentifier(field).map { _ in "Stop" }',
+            'let raw = AXHelpers.getIdentifier(field) ?? "Stop"',
+            'let raw = AXHelpers.getIdentifier(field)\nfunc check(raw: String) {}',
+        ):
+            self.assertIn("raw", guard.ax_backed_names(source))
+
     def test_a_parameter_named_name_is_not_an_ax_reading(self):
         """The defect that produced 9 of 11 findings. `name` here is a command name."""
         source = 'static func toggle(named name: String) {\n  if name == "Stop" { }\n}'
@@ -128,6 +147,18 @@ class TheGuardActuallyRefusesSomething(unittest.TestCase):
         problems = self._scan(self._READ + 'if title == "Copy" { }\n')
         self.assertTrue(problems, "a translated label compared against an AX reading must fail")
         self.assertIn("Copy", problems[0])
+
+    def test_a_direct_programmatic_id_needs_no_literal_waiver(self):
+        source = 'let raw = AXHelpers.getIdentifier(field, runtime: ax)\nif raw == "PathTextField" { }'
+        self.assertEqual(self._scan(source, waiver={}), [])
+
+    def test_the_same_literal_still_fails_when_another_read_is_a_label(self):
+        source = ('let raw = AXHelpers.getIdentifier(field, runtime: ax)\n'
+                  'if raw == "PathTextField" { }\n'
+                  'let title = AXHelpers.getTitle(other, runtime: ax)\n'
+                  'if title == "PathTextField" { }')
+        problems = self._scan(source, waiver={})
+        self.assertTrue(any("PathTextField" in problem for problem in problems))
 
     def test_a_waiver_excuses_it(self):
         self.assertEqual(self._scan(self._READ + 'if title == "Copy" { }\n',
