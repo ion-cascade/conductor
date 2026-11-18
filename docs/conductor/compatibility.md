@@ -15,6 +15,21 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
 
+## 1.15 Surround and spatial delivery
+
+| Workflow | Qualified Logic Pro 13.0 profile |
+| --- | --- |
+| Surround bounce | Saved, stopped foreground project with native Spatial Audio Off, Surround Format 5.1 (ITU 775), and 48 kHz. Explicit `channel_layout:"5.1"` selects Surround Bounce, interleaved 24-bit WAVE, Normalize Off and no dither. |
+| Dolby Atmos ADM BWF | Saved, stopped foreground project with Dolby Atmos, a 7.1.2 bed and 48 kHz. Export the native whole Project as 24-bit ADM BWF with one named ten-channel bed and one named mono object. Supply the exact expected frame count, including Logic's export padding or tail. |
+| Artifact attribution | The six-channel bounce uses WAVE order L, R, C, LFE, Ls, Rs. ADM readback checks the CHNA → track → stream → channel graph against AXML pack and object membership and reports each channel's native name. |
+| Destination protection | ADM publishes only a verified staged file to a new filename. Unverified exports retain their private staging directory. Existing destinations are preserved. |
+
+Qualification uses separate synthetic channel-identification signals and an independent mono object. The four-second surround fixture produces 192,000 frames, with all six channels matching the input samples. The ADM fixture produces 196,608 frames. Its six active bed channels and mono object match the source signals within two 24-bit quantization steps; unused bed channels and the 4,608-frame padding are silent. Both workflows are checked after project reopening and bridge restart.
+
+Other layouts, sample rates, bit depths, multiple objects, selected-range ADM exports and spatial project configuration are outside this profile. Configure the project in Logic before exporting. Omitting `channel_layout` retains the stereo bounce profile. Typed PCM bounce resume continues to refuse reuse when original settings provenance is unavailable and preserves existing bytes. Selected-stem delivery retains its separately qualified resume behavior.
+
+[Surround and ADM parameters](../API.md#surround-and-spatial-delivery)
+
 ## 1.14 Live Loops and notation
 
 | Workflow | Scope on Logic Pro 13.0 |

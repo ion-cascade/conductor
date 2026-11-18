@@ -41,7 +41,7 @@ Use the [compatibility matrix](docs/conductor/compatibility.md) to check the tes
 | Notation | Read one selected MIDI region in the Score Editor and export verified single-part MusicXML. |
 | Browser | Search visible instrument patches and load an exact result onto the selected software instrument track. |
 | Mixer and inserts | Adjust a referenced strip. Read Channel EQ, apply supported Compressor presets and sidechains, bypass occupied inserts, and edit qualified mono Gain levels and Gain automation. |
-| Render and delivery | Bounce an exact stereo PCM range, export selected aligned stems, verify a delivery receipt and resume unfinished outputs after reconnecting. |
+| Render and delivery | Bounce an exact stereo or qualified 5.1 PCM range, export a bounded Dolby Atmos ADM BWF project, or deliver aligned stems with receipt verification and resume. |
 | Stem Splitter and Step Sequencer | Separate audio into stems or individual drum kit pieces, or read and edit batches of Drum Machine Designer steps. |
 | Audio analysis | Read an audio file’s format, levels and spectral measurements. |
 
