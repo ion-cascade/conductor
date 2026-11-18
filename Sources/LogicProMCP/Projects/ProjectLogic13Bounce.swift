@@ -28,6 +28,14 @@ struct ProjectLogic13Bounce {
               MIDITrackExportPanel.Keyboard.goToFolderKeyIsMapped(using: .production) else {
             return .failure("pcm_bounce_permissions_or_keyboard_access")
         }
+        if settings.channelLayout == "5.1" {
+            guard let source = ProjectSpatialExport.acquire(projectPath: projectPath, runtime: runtime),
+                  let observed = try? await source.settings(),
+                  observed.surround == "5.1 (ITU 775)", observed.spatialAudio == "Off",
+                  observed.sampleRate == "48 kHz" else {
+                return .failure("pcm_bounce_unsupported_or_unreadable_surround_profile")
+            }
+        }
         let destination = URL(fileURLWithPath: path)
         let deadline = ContinuousClock.now.advanced(by: .seconds(3))
         var pending = "logic_host_unreadable"
@@ -266,7 +274,7 @@ struct ProjectLogic13Bounce {
         ]
         let toggleStates = [
             "Include Audio Tail": settings.includeAudioTail,
-            "Bounce 2nd Cycle Pass": false, "Surround Bounce": false, "Add to Project": false,
+            "Bounce 2nd Cycle Pass": false, "Surround Bounce": settings.channelLayout == "5.1", "Add to Project": false,
             "Add to Apple Music Library": false,
         ]
         let outputs = ["Uncompressed": true, "MP3": false, "M4A": false, "Burn to CD / DVD": false]

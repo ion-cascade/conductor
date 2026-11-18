@@ -17,6 +17,9 @@ struct ProjectPCMBounceSettings: Codable, Sendable, Equatable {
     let bitDepth: Int
     let includeAudioTail: Bool
     var range: ProjectBounceRange? = nil
+    var channelLayout: String? = nil
+
+    var channelCount: UInt32 { channelLayout == "5.1" ? 6 : 2 }
 
     enum CodingKeys: String, CodingKey {
         case format
@@ -24,6 +27,7 @@ struct ProjectPCMBounceSettings: Codable, Sendable, Equatable {
         case bitDepth = "bit_depth"
         case includeAudioTail = "include_audio_tail"
         case range
+        case channelLayout = "channel_layout"
     }
 
     var sampleRateLabel: String { sampleRate == 44_100 ? "44.1 kHz" : "\(sampleRate / 1000) kHz" }
@@ -31,7 +35,7 @@ struct ProjectPCMBounceSettings: Codable, Sendable, Equatable {
     static func parse(_ raw: Value?, artifacts: [String]) throws -> Self? {
         guard let raw else { return nil }
         guard case .object(let values) = raw,
-              Set(values.keys).isSubset(of: ["format", "sample_rate", "bit_depth", "include_audio_tail", "range"]),
+              Set(values.keys).isSubset(of: ["format", "sample_rate", "bit_depth", "include_audio_tail", "range", "channel_layout"]),
               artifacts.contains("bounce"),
               case .string(let label) = values["format"],
               let format = Format(rawValue: label),
@@ -46,14 +50,23 @@ struct ProjectPCMBounceSettings: Codable, Sendable, Equatable {
         case .bool(let requested): includeTail = requested
         default: throw ExportPlanError.invalid("bounce_settings.include_audio_tail must be a Boolean")
         }
+        let layout: String?
+        switch values["channel_layout"] {
+        case .none: layout = nil
+        case .string("5.1") where format == .wav && sampleRate == 48_000 && bitDepth == 24:
+            layout = "5.1"
+        default:
+            throw ExportPlanError.invalid("bounce_settings.channel_layout supports 5.1 only with 48 kHz 24-bit WAVE")
+        }
         let range = try ProjectBounceRange.parse(values["range"])
-        return Self(format: format, sampleRate: sampleRate, bitDepth: bitDepth, includeAudioTail: includeTail, range: range)
+        return Self(format: format, sampleRate: sampleRate, bitDepth: bitDepth, includeAudioTail: includeTail,
+                    range: range, channelLayout: layout)
     }
 
     func matchesFile(_ path: String) -> Bool {
         guard let (type, stream) = Self.readPCM(path) else { return false }
         return type == format.fileType && stream.mSampleRate == Double(sampleRate)
-            && stream.mBitsPerChannel == UInt32(bitDepth) && stream.mChannelsPerFrame == 2
+            && stream.mBitsPerChannel == UInt32(bitDepth) && stream.mChannelsPerFrame == channelCount
     }
 
     static func isStemWAVE24(_ path: String, sampleRate: Int) -> Bool {
