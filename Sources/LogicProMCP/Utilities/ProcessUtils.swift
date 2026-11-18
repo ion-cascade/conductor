@@ -270,6 +270,8 @@ enum ProcessUtils {
     /// complete) every time until the process called `CGWindowListCopyWindowInfo`, and succeeded
     /// from then on. Establish WindowServer contact on the calling thread here, so a fresh
     /// dispatcher or post-panel caller does not depend on a prior health observation.
+    /// Some host states still return unavailable after that bootstrap; callers must
+    /// keep that distinction rather than treating it as a known focused process.
     /// An unread answer is nil, never a pid, so a read that fails for this or any other
     /// reason leaves the window reading to answer alone.
     static func focusedApplicationPID() -> pid_t? {

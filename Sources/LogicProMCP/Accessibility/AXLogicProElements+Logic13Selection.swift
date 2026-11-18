@@ -18,7 +18,7 @@ extension AXLogicProElements {
             // that explicitly read as help tags; an unknown role stays in view.
             return windows?.filter { AXHelpers.getRole($0, runtime: ax) != kAXHelpTagRole as String }
         }
-        guard let pid = runtime.logicProPID(), runtime.focusedApplicationPID() == pid,
+        guard let pid = runtime.logicProPID(), selectionKeyboardOwnerIsCurrent(pid, runtime: runtime),
               let app = appRoot(runtime: runtime),
               AXHelpers.getAttribute(app, kAXFrontmostAttribute as String, runtime: ax) as Bool? == true,
               case .found(let window) = arrangeWindowRead(runtime: runtime),
@@ -33,7 +33,7 @@ extension AXLogicProElements {
               windows.count == 1, CFEqual(windows[0], window) else { return false }
         func current() -> Bool {
             guard !Task.isCancelled, permittingWrite(),
-                  runtime.focusedApplicationPID() == pid,
+                  selectionKeyboardOwnerIsCurrent(pid, runtime: runtime),
                   projectPickerDocumentRead(window, runtime: runtime) == .success(document),
                   case .success(let now) = AXHelpers.childrenResult(rail, runtime: ax),
                   now.count == rows.count, zip(now, rows).allSatisfy({ CFEqual($0, $1) }),
@@ -68,7 +68,7 @@ extension AXLogicProElements {
                 // An empty search can leave its field focused with no Close button.
                 // Dismiss only this operation's palette while it still has keyboard focus.
                 func stillOwnsPalette() -> Bool {
-                    guard runtime.logicProPID() == pid, runtime.focusedApplicationPID() == pid,
+                    guard runtime.logicProPID() == pid, selectionKeyboardOwnerIsCurrent(pid, runtime: runtime),
                           AXHelpers.getAttribute(app, kAXFrontmostAttribute as String, runtime: ax) as Bool? == true,
                           projectPickerDocumentRead(window, runtime: runtime) == .success(document),
                           let remaining = selectionWindows(in: app),
@@ -111,6 +111,19 @@ extension AXLogicProElements {
             }
         }
         return false
+    }
+
+    /// Use the same live WindowServer ownership observation as other verified
+    /// project writes. System-wide AX focus can remain unreadable after export;
+    /// that is not evidence of another owner. A readable mismatch, missing
+    /// window list, foreign owner or different Logic PID still refuses. Fake
+    /// runtimes without this observation retain the explicit AX focus gate.
+    static func selectionKeyboardOwnerIsCurrent(_ pid: pid_t, runtime: Runtime) -> Bool {
+        if let observe = runtime.observeFrontmost {
+            let ownership = observe()
+            return ownership.isReady && ownership.keyboardOwnerPID == pid
+        }
+        return runtime.focusedApplicationPID() == pid
     }
 
     static func searchTrackResultMatches(_ labels: [String], number: Int, name: String) -> Bool {
