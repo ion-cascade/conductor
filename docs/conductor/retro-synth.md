@@ -28,7 +28,7 @@ The response includes 21 parameters, their native display and units, an `instrum
 {"command":"set_retro_synth_parameter","params":{"project_ref":"<current project_ref>","target_ref":"<track target_ref>","instrument_ref":"<instrument_ref from the read>","expected_snapshot":"<snapshot_hash from the read>","param":"amp_attack","unit":"ms","value":500}}
 ```
 
-Use the new instrument reference and snapshot hash returned by each successful edit for the next edit. A later state read also replaces the previous reference. References expire on reconnect. If you change the sound manually, read fresh state before another edit.
+Use the new instrument reference and snapshot hash returned by each successful edit for the next edit. A later state read also replaces the previous reference. References belong to the running server session; obtain fresh state after reconnecting or reopening. If you change the sound manually, read fresh state before another edit.
 
 ## Supported controls
 
@@ -62,3 +62,5 @@ Changing `lfo_sync` converts the rate using Logic's native conversion. Setting `
 On the selected Retro Synth track, use the targeted `logic_tracks.record_sequence` workflow to import a short fixed MIDI phrase. The operation keeps its original imported GM lane as a safety copy and reports that lane separately. Once the target paste is verified, mute or remove the reported source lane using a fresh corroborated track reference before rendering. Render the same exact range before and after a parameter edit with identical bounce settings. For a clear first exercise, compare the initialized sound with a 500 ms amplifier attack, or lower normalized filter cutoff with resonance unchanged. Save and reopen the project, obtain fresh project and track references, and read the instrument again.
 
 A state **A** result requires matching native values, matching read bookends, preserved peer controls and successful UI restoration. The bookends are not an atomic Logic transaction. A **C** refusal reports no audio write attempt. A **B** result means an action may have taken effect: inspect the sound and read fresh state before deciding what to do next. Never automatically replay an uncertain edit.
+
+For synthesis concepts, see Apple’s [Retro Synth modulation guide](https://support.apple.com/en-ca/guide/logicpro/lgsicb606bce/mac). The supported MCP controls and their native units are listed above.

@@ -51,4 +51,18 @@ struct RetroSynthWalkTests {
         #expect(result == .uncertain)
         #expect(effects == 1)
     }
+    @Test func taskCancellationAfterTheFirstEffectStopsWithoutReplay() async {
+        var current = 0
+        var effects = 0
+        let worker = Task { @MainActor in
+            await RetroSynthWalk.apply(destination: 100, read: { current }, permitted: { true },
+                actuate: { next, _ in current = next; effects += 1 },
+                afterFirstEffect: { withUnsafeCurrentTask { $0?.cancel() } },
+                pause: { try Task.checkCancellation() })
+        }
+        #expect(await worker.value == .uncertain)
+        #expect(effects == 1 && current == 10)
+        #expect(!Task.isCancelled)
+    }
+
 }

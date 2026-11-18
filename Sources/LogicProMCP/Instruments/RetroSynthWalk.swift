@@ -4,7 +4,7 @@ import Foundation
 /// one-position attribute action. Acknowledgment alone never advances the walk.
 @MainActor
 enum RetroSynthWalk {
-    enum Outcome: Equatable {
+    enum Outcome: Equatable, Sendable {
         case verified(steps: Int)
         case refused
         case uncertain

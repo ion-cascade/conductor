@@ -109,6 +109,11 @@ extension RetroSynthNative {
               document == slot.physical.document,
               AXHelpers.getTitle(editor, runtime: runtime.ax) == slot.name,
               let children = try? children(editor) else { return false }
+        guard case .success(let projectChildren) = AXHelpers.childrenResult(slot.physical.window, runtime: runtime.ax),
+              (children + projectChildren).allSatisfy({
+                  guard let role = AXHelpers.getRole($0, runtime: runtime.ax) else { return false }
+                  return role != kAXSheetRole
+              }) else { return false }
         return children.contains {
             AXHelpers.getRole($0, runtime: runtime.ax) == kAXStaticTextRole
                 && (AXHelpers.getAttribute($0, kAXValueAttribute, runtime: runtime.ax) as String?) == "Retro Synth"

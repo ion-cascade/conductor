@@ -128,6 +128,11 @@ final class RetroSynthNative {
               let windows: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: runtime.ax) else { return false }
         let visible = windows.filter { AXHelpers.getRole($0, runtime: runtime.ax) != kAXHelpTagRole }
         guard case .success(let controls) = AXHelpers.childrenResult(editor, runtime: runtime.ax) else { return false }
+        guard case .success(let projectChildren) = AXHelpers.childrenResult(slot.physical.window, runtime: runtime.ax),
+              (controls + projectChildren).allSatisfy({
+                  guard let role = AXHelpers.getRole($0, runtime: runtime.ax) else { return false }
+                  return role != kAXSheetRole
+              }) else { return false }
         let links = controls.filter {
             AXHelpers.getRole($0, runtime: runtime.ax) == kAXCheckBoxRole
                 && AXHelpers.getDescription($0, runtime: runtime.ax) == "link"

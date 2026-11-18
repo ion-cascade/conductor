@@ -268,10 +268,13 @@ enum ProcessUtils {
     /// It answers only once the process has spoken to the window server: measured the same day
     /// from a fresh python3 holding the Accessibility grant, the read failed with -25204 (cannot
     /// complete) every time until the process called `CGWindowListCopyWindowInfo`, and succeeded
-    /// from then on. Every caller reads the window list first, in the same expression or the line
-    /// before. An unread answer is nil, never a pid, so a read that fails for this or any other
+    /// from then on. Establish WindowServer contact on the calling thread here, so a fresh
+    /// dispatcher or post-panel caller does not depend on a prior health observation.
+    /// An unread answer is nil, never a pid, so a read that fails for this or any other
     /// reason leaves the window reading to answer alone.
     static func focusedApplicationPID() -> pid_t? {
+        // Metadata only: this does not capture an image or request permission.
+        _ = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
         var value: AnyObject?
         guard AXUIElementCopyAttributeValue(
             AXUIElementCreateSystemWide(), kAXFocusedApplicationAttribute as CFString, &value
