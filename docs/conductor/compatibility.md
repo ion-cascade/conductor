@@ -15,7 +15,9 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
 
-## 1.16 Retro Synth Analog
+## 1.16 Retro Synth Analog — candidate
+
+**Release qualification is blocked by [#65](https://github.com/ion-cascade/conductor/issues/65).** Individual native control and render checks have passed, but repeated access has preceded two Logic host aborts. The following profile remains under investigation.
 
 | Workflow | Bounded profile |
 | --- | --- |
@@ -28,7 +30,7 @@ The synthesis engine is **Analog** and the filter is **LP 24dB Lush**. Other eng
 
 Logic can normalize the synchronized 1/8 rate from raw position 88 to 90 when reopening while retaining the displayed division. That measured transition is recorded explicitly. Obtain fresh state after reopening; do not reuse the previous snapshot. Render comparisons measure each stereo channel’s power independently before averaging, so channel phase cannot cancel the measured energy. PCM identity is not promised.
 
-One long-running Logic process aborted during an Accessibility table enumeration in qualification. Its cause is undetermined. Subsequent checks used a fresh Logic process; these bounded workflows do not establish long-session stability.
+Two Logic processes aborted during qualification, after 30 hours 40 minutes and 2 hours 34 minutes respectively. Both reports end in AttributeGraph table growth through SwiftUICore/AppKit; their cause is undetermined. Restarting Logic has not resolved the recurring failure. Automatic Controls acquisition remains unqualified for release while #65 is open.
 
 [Control matrix and beginner workflow](retro-synth.md)
 

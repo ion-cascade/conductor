@@ -42,7 +42,9 @@ struct MutationGateCompletenessTests {
             "refresh_cache", "saga_preflight", "saga_status",
         ],
         "logic_audio": ["analyze_file", "analyze_spectrum", "compare_spectra", "recommend_eq"],
-        "logic_plugins": ["get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "get_gain_automation", "get_preset_verified", "get_sidechain_verified"],
+        // Editor-acquiring reads keep their verified-plugin UI lease, but do not
+        // change audio/project state and are not mutation-gated operations.
+        "logic_plugins": ["get_retro_synth_state", "get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "get_gain_automation", "get_preset_verified", "get_sidechain_verified"],
     ]
 
     /// Error-only labels that exist as switch cases but return a "not exposed in

@@ -1,0 +1,92 @@
+{
+  "schema": 3,
+  "id": "2026-11-18-retro-synth-controls-recurring-host-abort",
+  "date": "2026-11-18",
+  "subject": "Repeated native Controls access precedes recurring Logic host aborts",
+  "question": "Do the individual native control and readback passes establish stability of the repeated Controls lifecycle?",
+  "verdict": "partial",
+  "issues": [
+    60,
+    61,
+    62,
+    63,
+    65
+  ],
+  "surface": "plugins.retro_synth",
+  "host": {
+    "app": "Logic Pro",
+    "version": "13.0",
+    "build": "7801",
+    "locale": "en-GB",
+    "os": "macOS 27.2.1 (26B131)"
+  },
+  "reverify": {
+    "kind": "manual",
+    "command": "Use only an owned backed-up disposable Logic project on the recorded host. Retain exact process launch and request timelines. With no compilation running, separately bound repeated Controls creation/view switching and operations in an already-open Controls view. Stop on a host failure, uncertain action, custody loss or resource budget; never replay the failed write. Re-observe actual saved state before any explicit recovery. Compare operation counts and process resources without inferring causation from uptime alone.",
+    "expected": "The two retained aborts are reproduced or a concrete stable alternative is demonstrated. No release is qualified solely by restarting Logic or by a short sequence of successful calls.",
+    "cost": "Exclusive Logic GUI custody, complete synthetic-project backup and a separately bounded lifecycle experiment; no automatic unbounded stress or OS setting change."
+  },
+  "depends": [
+    "Sources/LogicProMCP/Instruments/RetroSynthNative.swift:acquire",
+    "Sources/LogicProMCP/Instruments/RetroSynthNative.swift:snapshot",
+    "Sources/LogicProMCP/Instruments/RetroSynthNative+Interface.swift:cleanup"
+  ],
+  "evidence": [],
+  "method": "The first process aborted during an independent Accessibility table observation; the second fresh process aborted while opening an editor after an explicit continuation from independently verified factory state. Raw crash files, request logs and project backups are retained locally. Both reports were dismissed without sending. The candidate bridge and native batch were stopped. The common framework path is recorded as evidence, not established causation.",
+  "observations": [
+    {
+      "what": "First retained host abort",
+      "launch": "2026-11-17T10:01:53.3499Z",
+      "crash": "2026-11-18T16:42:24.9004Z",
+      "uptime_seconds": 110431.5505,
+      "signal": "SIGABRT",
+      "report_sha256": "1c1ede257d9f0f024f2a03df96acfd93cb85e1549db97144e40e98648288c7b4",
+      "framework_frames": [
+        "AG::precondition_failure",
+        "AG::data::table::grow_region",
+        "SwiftUICore",
+        "AppKit accessibility mock-cell construction"
+      ]
+    },
+    {
+      "what": "Second retained host abort",
+      "launch": "2026-11-18T16:52:11.8851Z",
+      "crash": "2026-11-18T19:25:56.9962Z",
+      "uptime_seconds": 9225.1111,
+      "signal": "SIGABRT",
+      "report_sha256": "669e74655ad4f8c7be3f0841f3952c9047e14b41ef803a7b386408f409520e1d",
+      "framework_frames": [
+        "AG::precondition_failure",
+        "AG::data::table::grow_region",
+        "SwiftUICore view construction",
+        "NSSliderCell drawing"
+      ]
+    },
+    {
+      "what": "Post-uncertain-initialization observation before the second abort",
+      "complete_native_rows": 83,
+      "matches_recorded_factory": true,
+      "initialization_replayed": false,
+      "subsequent_filter_enable_verified": true,
+      "next_parameter_audio_write_attempted": false,
+      "next_parameter_ui_restoration_verified": false
+    },
+    {
+      "what": "Resource context",
+      "host_ram_bytes": 17179869184,
+      "compilation_overlapped_part_of_native_work": true,
+      "swap_used_mib_observed": 3177,
+      "causation_established": false
+    }
+  ],
+  "conclusion": "Individual control/readback and paired-render passes do not qualify the stability of the repeated workflow. The recurring host abort is a release blocker under issue 65; its cause and a stable native alternative remain unverified.",
+  "limits": [
+    "The common framework stack does not prove whether table reads, editor lifecycle, rendering, resource contention or another host defect is responsible.",
+    "A fresh restart and one short passing run do not establish a fix or long-session stability.",
+    "Only the named synthetic project was used; these observations do not establish behavior on arbitrary production projects or other host builds."
+  ],
+  "supersedes": "2026-11-18-retro-synth-analog-readback-persistence",
+  "canon_not_applicable": {
+    "reason": "This record measures runtime process failure, numerical timings, action postconditions and framework stack symbols; it adds no localized label vocabulary or string-corpus claim."
+  }
+}
