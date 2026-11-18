@@ -13,6 +13,7 @@ enum FocusedApplicationOwnership {
         let focusedApplication: () -> AXUIElement?
         let elementPID: (AXUIElement) -> pid_t?
         let bundleID: (pid_t) -> String?
+        var candidateHostPID: () -> pid_t? = { nil }
 
         static let production = Runtime(ax: .production, focusedApplication: {
             var value: CFTypeRef?
@@ -24,7 +25,12 @@ enum FocusedApplicationOwnership {
             var pid: pid_t = 0
             guard AXUIElementGetPid(element, &pid) == .success, pid > 0 else { return nil }
             return pid
-        }, bundleID: ProcessUtils.bundleIDForPID)
+        }, bundleID: ProcessUtils.bundleIDForPID, candidateHostPID: {
+            guard let windows = CGWindowListCopyWindowInfo(
+                [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
+            ) as? [[String: Any]], let window = LogicOnScreenWindows.keyboardWindow(windows) else { return nil }
+            return ProcessUtils.pidValue(from: window[kCGWindowOwnerPID as String])
+        })
     }
 
     static func pid(runtime: Runtime = .production) -> pid_t? {
@@ -45,6 +51,20 @@ enum FocusedApplicationOwnership {
             return refused("field role=\(fieldRole ?? "unread") identifier=\(fieldIdentifier ?? "unread")")
         }
         var current = field
+        // The host can expose a canonical reference to a service-owned field.
+        // WindowServer only supplies a candidate; public AX equality and the
+        // complete host ancestry below are still required for acceptance.
+        if let candidatePID = runtime.candidateHostPID(), candidatePID != rawPID,
+           let candidateBundle = runtime.bundleID(candidatePID), LogicProTarget.isKnownBundleID(candidateBundle) {
+            let candidate = ax.axApp(candidatePID)
+            if let hostField: AXUIElement = AXHelpers.getAttribute(candidate, kAXFocusedUIElementAttribute, runtime: ax) {
+                let equal = CFEqual(hostField, field)
+                Log.debug("Hosted focus host candidate \(candidatePID): field pid=\(runtime.elementPID(hostField) ?? 0) equals service field=\(equal)", subsystem: "process")
+                if equal { current = hostField }
+            } else {
+                Log.debug("Hosted focus host candidate \(candidatePID): focused control unreadable", subsystem: "process")
+            }
+        }
         var visited: [AXUIElement] = []
         var sawFolderSheet = false
         var sawSavePanel = false

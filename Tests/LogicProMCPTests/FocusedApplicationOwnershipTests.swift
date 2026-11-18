@@ -5,7 +5,7 @@ import Testing
 struct FocusedApplicationOwnershipTests {
     @Test(arguments: ["bound", "service_owned_nodes", "mixed_service_nodes", "other_host", "wrong_sheet", "wrong_panel", "cross_pid", "retired_parent",
                       "host_not_frontmost", "different_host_focus", "changed_service_focus", "changed_application",
-                      "unknown_role", "cycle", "deep_chain", "wrong_field", "unknown_service", "missing_host_bundle"])
+                      "unknown_role", "cycle", "deep_chain", "wrong_field", "unknown_service", "missing_host_bundle", "canonical_host_field", "different_candidate_field"])
     func hostedFolderFocusRequiresTheActualHostChain(fault: String) throws {
         let b = FakeAXRuntimeBuilder()
         let service = b.element(1_961_100), host = b.element(1_961_101), field = b.element(1_961_102)
@@ -32,7 +32,7 @@ struct FocusedApplicationOwnershipTests {
         }
         if fault != "retired_parent" { b.setAttribute(panel, kAXParentAttribute as String, host) }
         b.setAttribute(service, kAXFocusedUIElementAttribute as String, field)
-        b.setAttribute(host, kAXFocusedUIElementAttribute as String, fault == "different_host_focus" ? other : field)
+        b.setAttribute(host, kAXFocusedUIElementAttribute as String, ["different_host_focus", "different_candidate_field"].contains(fault) ? other : field)
         b.setAttribute(host, kAXFrontmostAttribute as String, fault != "host_not_frontmost")
         let ax = b.makeLogicRuntime(appElement: host, attributeValueHandler: { element, attribute in
             if fault == "changed_service_focus", CFEqual(element, service), attribute == kAXFocusedUIElementAttribute as String {
@@ -56,14 +56,14 @@ struct FocusedApplicationOwnershipTests {
             if pid == servicePID { return fault == "unknown_service" ? "example.other-service" : FocusedApplicationOwnership.panelServiceBundle }
             if fault == "missing_host_bundle" { return nil }
             return pid == 900 ? "com.apple.finder" : "com.apple.logic10"
-        })
+        }, candidateHostPID: { ["canonical_host_field", "different_candidate_field"].contains(fault) ? hostPID : nil })
         let observed = FocusedApplicationOwnership.pid(runtime: runtime)
-        #expect(observed == (["bound", "service_owned_nodes", "mixed_service_nodes", "other_host"].contains(fault) ? hostPID : servicePID))
+        #expect(observed == (["bound", "service_owned_nodes", "mixed_service_nodes", "other_host", "canonical_host_field"].contains(fault) ? hostPID : servicePID))
         let ownership = ProcessUtils.keyboardOwnershipObservation(
             windows: [[kCGWindowOwnerPID as String: 672, kCGWindowLayer as String: 8]],
             focusedApplicationPID: observed,
             bundleIDForPID: { $0 == 672 ? "com.apple.logic10" : "com.apple.finder" })
-        #expect(ownership.isReady == (["bound", "service_owned_nodes", "mixed_service_nodes"].contains(fault)))
+        #expect(ownership.isReady == (["bound", "service_owned_nodes", "mixed_service_nodes", "canonical_host_field"].contains(fault)))
         #expect(b.actionCalls.isEmpty && b.setCalls.isEmpty)
     }
 
