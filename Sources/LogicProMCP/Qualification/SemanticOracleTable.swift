@@ -326,6 +326,8 @@ enum SemanticOracleTable {
     /// mutating spec, is DISJOINT from the covered set, and carries a reason —
     /// and remains separate from `conductorWriteQualificationCases`.
     static let structurallyUnverifiedMutatingOperationIDs: [OperationID: String] = [
+        .projectExportADMBWF:
+            "The installed release fixture independently checks ADM channel attribution, duration and PCM after reopening. The generic sweep lacks a spatial project fixture and independent ADM file witness.",
         .projectExportScoreMusicXML:
             "The installed fixture compares native notes and the parsed MusicXML after reopening. The generic sweep has no independent score and file witness.",
         .projectSetLiveLoopsCellPlaying:
