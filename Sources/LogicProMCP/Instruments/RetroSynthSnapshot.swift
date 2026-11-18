@@ -83,6 +83,18 @@ struct RetroSynthSnapshot: Codable, Equatable, Sendable {
         return value
     }
 
+    /// Native row order is independently bound to Bypass then Active at capture.
+    /// Complementary values are required; an ambiguous radio group never reads off.
+    func filterEnabled() throws -> Bool {
+        let controls = try row("Filter State:").controls
+        guard controls.count == 2, controls.allSatisfy({ $0.role == "AXRadioButton" }),
+              case .boolean(let bypass) = controls[0].value,
+              case .boolean(let active) = controls[1].value, bypass != active else {
+            throw Failure.unavailable("filter_state_readback")
+        }
+        return active
+    }
+
     func scalar(_ label: String) throws -> (position: Int, display: String) {
         let controls = try row(label).controls
         guard controls.count == 3, controls.filter({ $0.role == "AXSlider" }).count == 2,
@@ -108,6 +120,12 @@ struct RetroSynthSnapshot: Codable, Equatable, Sendable {
             let value = try text(parameter.label)
             guard let choice = parameter.choices.first(where: { $0.text == value }) else {
                 throw Failure.unavailable("unsupported_popup_value")
+            }
+            return choice
+        case .filterState:
+            let value = try filterEnabled()
+            guard let choice = parameter.choices.first(where: { $0.boolean == value }) else {
+                throw Failure.unavailable("unsupported_filter_state")
             }
             return choice
         case .sync:

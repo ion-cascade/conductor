@@ -40,7 +40,7 @@ Use the [compatibility matrix](docs/conductor/compatibility.md) to check the tes
 | Live Loops | Read a bounded grid and launch or stop one referenced, selected cell. |
 | Notation | Read one selected MIDI region in the Score Editor and export verified single-part MusicXML. |
 | Browser | Search visible instrument patches and load an exact result onto the selected software instrument track. |
-| Synth sound design | Read, initialize and edit 21 qualified Retro Synth Analog controls with snapshot guards. [Start a sound-design exercise](docs/conductor/retro-synth.md). |
+| Synth sound design | Read, initialize and edit 22 qualified Retro Synth Analog controls with snapshot guards. [Start a sound-design exercise](docs/conductor/retro-synth.md). |
 | Mixer and inserts | Adjust a referenced strip. Read Channel EQ, apply supported Compressor presets and sidechains, bypass occupied inserts, and edit qualified mono Gain levels and Gain automation. |
 | Render and delivery | Bounce an exact stereo or qualified 5.1 PCM range, export a bounded Dolby Atmos ADM BWF project, or deliver aligned stems with receipt verification and resume. |
 | Stem Splitter and Step Sequencer | Separate audio into stems or individual drum kit pieces, or read and edit batches of Drum Machine Designer steps. |

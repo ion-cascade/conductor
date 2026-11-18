@@ -74,7 +74,38 @@ struct RetroSynthProfileTests {
             _ = try snapshot.observation(parameter)
         }
         #expect(snapshot.isFactoryInitialized)
-        #expect(RetroSynthProfile.parameters.count == 21)
+        #expect(RetroSynthProfile.parameters.count == 22)
+    }
+
+    @Test func initializedFilterIsBypassedAndEnablingPreservesEveryPeer() throws {
+        let parameter = try #require(RetroSynthProfile.parameter("filter_enabled"))
+        let before = factory()
+        #expect(try before.observation(parameter).boolean == false)
+        #expect(parameter.resolve(value: .boolean(true), unit: "bool")?.sync == nil)
+        #expect(parameter.resolve(value: .number(1), unit: "bool") == nil)
+        #expect(parameter.resolve(value: .text("Active"), unit: "bool") == nil)
+        var rows = before.rows
+        let index = try #require(rows.firstIndex { $0.label == parameter.label })
+        rows[index] = .init(label: parameter.label, controls: [
+            .init(role: "AXRadioButton", value: .boolean(false), display: ""),
+            .init(role: "AXRadioButton", value: .boolean(true), display: ""),
+        ])
+        let after = RetroSynthSnapshot(preset: "Manual", rows: rows)
+        #expect(try after.observation(parameter).boolean == true)
+        #expect(after.preservesPeers(of: before, changing: [parameter.label]))
+        #expect(!after.preservesPeers(of: before, changing: ["Cutoff:"]))
+        #expect(!after.isFactoryInitialized)
+    }
+
+    @Test(arguments: [false, true])
+    func contradictoryFilterRadioValuesRefuse(_ value: Bool) throws {
+        var rows = factory().rows
+        let index = try #require(rows.firstIndex { $0.label == "Filter State:" })
+        rows[index] = .init(label: "Filter State:", controls: [
+            .init(role: "AXRadioButton", value: .boolean(value), display: ""),
+            .init(role: "AXRadioButton", value: .boolean(value), display: ""),
+        ])
+        #expect(throws: (any Error).self) { try RetroSynthSnapshot(preset: "Manual", rows: rows).filterEnabled() }
     }
 
     @Test func mismatchedRawAndDisplayedSliderValuesRefuse() throws {

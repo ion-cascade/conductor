@@ -19,6 +19,7 @@ enum RetroSynthProfile {
         case choices([String])
         case lfoRate
         case sync
+        case filterState
     }
 
     struct Choice: Sendable, Equatable {
@@ -64,6 +65,9 @@ enum RetroSynthProfile {
             case let .choices(values):
                 return values.map { Choice(position: nil, number: nil, text: $0, boolean: nil,
                                            unit: unit, display: $0, sync: nil) }
+            case .filterState:
+                return [false, true].map { Choice(position: nil, number: nil, text: nil, boolean: $0,
+                                                 unit: "bool", display: String($0), sync: nil) }
             case .sync:
                 return [false, true].map { Choice(position: nil, number: nil, text: nil, boolean: $0,
                                                  unit: "bool", display: String($0), sync: $0) }
@@ -123,6 +127,7 @@ enum RetroSynthProfile {
         .init(id: "oscillator_mix", label: "Oscillator Mix:", unit: "normalized", kind: .linear(maximum: 100, stepsPerUnit: 100, offset: 0)),
         .init(id: "osc2_semitones", label: "Oscillator 2 Semitone:", unit: "semitones", kind: .linear(maximum: 48, stepsPerUnit: 1, offset: -24)),
         .init(id: "osc2_detune", label: "Oscillator 2 Detune:", unit: "cents", kind: .linear(maximum: 100, stepsPerUnit: 1, offset: -50)),
+        .init(id: "filter_enabled", label: "Filter State:", unit: "bool", kind: .filterState),
         .init(id: "filter_cutoff", label: "Cutoff:", unit: "normalized", kind: .linear(maximum: 500, stepsPerUnit: 500, offset: 0)),
         .init(id: "filter_resonance", label: "Resonance:", unit: "normalized", kind: .linear(maximum: 100, stepsPerUnit: 100, offset: 0)),
         .init(id: "filter_envelope_depth", label: "Cutoff by Env:", unit: "normalized", kind: .linear(maximum: 200, stepsPerUnit: 100, offset: -1)),

@@ -243,7 +243,10 @@ final class RetroSynthNative {
         }
         var values: [RetroSynthSnapshot.Row] = []
         for row in try rows() {
-            values.append(try .init(label: rowLabel(row), controls: controls(row).map(controlState)))
+            let label = try rowLabel(row)
+            let native = try controls(row)
+            if label == "Filter State:" { try validateFilterRadios(native) }
+            values.append(try .init(label: label, controls: native.map(controlState)))
         }
         guard holdsTarget() else { throw Failure.unavailable("snapshot_context_changed") }
         let result = RetroSynthSnapshot(preset: preset, rows: values, enabled: enabled)
@@ -262,6 +265,14 @@ final class RetroSynthNative {
             throw Failure.unavailable("instrument_changed_during_read")
         }
         return after
+    }
+
+    func validateFilterRadios(_ controls: [AXUIElement]) throws {
+        guard controls.count == 2,
+              controls.allSatisfy({ AXHelpers.getRole($0, runtime: runtime.ax) == kAXRadioButtonRole }),
+              try controls.map({ try string($0, kAXTitleAttribute, required: true) }) == ["Bypass", "Active"] else {
+            throw Failure.unavailable("filter_state_address")
+        }
     }
 
     func scalar(_ label: String) throws -> (control: AXUIElement, position: Int, display: String) {

@@ -31,6 +31,22 @@ extension RetroSynthNative {
             }
         }
         switch parameter.kind {
+        case .filterState:
+            guard let desired = choice.boolean else { throw Failure.unavailable("filter_state_choice") }
+            if try snapshot().filterEnabled() == desired { return }
+            let row = try row("Filter State:")
+            try await reveal(row)
+            let radios = try controls(row)
+            try validateFilterRadios(radios)
+            try authorize("retro_filter_state_toggle")
+            _ = AXHelpers.performAction(radios[desired ? 1 : 0], kAXPressAction, runtime: runtime.ax)
+            await didWrite()
+            for _ in 0..<20 {
+                try await pause()
+                guard holdsTarget() else { throw Failure.unavailable("filter_state_context_changed") }
+                if let fresh = try? snapshot(), try fresh.filterEnabled() == desired { return }
+            }
+            throw Failure.unavailable("filter_state_readback_timeout")
         case .sync:
             guard let desired = choice.boolean else { throw Failure.unavailable("sync_choice") }
             try await setSync(desired, authorize: authorize, didWrite: didWrite)

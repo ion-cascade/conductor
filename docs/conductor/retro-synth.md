@@ -21,7 +21,7 @@ Read `logic://project/info` and `logic://tracks` for the current `project_ref` a
 }
 ```
 
-This verifies the complete initialized Controls table rather than treating the preset name as proof. It does not change your saved default setting.
+This verifies the complete initialized Controls table rather than treating the preset name as proof. It does not change your saved default setting. Logic’s initialized setting has the filter bypassed. Set `filter_enabled` to JSON `true` with unit `bool` before testing cutoff, resonance, filter envelopes or LFO modulation. This is an explicit edit; initialization preserves the actual factory setting.
 
 ## Read, then edit
 
@@ -36,7 +36,7 @@ This verifies the complete initialized Controls table rather than treating the p
 }
 ```
 
-The response includes 21 parameters, their native display and units, an `instrument_ref` and `snapshot_hash`. `options_for` lists exact supported values for one parameter. For example, choose a supported attack time in milliseconds:
+The response includes 22 parameters, their native display and units, an `instrument_ref` and `snapshot_hash`. `options_for` lists exact supported values for one parameter. For example, choose a supported attack time in milliseconds:
 
 ```json
 {
@@ -64,6 +64,7 @@ Use the new instrument reference and snapshot hash returned by each successful e
 | `oscillator_mix` | `normalized`, 0–1 in 0.01 steps |
 | `osc2_semitones` | `semitones`, −24–24 in whole steps |
 | `osc2_detune` | `cents`, −50–50 in whole steps |
+| `filter_enabled` | `bool`, JSON `true` for Active or `false` for Bypass |
 | `filter_cutoff` | `normalized`, 0–1 in 0.002 steps; no Hz conversion |
 | `filter_resonance` | `normalized`, 0–1 in 0.01 steps |
 | `filter_envelope_depth` | `normalized`, −1–1 in 0.01 steps |
@@ -92,7 +93,7 @@ On the selected Retro Synth track, use the targeted `logic_tracks.record_sequenc
 | 52 | 4,500 ms | 1,000 ms |
 | 55 | 6,000 ms | 1,000 ms |
 
-Bounce **1.1.1.1 through 5.1.1.1** as stereo WAV at 48 kHz / 24-bit, with audio tail disabled. This produces an eight-second comparison. Render the same range before and after a parameter edit with identical bounce settings. For a clear first exercise, compare the initialized sound with a 500 ms amplifier attack, or lower normalized filter cutoff with resonance unchanged. Save and reopen the project, obtain fresh project and track references, and read the instrument again.
+Bounce **1.1.1.1 through 5.1.1.1** as stereo WAV at 48 kHz / 24-bit, with audio tail disabled. This produces an eight-second comparison. Render the same range before and after a parameter edit with identical bounce settings. For a clear first exercise, compare the initialized sound with a 500 ms amplifier attack, or enable the filter in both comparison renders and lower normalized filter cutoff with resonance unchanged. Save and reopen the project, obtain fresh project and track references, and read the instrument again.
 
 A state **A** result requires matching native values, matching read bookends, preserved peer controls and successful UI restoration. The bookends are not an atomic Logic transaction. A **C** refusal reports no audio write attempt. A **B** result means an action may have taken effect: inspect the sound and read fresh state before deciding what to do next. Never automatically replay an uncertain edit.
 

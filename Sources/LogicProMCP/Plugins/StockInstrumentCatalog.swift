@@ -332,7 +332,7 @@ enum StockInstrumentCatalog {
             notes: notes + [
                 "Live menu availability and preset loading require native readback.",
             ] + (idSuffix == "retro_synth" ? [
-                "A bounded Analog / LP 24dB Lush Controls profile supports 21 parameters on English Logic 13.0 build 7801. Read live state before each edit; other engines, filter types and unlisted controls remain unsupported.",
+                "A bounded Analog / LP 24dB Lush Controls profile supports 22 parameters on English Logic 13.0 build 7801. Read live state before each edit; other engines, filter types and unlisted controls remain unsupported.",
                 "Filter cutoff uses native normalized units, not Hz. ADSR and LFO rates accept measured native choices; changing LFO Sync also converts its rate.",
             ] : ["Direct instrument parameter editing remains unsupported."])
         )

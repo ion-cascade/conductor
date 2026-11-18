@@ -16,7 +16,7 @@ enum RetroSynthReport {
                 row["step"] = 1 / Double(stepsPerUnit)
             case .choices:
                 row["choices"] = parameter.choices.compactMap(\.text)
-            case .sync: break
+            case .sync, .filterState: break
             default:
                 row["quantization"] = "native_display_choices"
                 let values = parameter.choices.filter { $0.unit == observation.unit }.compactMap(\.number)

@@ -10,7 +10,7 @@ extension SemanticOracleTable {
         .pluginsGetRetroSynthState, operation: "plugin.get_retro_synth_state",
         constraints: [
             .valueEquals(key: "profile", expected: .string("logic13.retro_synth.analog.controls.v1")),
-            .valueEquals(key: "parameter_count", expected: .number(21)),
+            .valueEquals(key: "parameter_count", expected: .number(22)),
             .valueEquals(key: "native_row_count", expected: .number(83)),
             .typedField(key: "instrument_ref", type: .string),
             .typedField(key: "snapshot_hash", type: .string),
