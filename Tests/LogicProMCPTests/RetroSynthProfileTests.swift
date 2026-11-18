@@ -104,6 +104,31 @@ struct RetroSynthProfileTests {
         #expect(throws: (any Error).self) { try RetroSynthSnapshot(preset: "Manual", rows: rows).validateLayout() }
     }
 
+    @Test(arguments: [1, 2])
+    func squareEnablesPulseWidthPresentationWithoutAuthorizingAValueChange(_ oscillator: Int) throws {
+        let before = factory()
+        let waveform = "Oscillator \(oscillator) Waveform:"
+        let width = "Oscillator \(oscillator)  Pulse Width:"
+        var rows = before.rows
+        let waveIndex = try #require(rows.firstIndex { $0.label == waveform })
+        let widthIndex = try #require(rows.firstIndex { $0.label == width })
+        rows[waveIndex] = .init(label: waveform, controls: [.init(role: "AXPopUpButton", value: .text("Square"), display: "")])
+        let native = try #require(rows[widthIndex].controls.first)
+        rows[widthIndex] = .init(label: width, controls: [
+            .init(role: "AXSlider", value: native.value, display: ""), native,
+            .init(role: "AXValueIndicator", value: native.value, display: ""),
+        ])
+        let after = RetroSynthSnapshot(preset: "Manual", rows: rows)
+        try after.validateLayout()
+        #expect(after.preservesPeers(of: before, changing: [waveform]))
+        rows[widthIndex] = .init(label: width, controls: [
+            .init(role: "AXSlider", value: native.value, display: ""),
+            .init(role: "AXSlider", value: native.value, display: "51.0 %"),
+            .init(role: "AXValueIndicator", value: native.value, display: ""),
+        ])
+        #expect(!RetroSynthSnapshot(preset: "Manual", rows: rows).preservesPeers(of: before, changing: [waveform]))
+    }
+
     private func factory() -> RetroSynthSnapshot {
         .init(preset: "Manual", rows: RetroSynthFactoryBaseline.labels.map { label in
             .init(label: label, controls: label.flatMap { RetroSynthFactoryBaseline.values[$0] } ?? [])

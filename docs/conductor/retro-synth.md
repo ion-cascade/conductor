@@ -51,6 +51,8 @@ Use the new instrument reference and snapshot hash returned by each successful e
 | `filter_attack`, `filter_decay`, `filter_release` | `ms`, exact native choices |
 | `amp_sustain`, `filter_sustain` | `normalized`, exact native choices |
 
+Choosing Square enables that oscillator’s native pulse-width controls. Conductor verifies that the pulse-width value and display stay unchanged through this presentation change; pulse-width editing is not exposed.
+
 The filter type is fixed to **LP 24dB Lush**. Attack, decay and release have different native curves. Some displayed values correspond to several native positions; the setter chooses the first measured position and returns `native_step`. It refuses unsupported values and may offer nearby choices; it never silently rounds the request.
 
 Changing `lfo_sync` converts the rate using Logic's native conversion. Setting `lfo_rate` also selects the corresponding sync mode. Both rows may change together. Read the returned rate instead of assuming the previous value survives conversion.

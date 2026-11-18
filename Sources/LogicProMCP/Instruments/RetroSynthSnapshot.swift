@@ -42,8 +42,13 @@ struct RetroSynthSnapshot: Codable, Equatable, Sendable {
     }
 
     func validateLayout() throws {
+        var roles = RetroSynthFactoryBaseline.roles
+        for oscillator in [1, 2] where try text("Oscillator \(oscillator) Waveform:") == "Square" {
+            let index = oscillator == 1 ? 34 : 36
+            roles[index] = ["AXSlider", "AXSlider", "AXValueIndicator"]
+        }
         guard rows.count == 83, rows.map(\.label) == RetroSynthFactoryBaseline.labels,
-              rows.map({ $0.controls.map(\.role).sorted() }) == RetroSynthFactoryBaseline.roles else {
+              rows.map({ $0.controls.map(\.role).sorted() }) == roles else {
             throw Failure.unavailable("controls_layout")
         }
         let labels = rows.compactMap(\.label)
@@ -134,8 +139,28 @@ struct RetroSynthSnapshot: Codable, Equatable, Sendable {
         guard enabled == before.enabled, rows.map(\.label) == before.rows.map(\.label),
               preset == before.preset || preset == "Manual" else { return false }
         return zip(before.rows, rows).allSatisfy { old, new in
-            old.label.map(labels.contains) == true || old == new
+            if old.label.map(labels.contains) == true || old == new { return true }
+            for oscillator in [1, 2] where labels.contains("Oscillator \(oscillator) Waveform:") {
+                if old.label == "Oscillator \(oscillator)  Pulse Width:",
+                   let a = Self.pulseWidthValue(old), let b = Self.pulseWidthValue(new) {
+                    return a == b
+                }
+            }
+            return false
         }
+    }
+
+    /// Square enables a three-control pulse-width row. Other waveforms expose
+    /// one disabled slider. Preserve both native value and display across that
+    /// presentation transition; it grants no pulse-width editing authority.
+    private static func pulseWidthValue(_ row: Row) -> Control? {
+        let roles = row.controls.map(\.role).sorted()
+        guard roles == ["AXSlider"] || roles == ["AXSlider", "AXSlider", "AXValueIndicator"] else { return nil }
+        let displayed = row.controls.filter { !$0.display.isEmpty }
+        guard displayed.count == 1, displayed[0].role == "AXSlider",
+              case .number(let number) = displayed[0].value, number.isFinite,
+              row.controls.allSatisfy({ $0.value == displayed[0].value }) else { return nil }
+        return displayed[0]
     }
 
     var isFactoryInitialized: Bool {

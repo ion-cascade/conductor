@@ -107,7 +107,7 @@ extension RetroSynthNative {
             for _ in 0..<20 {
                 try await pause()
                 guard holdsTarget() else { throw Failure.unavailable("popup_context_changed") }
-                if let observed = try? snapshot(), try observed.text(label) == value { return }
+                if (try? parameterText(label)) == value { return }
             }
             throw Failure.unavailable("popup_readback_timeout")
         } catch {
