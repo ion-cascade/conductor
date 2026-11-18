@@ -80,6 +80,14 @@ struct ProjectADMArtifact: Codable, Sendable {
         }
         let uids = try trackUIDs(chna, channels: channels)
         let xml = try ADMXML.read(axml)
+        let trackNodes = xml.nodes(named: "audioTrackUID")
+        guard trackNodes.count == channels else { throw Failure.invalid }
+        for node in trackNodes {
+            guard let uid = node.attributes["UID"], let record = uids[uid],
+                  node.children.filter({ $0.name == "audioTrackFormatIDRef" }).map(\.text) == [record.track],
+                  node.children.filter({ $0.name == "audioPackFormatIDRef" }).map(\.text) == [record.pack]
+            else { throw Failure.invalid }
+        }
         let objectNodes = xml.nodes(named: "audioObject")
         var seenChannels = Set<Int>()
         let objects = try objectNodes.map { node -> Object in
@@ -89,8 +97,9 @@ struct ProjectADMArtifact: Codable, Sendable {
             let packs = node.children.filter { $0.name == "audioPackFormatIDRef" }.map(\.text)
             guard !references.isEmpty, !packs.isEmpty else { throw Failure.invalid }
             let indices = try references.map { uid -> Int in
-                guard let index = uids[uid], seenChannels.insert(index).inserted else { throw Failure.invalid }
-                return index
+                guard let record = uids[uid], packs.contains(record.pack),
+                      seenChannels.insert(record.index).inserted else { throw Failure.invalid }
+                return record.index
             }
             return Object(id: id, name: name, packReferences: packs, channels: indices)
         }
@@ -112,18 +121,21 @@ struct ProjectADMArtifact: Codable, Sendable {
         bytes[offset..<(offset + count)].enumerated().reduce(0) { $0 | UInt64($1.element) << ($1.offset * 8) }
     }
 
-    private static func trackUIDs(_ data: Data, channels: Int) throws -> [String: Int] {
+    private static func trackUIDs(_ data: Data, channels: Int) throws -> [String: (index: Int, track: String, pack: String)] {
         guard data.count >= 4, integer(data, 0, 2) == channels,
               integer(data, 2, 2) == channels, data.count == 4 + channels * 40 else { throw Failure.invalid }
-        var result: [String: Int] = [:]
+        var result: [String: (index: Int, track: String, pack: String)] = [:]
         for row in 0..<channels {
             let start = 4 + row * 40
             let index = Int(integer(data, start, 2))
             let uid = String(decoding: data[(start + 2)..<(start + 14)], as: UTF8.self)
             guard (1...channels).contains(index), uid.hasPrefix("ATU_"), result[uid] == nil else { throw Failure.invalid }
-            result[uid] = index
+            let track = String(decoding: data[(start + 14)..<(start + 28)], as: UTF8.self)
+            let pack = String(decoding: data[(start + 28)..<(start + 39)].prefix(while: { $0 != 0 }), as: UTF8.self)
+            guard track.hasPrefix("AT_"), pack.hasPrefix("AP_"), data[start + 39] == 0 else { throw Failure.invalid }
+            result[uid] = (index, track, pack)
         }
-        guard Set(result.values).count == channels else { throw Failure.invalid }
+        guard Set(result.values.map(\.index)).count == channels else { throw Failure.invalid }
         return result
     }
 }
