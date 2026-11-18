@@ -66,14 +66,15 @@ struct RetroSynthPowerStateTests {
             b.setAttribute(other, kAXDescriptionAttribute as String, "bypass")
             header.append(other)
         }
+        let slotKey = b.elementID(slot), powerKey = b.elementID(power)
         let runtime = b.makeAXRuntime(attributeValueResultHandler: { element, attribute in
             guard attribute == kAXValueAttribute as String else { return nil }
             let id = b.elementID(element)
-            if (id == 1_991_101 && fault == "slot_transport") ||
-                (id == 1_991_102 && ["header_transport", "button_transport"].contains(fault)) {
+            if (id == slotKey && fault == "slot_transport") ||
+                (id == powerKey && ["header_transport", "button_transport"].contains(fault)) {
                 return .failure(.init(raw: AXError.cannotComplete.rawValue))
             }
-            if id == 1_991_102 && style == "button_unsupported" {
+            if id == powerKey && style == "button_unsupported" {
                 return .failure(.init(raw: AXError.attributeUnsupported.rawValue))
             }
             return nil
