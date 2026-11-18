@@ -17,7 +17,7 @@ First read `logic://project/info` and `logic://tracks` for fresh project and sel
 }
 ```
 
-If the project is reopened, obtain fresh project and track references and prepare its window again. Closing the window deliberately ends the editing session; a later read without `open_editor:true` refuses safely. For a bounce, finish the edits before closing the window and starting export. The recurring host abort remains a release blocker until this revised workflow passes native qualification.
+If the project is reopened, obtain fresh project and track references and prepare its window again. Closing the window deliberately ends the editing session; a later read without `open_editor:true` refuses safely. The recurring host abort remains a release blocker until this revised workflow passes native qualification.
 
 ## Start with a native setting
 
@@ -36,7 +36,7 @@ Read `logic://project/info` and `logic://tracks` for the current `project_ref` a
 }
 ```
 
-This verifies the complete initialized Controls table rather than treating the preset name as proof. It does not change your saved default setting. Logic’s initialized setting has the filter bypassed. Set `filter_enabled` to JSON `true` with unit `bool` before testing cutoff, resonance, filter envelopes or LFO modulation. This is an explicit edit; initialization preserves the actual factory setting.
+This verifies the complete initialized Controls table rather than treating the preset name as proof. It does not change your saved default setting. Logic’s initialized setting has the filter bypassed. Set `filter_enabled` to JSON `true` with unit `bool` before testing cutoff, resonance, filter envelopes or LFO modulation. This is an explicit edit; initialization preserves the actual factory setting. For a filter LFO exercise, set `lfo_via_amount` to `0` with unit `normalized` to remove dependence on the modulation wheel, then compare a fixed phrase with identical controller events.
 
 ## Read, then edit
 
@@ -107,6 +107,19 @@ On the selected Retro Synth track, use the targeted `logic_tracks.record_sequenc
 | 48 | 0 ms | 4,000 ms |
 | 52 | 4,500 ms | 1,000 ms |
 | 55 | 6,000 ms | 1,000 ms |
+
+For a bounce, finish the edits, then use the state read below to close the bound Controls window and return to the project before export. It verifies the final native state and reports `editor_closed:true`, `editor_retained:false` and `ui_restored:false` for that requested layout change. Do not combine `open_editor:true` and `close_editor:true`.
+
+```json
+{
+  "command": "get_retro_synth_state",
+  "params": {
+    "project_ref": "<current project_ref>",
+    "target_ref": "<track_ref from the selected row>",
+    "close_editor": true
+  }
+}
+```
 
 Bounce **1.1.1.1 through 5.1.1.1** as stereo WAV at 48 kHz / 24-bit, with audio tail disabled. This produces an eight-second comparison. Render the same range before and after a parameter edit with identical bounce settings. For a clear first exercise, compare the initialized sound with a 500 ms amplifier attack, or enable the filter in both comparison renders and lower normalized filter cutoff with resonance unchanged. Save and reopen the project, obtain fresh project and track references, and read the instrument again.
 

@@ -805,7 +805,7 @@ enum OperationRegistry {
         )
     } + ([
         (.pluginsGetRetroSynthState, "get_retro_synth_state", Mutability.readOnly, DeadlineClass.long,
-         VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["options_for", "open_editor"]),
+         VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["options_for", "open_editor", "close_editor"]),
         (.pluginsInitializeRetroSynth, "initialize_retro_synth", Mutability.mutating, DeadlineClass.long,
          VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["confirmed"]),
         (.pluginsSetRetroSynthParameter, "set_retro_synth_parameter", Mutability.mutating, DeadlineClass.long,

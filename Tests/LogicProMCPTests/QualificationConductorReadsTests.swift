@@ -5,20 +5,24 @@ import Testing
 
 @Suite("Conductor read qualification")
 struct QualificationConductorReadsTests {
-    @Test(arguments: [true, false])
-    func retroSynthPreparationDoesNotClaimClosedLayoutRestored(_ opened: Bool) throws {
+    @Test(arguments: ["preserve", "prepare", "close"])
+    func retroSynthPreparationDoesNotClaimClosedLayoutRestored(_ action: String) throws {
         let fixture = try #require(SemanticOracleFixtures.byOperationID[.pluginsGetRetroSynthState])
         let oracle = try #require(SemanticOracleTable.byOperationID[.pluginsGetRetroSynthState])
         var body = try #require(JSONInspector.parse(fixture.responseData) as? [String: Any])
+        let opened = action == "prepare", closed = action == "close"
+        let restored = !opened && !closed
         body["editor_opened"] = opened
-        body["ui_restored"] = !opened
+        body["editor_closed"] = closed
+        body["editor_retained"] = !closed
+        body["ui_restored"] = restored
         func evaluates() throws -> Bool? {
             oracle.evaluate(responseData: try JSONSerialization.data(withJSONObject: body), readbackData: Data())
         }
         #expect(try evaluates() == true)
-        body["ui_restored"] = opened
+        body["ui_restored"] = !restored
         #expect(try evaluates() == false)
-        body["ui_restored"] = !opened
+        body["ui_restored"] = restored
         body["ui_policy_satisfied"] = false
         #expect(try evaluates() == false)
     }

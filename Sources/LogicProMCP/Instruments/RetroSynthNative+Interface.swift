@@ -128,17 +128,31 @@ extension RetroSynthNative {
         }
     }
 
-    func cleanup() async -> Bool {
+    func cleanup(closeExisting: Bool = false) async -> Bool {
         guard cleanupPermitted() else { return false }
-        if openedEditor {
+        if openedEditor || closeExisting {
+            if closeExisting {
+                guard holdsTarget(), OperationTraceContext.claimDeadlineEffect(
+                    "retro_close_retained_editor", rejectTaskCancellationWithoutContext: true
+                ) else { return false }
+            }
             guard let buttons = try? children(editor).filter({
                 AXHelpers.getRole($0, runtime: runtime.ax) == kAXButtonRole
                     && AXHelpers.getDescription($0, runtime: runtime.ax) == "close"
             }), buttons.count == 1 else { return false }
+            guard !closeExisting || holdsTarget() else { return false }
             _ = AXHelpers.performAction(buttons[0], kAXPressAction, runtime: runtime.ax)
             for _ in 0..<15 {
                 let windows: [AXUIElement]? = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: runtime.ax)
-                if windows?.contains(where: { CFEqual($0, editor) }) == false { return true }
+                if windows?.contains(where: { CFEqual($0, editor) }) == false {
+                    guard closeExisting else { return true }
+                    let visible = windows?.filter { AXHelpers.getRole($0, runtime: runtime.ax) != kAXHelpTagRole }
+                    guard runtime.logicProPID() == pid, slot.isCurrent(), ProjectScore.foreground(pid, runtime: runtime),
+                          visible?.count == 1, visible?.contains(where: { CFEqual($0, slot.physical.window) }) == true,
+                          let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: runtime.ax)
+                    else { return false }
+                    return CFEqual(focused, slot.physical.window)
+                }
                 try? await interfacePause(cleanup: true, milliseconds: 40)
             }
             return false

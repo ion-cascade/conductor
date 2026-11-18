@@ -10,9 +10,11 @@ struct RetroSynthDispatchTests {
         let gate = VerifiedOpGate()
         #expect(gate.tryAcquire())
         defer { gate.release() }
-        let body = try await request("get_retro_synth_state", ["open_editor": value], gate: gate)
-        #expect(body["error"] as? String == "invalid_params")
-        #expect(body["write_attempted"] as? Bool == false)
+        for key in ["open_editor", "close_editor"] {
+            let body = try await request("get_retro_synth_state", [key: value], gate: gate)
+            #expect(body["error"] as? String == "invalid_params")
+            #expect(body["write_attempted"] as? Bool == false)
+        }
     }
 
     @Test(arguments: [true, false])
@@ -20,14 +22,34 @@ struct RetroSynthDispatchTests {
         let gate = VerifiedOpGate()
         #expect(gate.tryAcquire())
         defer { gate.release() }
-        let body = try await request("get_retro_synth_state", ["open_editor": .bool(consent)], gate: gate)
-        #expect(body["error"] as? String == "verified_op_in_progress")
-        #expect(body["write_attempted"] as? Bool == false)
+        for key in ["open_editor", "close_editor"] {
+            let body = try await request("get_retro_synth_state", [key: .bool(consent)], gate: gate)
+            #expect(body["error"] as? String == "verified_op_in_progress")
+            #expect(body["write_attempted"] as? Bool == false)
+        }
     }
 
     @Test(arguments: ["initialize_retro_synth", "set_retro_synth_parameter"])
     func audioEditsCannotAuthorizeImplicitEditorCreation(_ command: String) async throws {
-        let body = try await request(command, ["open_editor": .bool(true), "confirmed": .bool(true)], gate: VerifiedOpGate())
+        let gate = VerifiedOpGate()
+        #expect(gate.tryAcquire())
+        defer { gate.release() }
+        let valid: [String: Value] = command == "initialize_retro_synth" ? ["confirmed": .bool(true)] : [
+            "instrument_ref": .string("rsy_fixture"), "expected_snapshot": .string("snapshot"),
+            "param": .string("oscillator_mix"), "unit": .string("normalized"), "value": .double(0.1),
+        ]
+        for key in ["open_editor", "close_editor"] {
+            let body = try await request(command, valid.merging([key: .bool(true)], uniquingKeysWith: { _, new in new }), gate: gate)
+            #expect(body["error"] as? String == "invalid_params")
+            #expect(body["write_attempted"] as? Bool == false)
+        }
+    }
+
+    @Test func prepareAndCloseCannotBeRequestedTogether() async throws {
+        let gate = VerifiedOpGate()
+        #expect(gate.tryAcquire())
+        defer { gate.release() }
+        let body = try await request("get_retro_synth_state", ["open_editor": .bool(true), "close_editor": .bool(true)], gate: gate)
         #expect(body["error"] as? String == "invalid_params")
         #expect(body["write_attempted"] as? Bool == false)
     }

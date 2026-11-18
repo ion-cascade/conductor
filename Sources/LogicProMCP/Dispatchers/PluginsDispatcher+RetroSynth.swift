@@ -28,7 +28,7 @@ extension PluginsDispatcher {
             return toolTextResult(.error(HonestContract.encodeStateC(error: error, hint: hint, extras: details)))
         }
         var allowed: Set<String> = ["project_ref", "target_ref"]
-        if command == "get_retro_synth_state" { allowed.formUnion(["options_for", "open_editor"]) }
+        if command == "get_retro_synth_state" { allowed.formUnion(["options_for", "open_editor", "close_editor"]) }
         if command == "initialize_retro_synth" { allowed.insert("confirmed") }
         if command == "set_retro_synth_parameter" {
             allowed.formUnion(["instrument_ref", "expected_snapshot", "param", "unit", "value"])
@@ -52,6 +52,16 @@ extension PluginsDispatcher {
             }
             openEditor = value
         } else { openEditor = false }
+        let closeEditor: Bool
+        if let requested = params["close_editor"] {
+            guard case .bool(let value) = requested else {
+                return refuse(.invalidParams, "close_editor must be a JSON Boolean. true reads the current state, then closes its Controls window before export.")
+            }
+            closeEditor = value
+        } else { closeEditor = false }
+        guard !(openEditor && closeEditor) else {
+            return refuse(.invalidParams, "Choose either open_editor:true to prepare an editing session or close_editor:true to finish it.")
+        }
         if command == "initialize_retro_synth" {
             guard case .bool(true) = params["confirmed"] else {
                 return refuse(.invalidParams, "Initialize Setting replaces the instrument's current setting. Pass confirmed:true.")
@@ -170,15 +180,17 @@ extension PluginsDispatcher {
             guard !Task.isCancelled, await targetRegistry.resolve(reference) != nil,
                   await targetRegistry.resolveCurrentProject(.init(rawValue: project)) != nil,
                   native.holdsTarget() else { throw RetroSynthSnapshot.Failure.unavailable("final_target_changed") }
+            let hash = try result.fingerprint
+            let parameters = try RetroSynthReport.parameters(result, optionsFor: options)
             let retainedNewEditor = native.openedEditor
             let cleaned: Bool
             if retainedNewEditor { cleaned = native.retainPreparedEditor() }
-            else { cleaned = await native.cleanup(); cleanupResult = cleaned }
+            else { cleaned = await native.cleanup(closeExisting: closeEditor); cleanupResult = closeEditor ? false : cleaned }
             guard cleaned, slot.isCurrent(), !Task.isCancelled else {
                 throw RetroSynthSnapshot.Failure.unavailable("editor_restoration_unverified")
             }
             source = nil
-            let hash = try result.fingerprint
+            cleanupResult = !retainedNewEditor && !closeEditor
             let instrument = "rsy_" + UUID().uuidString.lowercased()
             RetroSynthSession.current = .init(reference: instrument, project: project, track: reference.rawValue, slot: slot.group, hash: hash)
             return toolTextResult(ResourceHandlers.encodeJSONObject([
@@ -187,9 +199,10 @@ extension PluginsDispatcher {
                 "instrument_ref": instrument, "snapshot_hash": hash, "profile": RetroSynthProfile.id,
                 "instrument": "Retro Synth", "mode": "Analog", "preset": result.preset,
                 "enabled": result.enabled, "parameter_count": RetroSynthProfile.parameters.count,
-                "native_row_count": result.rows.count, "ui_restored": !retainedNewEditor,
-                "editor_retained": true, "editor_opened": retainedNewEditor, "ui_policy_satisfied": true,
-                "parameters": try RetroSynthReport.parameters(result, optionsFor: options),
+                "native_row_count": result.rows.count, "ui_restored": !retainedNewEditor && !closeEditor,
+                "editor_retained": !closeEditor, "editor_opened": retainedNewEditor,
+                "editor_closed": closeEditor, "ui_policy_satisfied": true,
+                "parameters": parameters,
             ]))
         } catch {
             RetroSynthSession.current = nil
