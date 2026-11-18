@@ -41,22 +41,18 @@ enum FocusedApplicationOwnership {
         }
         let fieldRole = AXHelpers.getRole(field, runtime: ax)
         let fieldIdentifier = AXHelpers.getIdentifier(field, runtime: ax)
-        let observedPID = runtime.elementPID(field)
-        guard fieldRole == kAXTextFieldRole, fieldIdentifier == "PathTextField",
-              let hostPID = observedPID, hostPID > 0, hostPID != rawPID,
-              let hostBundle = runtime.bundleID(hostPID), hostBundle != panelServiceBundle else {
-            return refused("field role=\(fieldRole ?? "unread") identifier=\(fieldIdentifier ?? "unread") pid=\(observedPID ?? 0)")
+        guard fieldRole == kAXTextFieldRole, fieldIdentifier == "PathTextField" else {
+            return refused("field role=\(fieldRole ?? "unread") identifier=\(fieldIdentifier ?? "unread")")
         }
-        let host = ax.axApp(hostPID)
         var current = field
         var visited: [AXUIElement] = []
         var sawFolderSheet = false
         var sawSavePanel = false
         for _ in 0..<12 {
             guard !visited.contains(where: { CFEqual($0, current) }),
-                  let role = AXHelpers.getRole(current, runtime: ax),
-                  runtime.elementPID(current) == hostPID else { return refused("ancestor_identity_\(visited.count)") }
+                  let role = AXHelpers.getRole(current, runtime: ax) else { return refused("ancestor_identity_\(visited.count)") }
             visited.append(current)
+            Log.debug("Hosted focus ancestor depth \(visited.count): role=\(role) pid=\(runtime.elementPID(current) ?? 0)", subsystem: "process")
             if role == kAXSheetRole {
                 guard !sawFolderSheet, !sawSavePanel,
                       AXHelpers.getIdentifier(current, runtime: ax) == "GoToWindow" else { return refused("folder_sheet") }
@@ -68,6 +64,19 @@ enum FocusedApplicationOwnership {
                 sawSavePanel = true
             }
             if role == kAXApplicationRole {
+                // A hosted field can itself carry the service PID. The actual
+                // application ancestor identifies its host; every node must
+                // remain inside that exact host/service pair.
+                let observedHostPID = runtime.elementPID(current)
+                guard let hostPID = observedHostPID, hostPID > 0, hostPID != rawPID,
+                      let hostBundle = runtime.bundleID(hostPID), hostBundle != panelServiceBundle else {
+                    return refused("application_ancestor_pid_\(observedHostPID ?? 0)")
+                }
+                let host = ax.axApp(hostPID)
+                guard visited.allSatisfy({ node in
+                    guard let pid = runtime.elementPID(node) else { return false }
+                    return pid == rawPID || pid == hostPID
+                }) else { return refused("third_process_in_ancestor_chain") }
                 guard sawFolderSheet, sawSavePanel, CFEqual(current, host),
                       (AXHelpers.getAttribute(host, kAXFrontmostAttribute, runtime: ax) as Bool?) == true,
                       let hostFocus: AXUIElement = AXHelpers.getAttribute(host, kAXFocusedUIElementAttribute, runtime: ax),

@@ -3,7 +3,7 @@ import Testing
 @testable import LogicProMCP
 
 struct FocusedApplicationOwnershipTests {
-    @Test(arguments: ["bound", "other_host", "wrong_sheet", "wrong_panel", "cross_pid", "retired_parent",
+    @Test(arguments: ["bound", "service_owned_nodes", "mixed_service_nodes", "other_host", "wrong_sheet", "wrong_panel", "cross_pid", "retired_parent",
                       "host_not_frontmost", "different_host_focus", "changed_service_focus", "changed_application",
                       "unknown_role", "cycle", "deep_chain", "wrong_field", "unknown_service", "missing_host_bundle"])
     func hostedFolderFocusRequiresTheActualHostChain(fault: String) throws {
@@ -48,6 +48,8 @@ struct FocusedApplicationOwnershipTests {
             return fault == "changed_application" && applicationReads > 1 ? other : service
         }, elementPID: { element in
             if CFEqual(element, service) { return servicePID }
+            if fault == "service_owned_nodes", !CFEqual(element, host) { return servicePID }
+            if fault == "mixed_service_nodes", CFEqual(element, field) || CFEqual(element, sheet) { return servicePID }
             if fault == "cross_pid", CFEqual(element, sheet) { return 901 }
             return hostPID
         }, bundleID: { pid in
@@ -56,12 +58,12 @@ struct FocusedApplicationOwnershipTests {
             return pid == 900 ? "com.apple.finder" : "com.apple.logic10"
         })
         let observed = FocusedApplicationOwnership.pid(runtime: runtime)
-        #expect(observed == (["bound", "other_host"].contains(fault) ? hostPID : servicePID))
+        #expect(observed == (["bound", "service_owned_nodes", "mixed_service_nodes", "other_host"].contains(fault) ? hostPID : servicePID))
         let ownership = ProcessUtils.keyboardOwnershipObservation(
             windows: [[kCGWindowOwnerPID as String: 672, kCGWindowLayer as String: 8]],
             focusedApplicationPID: observed,
             bundleIDForPID: { $0 == 672 ? "com.apple.logic10" : "com.apple.finder" })
-        #expect(ownership.isReady == (fault == "bound"))
+        #expect(ownership.isReady == (["bound", "service_owned_nodes", "mixed_service_nodes"].contains(fault)))
         #expect(b.actionCalls.isEmpty && b.setCalls.isEmpty)
     }
 
