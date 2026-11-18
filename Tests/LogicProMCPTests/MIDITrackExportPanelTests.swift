@@ -41,6 +41,19 @@ private struct MIDIExportPanelFixture {
         b.setAttribute(app, kAXWindowsAttribute as String, fault == "preexisting" ? [window, panel] : [window])
         b.setChildren(bar, [file]); b.setChildren(file, [menu]); b.setChildren(menu, [export])
         b.setChildren(export, [submenu]); b.setChildren(submenu, [leaf])
+        if fault == "unreadable_unrelated_menu" || fault == "unreadable_unrelated_submenu" {
+            let other = b.element(40)
+            b.setRole(other, fault == "unreadable_unrelated_menu" ? "AXMenuBarItem" : "AXMenuItem")
+            b.setAttribute(other, kAXTitleAttribute as String, "Help")
+            b.setAttribute(other, "children_reads", 0)
+            if fault == "unreadable_unrelated_menu" { b.setChildren(bar, [file, other]) }
+            else { b.setChildren(menu, [export, other]) }
+        }
+        if fault == "duplicate_export" {
+            let other = b.element(40)
+            b.setRole(other, "AXMenuItem"); b.setAttribute(other, kAXTitleAttribute as String, "Export")
+            b.setChildren(menu, [export, other])
+        }
         b.setAttribute(file, kAXTitleAttribute as String, "File")
         b.setAttribute(export, kAXTitleAttribute as String, "Export")
         b.setAttribute(leaf, kAXTitleAttribute as String, "All MIDI Tracks as MIDI File…")
@@ -103,6 +116,12 @@ private struct MIDIExportPanelFixture {
             }
             if fault == "unreadable_identifier", CFEqual(element, b.element(18)), attribute == kAXIdentifierAttribute as String {
                 return .failure(.init(raw: AXError.cannotComplete.rawValue))
+            }
+            return nil
+        }, childrenResultHandler: { element in
+            if fault.hasPrefix("unreadable_unrelated"), CFEqual(element, b.element(40)) {
+                b.setAttribute(element, "children_reads", (b.attributeValue(element, "children_reads") as? Int ?? 0) + 1)
+                return .failure(.init(raw: AXError.failure.rawValue))
             }
             return nil
         }, setAttributeHandler: nil, performActionHandler: { element, action in
@@ -190,7 +209,7 @@ private struct MIDIExportPanelFixture {
     #expect(f.savePresses == 1)
 }
 
-@MainActor @Test(arguments: ["preexisting", "wrong_folder", "changed_document", "replaced_panel", "keyboard_refused", "unreadable_identifier", "unreadable_role", "persistent_retiring_go", "deeper_selected", "other_focused_window", "replaced_go", "late_panel_replaced", "late_folder", "late_name"])
+@MainActor @Test(arguments: ["preexisting", "wrong_folder", "changed_document", "replaced_panel", "keyboard_refused", "unreadable_identifier", "unreadable_role", "persistent_retiring_go", "deeper_selected", "other_focused_window", "replaced_go", "late_panel_replaced", "late_folder", "late_name", "duplicate_export"])
 func midiExportPanelRefusesWrongOwnershipAndDestination(fault: String) async throws {
     let temporary = try ExportTemporaryFiles.temporaryExportFile()
     defer { ExportTemporaryFiles.cleanupTemporaryExportFile(temporary) }
@@ -253,4 +272,14 @@ func midiExportPanelRecoversOnlyTheSheetItOpened(fault: String) async throws {
     #expect(fixture.savePresses == 0)
     #expect(fixture.builder.attributeValue(fixture.app, "returns") as? Int == 1)
     #expect(!FileManager.default.fileExists(atPath: temporary.fileURL.path))
+}
+
+@MainActor @Test(arguments: ["unreadable_unrelated_menu", "unreadable_unrelated_submenu"])
+func midiExportMenuPathDoesNotReadUnrelatedLazyBranches(fault: String) async throws {
+    let temporary = try ExportTemporaryFiles.temporaryExportFile()
+    defer { ExportTemporaryFiles.cleanupTemporaryExportFile(temporary) }
+    let fixture = MIDIExportPanelFixture(destination: temporary.fileURL, fault: fault)
+    try await fixture.driver().exportAll(to: temporary.fileURL)
+    #expect(fixture.savePresses == 1 && fixture.cancelPresses == 0)
+    #expect(fixture.builder.attributeValue(fixture.builder.element(40), "children_reads") as? Int == 0)
 }

@@ -342,8 +342,12 @@ final class MIDITrackExportPanel {
     }
 
     private func label(_ labels: AXLocalePolicy.LabelSet, role: String, in root: AXUIElement) throws -> AXUIElement {
+        // The bar owns its items directly; an item owns its menu, then that
+        // menu's immediate items. Traversing unrelated submenus can fail on
+        // lazy AppKit branches and must not widen this exact command path.
+        let depth = role == kAXMenuBarItemRole as String ? 1 : 2
         let observed = AXLocalePolicy.censusDescendantResult(of: root, role: role,
-                matching: labels, mode: .exactStrict, maxDepth: 8, runtime: runtime.ax)
+                matching: labels, mode: .exactStrict, maxDepth: depth, runtime: runtime.ax)
         switch observed {
         case .success(let census) where census.candidates == 1:
             if let element = census.element { return element }
