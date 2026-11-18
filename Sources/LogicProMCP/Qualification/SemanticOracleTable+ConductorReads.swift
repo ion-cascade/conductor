@@ -14,7 +14,9 @@ extension SemanticOracleTable {
             .valueEquals(key: "native_row_count", expected: .number(83)),
             .typedField(key: "instrument_ref", type: .string),
             .typedField(key: "snapshot_hash", type: .string),
-            .valueEquals(key: "ui_restored", expected: .bool(true)),
+            .booleanFlipped(keyA: "ui_restored", keyB: "editor_opened"),
+            .valueEquals(key: "editor_retained", expected: .bool(true)),
+            .valueEquals(key: "ui_policy_satisfied", expected: .bool(true)),
             .nonEmptyArray(key: "parameters"),
             .arrayElements(key: "parameters", constraints: [
                 .typedField(key: "param", type: .string),

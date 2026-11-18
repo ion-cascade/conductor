@@ -1,7 +1,8 @@
 import ApplicationServices
 import Foundation
 
-/// Owns a temporary Controls-view acquisition on one selected instrument slot.
+/// Reuses one Controls window on the selected instrument slot. Only an explicit
+/// preparation read may open a window, which remains visible after success.
 /// Parameter elements are reacquired from the current table; only the physical
 /// track and instrument-slot carrier survive between requests.
 @MainActor
@@ -31,7 +32,7 @@ final class RetroSynthNative {
         self.originalView = originalView
     }
 
-    static func acquire(slot: RetroSynthSlot) async throws -> RetroSynthNative {
+    static func acquire(slot: RetroSynthSlot, openEditor: Bool = false) async throws -> RetroSynthNative {
         let runtime = slot.physical.runtime
         guard AXIsProcessTrusted(), let pid = runtime.logicProPID(),
               let host = runtime.observeHost(pid), host.logicVersion == RetroSynthProfile.logicVersion,
@@ -54,6 +55,9 @@ final class RetroSynthNative {
         var found = visible.filter(candidate)
         let opened = found.isEmpty
         guard visible.count == (opened ? 1 : 2), found.count <= 1 else { throw Failure.unavailable("other_editor_or_dialog") }
+        // Recreating Controls cells on every request showed bounded, repeatable
+        // host memory growth. Never do that implicitly, including for writes.
+        guard !opened || openEditor else { throw Failure.unavailable("controls_editor_required") }
         var pressedOpen = false
         do {
             if opened {
@@ -85,6 +89,7 @@ final class RetroSynthNative {
             guard views.count == 1, let view = AXHelpers.getTitle(views[0], runtime: runtime.ax), !view.isEmpty else {
                 throw Failure.unavailable("editor_view_unknown")
             }
+            guard opened || view == "Controls" else { throw Failure.unavailable("controls_editor_required") }
             let source = RetroSynthNative(slot: slot, pid: pid, app: app, editor: editor, opened: opened, originalView: view)
             if let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: runtime.ax),
                !CFEqual(focused, editor), slot.isCurrent(), ProjectScore.foreground(pid, runtime: runtime),

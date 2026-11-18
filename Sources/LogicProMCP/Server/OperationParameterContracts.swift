@@ -564,6 +564,7 @@ extension OperationRegistry {
             "plugins.get_retro_synth_state": .init(params: [
                 "project_ref": .enforced(.string, "prj_lpm_reference"), "target_ref": trackReference,
                 "options_for": .enforced(.string, "amp_attack"),
+                "open_editor": .enforced(.boolean, .bool(true)),
             ], required: [["project_ref"], ["target_ref"]]),
             "plugins.initialize_retro_synth": .init(params: [
                 "project_ref": .enforced(.string, "prj_lpm_reference"), "target_ref": trackReference,

@@ -2,6 +2,14 @@ import ApplicationServices
 import Foundation
 
 extension RetroSynthNative {
+    /// A preparation read explicitly leaves its newly opened Controls window
+    /// visible. Failure paths still use cleanup() to restore the original UI.
+    func retainPreparedEditor() -> Bool {
+        guard openedEditor, holdsTarget(), let button = try? viewButton(),
+              AXHelpers.getTitle(button, runtime: runtime.ax) == "Controls" else { return false }
+        return true
+    }
+
     func viewButton() throws -> AXUIElement {
         let buttons = try children(editor).filter {
             AXHelpers.getRole($0, runtime: runtime.ax) == "AXMenuButton"

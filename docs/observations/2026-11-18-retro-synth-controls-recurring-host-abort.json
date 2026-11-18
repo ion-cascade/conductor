@@ -77,9 +77,35 @@
       "compilation_overlapped_part_of_native_work": true,
       "swap_used_mib_observed": 3177,
       "causation_established": false
+    },
+    {
+      "what": "Retained Controls window:30 edits and10 reads",
+      "status": "bounded_probe_pass",
+      "completed_requests": 40,
+      "baseline_rss_kib": 535312,
+      "final_rss_kib": 515808,
+      "peak_observed_rss_kib": 536656,
+      "rss_budget_kib": 797456,
+      "logic_pid": 28730,
+      "source_binary": "12712ab1626236efdfd0d2a2f080dda519b99b0db1fd8da030e151332efe42dc",
+      "result_sha256": "92178c2182801deb8cca237596691e3aaf91792acb4f3eb3903ad015c45a443d",
+      "limits": "Same process and synthetic project; no compilation. No host abort observed in these bounded experiments. Not proof of the earlier abort cause or long-session stability."
+    },
+    {
+      "what": "Automatic open/close:read-only contrast stopped at memory budget",
+      "status": "probe_failed",
+      "completed_requests": 9,
+      "baseline_rss_kib": 516352,
+      "final_rss_kib": 794496,
+      "peak_observed_rss_kib": 794496,
+      "rss_budget_kib": 778496,
+      "logic_pid": 28730,
+      "source_binary": "12712ab1626236efdfd0d2a2f080dda519b99b0db1fd8da030e151332efe42dc",
+      "result_sha256": "1c03085623cd6964c53d04b78a0250c2f1b774e6893a4222a4f1285fa1a9879d",
+      "limits": "Same process and synthetic project; no compilation. No host abort observed in these bounded experiments. Not proof of the earlier abort cause or long-session stability."
     }
   ],
-  "conclusion": "Individual control/readback and paired-render passes do not qualify the stability of the repeated workflow. The recurring host abort is a release blocker under issue 65; its cause and a stable native alternative remain unverified.",
+  "conclusion": "The retained Controls window completed30 edits and10 reads with flat memory. Nine read-only requests recreating the editor crossed the preset256MiB growth budget and stopped without a host abort. This isolates repeatable editor-lifecycle memory growth in the owned fixture, but does not prove the earlier abort cause. A candidate now requires explicit open_editor:true on a preparation read, retains that window, and refuses implicit acquisition or graphical-view switching. Its native qualification remains pending; issue65 is still a release blocker.",
   "limits": [
     "The common framework stack does not prove whether table reads, editor lifecycle, rendering, resource contention or another host defect is responsible.",
     "A fresh restart and one short passing run do not establish a fix or long-session stability.",

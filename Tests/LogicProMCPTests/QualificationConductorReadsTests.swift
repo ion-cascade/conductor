@@ -5,6 +5,24 @@ import Testing
 
 @Suite("Conductor read qualification")
 struct QualificationConductorReadsTests {
+    @Test(arguments: [true, false])
+    func retroSynthPreparationDoesNotClaimClosedLayoutRestored(_ opened: Bool) throws {
+        let fixture = try #require(SemanticOracleFixtures.byOperationID[.pluginsGetRetroSynthState])
+        let oracle = try #require(SemanticOracleTable.byOperationID[.pluginsGetRetroSynthState])
+        var body = try #require(JSONInspector.parse(fixture.responseData) as? [String: Any])
+        body["editor_opened"] = opened
+        body["ui_restored"] = !opened
+        func evaluates() throws -> Bool? {
+            oracle.evaluate(responseData: try JSONSerialization.data(withJSONObject: body), readbackData: Data())
+        }
+        #expect(try evaluates() == true)
+        body["ui_restored"] = opened
+        #expect(try evaluates() == false)
+        body["ui_restored"] = !opened
+        body["ui_policy_satisfied"] = false
+        #expect(try evaluates() == false)
+    }
+
     @Test func exportStatusMatchesOwnedFilesAndRejectsWrongEvidence() throws {
         let fixture = try QualificationExportStatusProbe()
         let params = try fixture.params.mapValues { value in

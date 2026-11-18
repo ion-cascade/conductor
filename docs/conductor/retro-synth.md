@@ -1,8 +1,23 @@
 # Retro Synth sound design
 
-Conductor 1.16 provides a bounded Analog profile for Retro Synth on English Logic Pro 13.0, build 7801. Alchemy, the other Retro Synth engines and unlisted parameters remain outside this profile.
+The Conductor 1.16 candidate provides a bounded Analog profile for Retro Synth on English Logic Pro 13.0, build 7801. Alchemy, the other Retro Synth engines and unlisted parameters remain outside this profile.
 
-Open a saved disposable project, load Retro Synth on one uniquely named software instrument track, select that track and leave its Inspector visible. Stop playback and recording. Close other plug-in windows and dialogs. The Retro Synth window must be unlinked if already open. Conductor opens and closes an editor it acquires, or restores the view and scroll position of an existing editor.
+Open a saved disposable project, load Retro Synth on one uniquely named software instrument track, select that track and leave its Inspector visible. Stop playback and recording. Close other plug-in windows and dialogs. The Retro Synth window must be unlinked if already open. Keep one unlinked Retro Synth window open in **Controls** view throughout your edits. Recreating that window for every request showed rapid host memory growth in qualification. Conductor therefore refuses a closed window by default and does not switch an existing graphical Editor.
+
+Prepare the window once with a state read using `open_editor:true`. This opens it, selects Controls and leaves it visible. Subsequent reads and edits reuse it and preserve its scroll position. The preparation response reports `editor_opened:true`, `editor_retained:true`, `ui_restored:false` and `ui_policy_satisfied:true`: the requested visible window was retained, so the original closed layout was intentionally changed. Reuse reports `editor_opened:false` and `ui_restored:true`. If the window is already open in the graphical Editor, select **Controls** manually first. Avoid closing and recreating it between individual edits.
+
+```json
+{
+  "command": "get_retro_synth_state",
+  "params": {
+    "project_ref": "<current project_ref>",
+    "target_ref": "<track_ref from the selected row>",
+    "open_editor": true
+  }
+}
+```
+
+If the project is reopened, obtain fresh project and track references and prepare its window again. Closing the window deliberately ends the editing session; a later read without `open_editor:true` refuses safely. For a bounce, finish the edits before closing the window and starting export. The recurring host abort remains a release blocker until this revised workflow passes native qualification.
 
 ## Start with a native setting
 

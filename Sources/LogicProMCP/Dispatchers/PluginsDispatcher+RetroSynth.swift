@@ -28,7 +28,7 @@ extension PluginsDispatcher {
             return toolTextResult(.error(HonestContract.encodeStateC(error: error, hint: hint, extras: details)))
         }
         var allowed: Set<String> = ["project_ref", "target_ref"]
-        if command == "get_retro_synth_state" { allowed.insert("options_for") }
+        if command == "get_retro_synth_state" { allowed.formUnion(["options_for", "open_editor"]) }
         if command == "initialize_retro_synth" { allowed.insert("confirmed") }
         if command == "set_retro_synth_parameter" {
             allowed.formUnion(["instrument_ref", "expected_snapshot", "param", "unit", "value"])
@@ -45,6 +45,13 @@ extension PluginsDispatcher {
             }
             options = id
         } else { options = nil }
+        let openEditor: Bool
+        if let requested = params["open_editor"] {
+            guard case .bool(let value) = requested else {
+                return refuse(.invalidParams, "open_editor must be a JSON Boolean. true opens and leaves the Controls window visible for repeated edits.")
+            }
+            openEditor = value
+        } else { openEditor = false }
         if command == "initialize_retro_synth" {
             guard case .bool(true) = params["confirmed"] else {
                 return refuse(.invalidParams, "Initialize Setting replaces the instrument's current setting. Pass confirmed:true.")
@@ -127,7 +134,7 @@ extension PluginsDispatcher {
             }
         }
         do {
-            let native = try await RetroSynthNative.acquire(slot: slot)
+            let native = try await RetroSynthNative.acquire(slot: slot, openEditor: openEditor)
             source = native
             try await native.prepareControls()
             let result: RetroSynthSnapshot
@@ -163,12 +170,14 @@ extension PluginsDispatcher {
             guard !Task.isCancelled, await targetRegistry.resolve(reference) != nil,
                   await targetRegistry.resolveCurrentProject(.init(rawValue: project)) != nil,
                   native.holdsTarget() else { throw RetroSynthSnapshot.Failure.unavailable("final_target_changed") }
-            let cleaned = await native.cleanup()
-            cleanupResult = cleaned
-            source = nil
+            let retainedNewEditor = native.openedEditor
+            let cleaned: Bool
+            if retainedNewEditor { cleaned = native.retainPreparedEditor() }
+            else { cleaned = await native.cleanup(); cleanupResult = cleaned }
             guard cleaned, slot.isCurrent(), !Task.isCancelled else {
                 throw RetroSynthSnapshot.Failure.unavailable("editor_restoration_unverified")
             }
+            source = nil
             let hash = try result.fingerprint
             let instrument = "rsy_" + UUID().uuidString.lowercased()
             RetroSynthSession.current = .init(reference: instrument, project: project, track: reference.rawValue, slot: slot.group, hash: hash)
@@ -178,7 +187,8 @@ extension PluginsDispatcher {
                 "instrument_ref": instrument, "snapshot_hash": hash, "profile": RetroSynthProfile.id,
                 "instrument": "Retro Synth", "mode": "Analog", "preset": result.preset,
                 "enabled": result.enabled, "parameter_count": RetroSynthProfile.parameters.count,
-                "native_row_count": result.rows.count, "ui_restored": true,
+                "native_row_count": result.rows.count, "ui_restored": !retainedNewEditor,
+                "editor_retained": true, "editor_opened": retainedNewEditor, "ui_policy_satisfied": true,
                 "parameters": try RetroSynthReport.parameters(result, optionsFor: options),
             ]))
         } catch {
@@ -189,6 +199,11 @@ extension PluginsDispatcher {
             else { cleaned = await source?.cleanup() ?? true }
             Log.debug("Retro Synth operation unverified: \(error)", subsystem: "plugins")
             if !attempted {
+                if let failure = error as? RetroSynthSnapshot.Failure,
+                   case .unavailable("controls_editor_required") = failure {
+                    return refuse(.readbackUnavailable, "Keep the unlinked Retro Synth window open in Controls view while editing. To open and retain one, call get_retro_synth_state with open_editor:true. An existing graphical Editor must be switched to Controls manually.",
+                                  extras: ["ui_restored": cleaned, "reason": "controls_editor_required"])
+                }
                 return refuse(.readbackUnavailable, "The bound instrument or its Controls view could not be verified. Read fresh state before another request.",
                               extras: ["ui_restored": cleaned])
             }
