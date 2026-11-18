@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Require fresh instrument references and expected snapshots for parameter edits; verify native values and preserve untargeted controls.
 - Expose native quantization and explicit units. Cutoff is normalized; changing LFO sync also converts its rate.
 - Allow targeted MIDI sequence import onto the selected, physically verified Retro Synth track.
+- Wait for positive MIDI export destination readback after folder navigation, without repeating confirmation.
+- Verify track-selection keyboard ownership when the system-wide Accessibility focus read is unavailable.
 
 ## [1.15.0] — 2026-11-18
 

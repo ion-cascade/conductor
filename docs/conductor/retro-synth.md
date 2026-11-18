@@ -11,7 +11,14 @@ Read `logic://project/info` and `logic://tracks` for the current `project_ref` a
 `logic_plugins.initialize_retro_synth` calls Logic's **Initialize Setting**. It replaces the current sound, so use it deliberately on your test track:
 
 ```json
-{"command":"initialize_retro_synth","params":{"project_ref":"<current project_ref>","target_ref":"<Retro Synth track target_ref>","confirmed":true}}
+{
+  "command": "initialize_retro_synth",
+  "params": {
+    "project_ref": "<current project_ref>",
+    "target_ref": "<Retro Synth track target_ref>",
+    "confirmed": true
+  }
+}
 ```
 
 This verifies the complete initialized Controls table rather than treating the preset name as proof. It does not change your saved default setting.
@@ -19,13 +26,31 @@ This verifies the complete initialized Controls table rather than treating the p
 ## Read, then edit
 
 ```json
-{"command":"get_retro_synth_state","params":{"project_ref":"<current project_ref>","target_ref":"<track target_ref>","options_for":"amp_attack"}}
+{
+  "command": "get_retro_synth_state",
+  "params": {
+    "project_ref": "<current project_ref>",
+    "target_ref": "<track target_ref>",
+    "options_for": "amp_attack"
+  }
+}
 ```
 
 The response includes 21 parameters, their native display and units, an `instrument_ref` and `snapshot_hash`. `options_for` lists exact supported values for one parameter. For example, choose a supported attack time in milliseconds:
 
 ```json
-{"command":"set_retro_synth_parameter","params":{"project_ref":"<current project_ref>","target_ref":"<track target_ref>","instrument_ref":"<instrument_ref from the read>","expected_snapshot":"<snapshot_hash from the read>","param":"amp_attack","unit":"ms","value":500}}
+{
+  "command": "set_retro_synth_parameter",
+  "params": {
+    "project_ref": "<current project_ref>",
+    "target_ref": "<track target_ref>",
+    "instrument_ref": "<instrument_ref from the read>",
+    "expected_snapshot": "<snapshot_hash from the read>",
+    "param": "amp_attack",
+    "unit": "ms",
+    "value": 500
+  }
+}
 ```
 
 Use the new instrument reference and snapshot hash returned by each successful edit for the next edit. A later state read also replaces the previous reference. References belong to the running server session; obtain fresh state after reconnecting or reopening. If you change the sound manually, read fresh state before another edit.
@@ -59,7 +84,15 @@ Changing `lfo_sync` converts the rate using Logic's native conversion. Setting `
 
 ## Hear the change
 
-On the selected Retro Synth track, use the targeted `logic_tracks.record_sequence` workflow to import a short fixed MIDI phrase. The operation keeps its original imported GM lane as a safety copy and reports that lane separately. Once the target paste is verified, mute or remove the reported source lane using a fresh corroborated track reference before rendering. Render the same exact range before and after a parameter edit with identical bounce settings. For a clear first exercise, compare the initialized sound with a 500 ms amplifier attack, or lower normalized filter cutoff with resonance unchanged. Save and reopen the project, obtain fresh project and track references, and read the instrument again.
+On the selected Retro Synth track, use the targeted `logic_tracks.record_sequence` workflow to import a short fixed MIDI phrase. The operation keeps its original imported GM lane as a safety copy and reports that lane separately. Once the target paste is verified, mute or remove the reported source lane using a fresh corroborated track reference before rendering. Use this reproducible phrase at **120 BPM in 4/4**, on MIDI channel 1 with velocity 80:
+
+| MIDI note | Start from bar 1 | Duration |
+| --- | --- | --- |
+| 48 | 0 ms | 4,000 ms |
+| 52 | 4,500 ms | 1,000 ms |
+| 55 | 6,000 ms | 1,000 ms |
+
+Bounce **1.1.1.1 through 5.1.1.1** as stereo WAV at 48 kHz / 24-bit, with audio tail disabled. This produces an eight-second comparison. Render the same range before and after a parameter edit with identical bounce settings. For a clear first exercise, compare the initialized sound with a 500 ms amplifier attack, or lower normalized filter cutoff with resonance unchanged. Save and reopen the project, obtain fresh project and track references, and read the instrument again.
 
 A state **A** result requires matching native values, matching read bookends, preserved peer controls and successful UI restoration. The bookends are not an atomic Logic transaction. A **C** refusal reports no audio write attempt. A **B** result means an action may have taken effect: inspect the sound and read fresh state before deciding what to do next. Never automatically replay an uncertain edit.
 
