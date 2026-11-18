@@ -72,7 +72,7 @@ struct QualificationConductorReadsTests {
     }
 
     @Test(arguments: [
-        OperationID.pluginsGetPresetVerified, .pluginsGetSidechainVerified,
+        OperationID.pluginsGetRetroSynthState, .pluginsGetPresetVerified, .pluginsGetSidechainVerified,
         .projectGetPatternStep, .projectScanRegions, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
         .projectGetRegionGain, .projectGetRegionFade, .midiGetRegionNotes, .pluginsGetGainAutomation,
         .projectCapturePatternGrid, .projectReadLiveLoops, .projectReadScore, .projectGetChordTrack, .projectGetSessionPlayer, .projectSearchBrowserPatches,

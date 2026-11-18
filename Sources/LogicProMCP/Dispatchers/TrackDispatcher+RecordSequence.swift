@@ -31,9 +31,9 @@ struct RecordSequenceRelocationTrackObservation: @unchecked Sendable {
         selectionReadback = track.selectionReadback
     }
 
-    /// Proof of the selected factory piano on the original physical track.
+    /// Proof of a selected, qualified instrument on the original physical track.
     /// The Inspector is only authoritative while this track owns selection.
-    func hasSelectedLogic13Piano() -> Bool {
+    func hasSelectedLogic13QualifiedInstrument() -> Bool {
         guard let binding = physicalBinding, selectionReadback == true,
               binding.currentIndex() == index,
               case .read(let headers) = AXLogicProElements.allTrackHeadersVerifiedRead(
@@ -43,8 +43,9 @@ struct RecordSequenceRelocationTrackObservation: @unchecked Sendable {
                   AXValueExtractors.extractSelectedState($0.element, runtime: binding.runtime.ax)
                       == ($0.offset == index)
               }),
-              AccessibilityChannel.logic13StudioGrandInspector(
+              (AccessibilityChannel.logic13StudioGrandInspector(
                   named: name, in: binding.window, runtime: binding.runtime.ax)
+               || RetroSynthSlot.acquire(physical: binding, index: index, name: name) != nil)
         else { return false }
         return binding.currentIndex() == index
     }
@@ -292,11 +293,11 @@ extension TrackDispatcher {
                 return jsonToolTextResult(refusal, isError: true)
             }
             let verifiedInstrument = logic13Targeting
-                ? target.hasSelectedLogic13Piano() : target.type == .softwareInstrument
+                ? target.hasSelectedLogic13QualifiedInstrument() : target.type == .softwareInstrument
             guard verifiedInstrument else {
                 refusal["error"] = "target_not_software_instrument"
                 refusal["hint"] = logic13Targeting
-                    ? "Select the requested Studio Grand track before import so its Inspector can verify the instrument."
+                    ? "Select the requested Studio Grand or Retro Synth track before import so its Inspector can verify the instrument."
                     : "target_track must be positively observed as a Software Instrument track."
                 return jsonToolTextResult(refusal, isError: true)
             }
@@ -494,7 +495,7 @@ extension TrackDispatcher {
         if let relocationTarget, let relocationBaseline {
             guard let renewed = relocationTrackInventory(),
                   relocationInventoriesMatch(relocationBaseline, renewed),
-                  !logic13Targeting || renewed[relocationTarget.index].hasSelectedLogic13Piano() else {
+                  !logic13Targeting || renewed[relocationTarget.index].hasSelectedLogic13QualifiedInstrument() else {
                 return jsonToolTextResult([
                     "success": false,
                     "verified": false,
@@ -1023,7 +1024,7 @@ extension TrackDispatcher {
               relocationInventoriesMatch(afterImport, pasteBoundary),
               pasteBoundary.indices.contains(target.index),
               pasteBoundary[target.index].name.utf8.elementsEqual(target.expectedName.utf8),
-              logic13 ? pasteBoundary[target.index].hasSelectedLogic13Piano()
+              logic13 ? pasteBoundary[target.index].hasSelectedLogic13QualifiedInstrument()
                   : pasteBoundary[target.index].type == .softwareInstrument else {
             return await failure(
                 "target_changed", stage: "relocation_paste_boundary",

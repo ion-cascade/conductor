@@ -665,6 +665,7 @@ struct WorkflowCommandCensusTests {
         // These were missing before #111 and let the census claim to be the
         // pinned public surface while omitting real production commands.
         #expect(WorkflowSkillCatalog.publicCommands["logic_plugins"] == [
+            "get_retro_synth_state", "initialize_retro_synth", "set_retro_synth_parameter",
             "get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified",
             "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
             "get_gain_automation", "set_gain_automation_point", "get_preset_verified", "set_preset_verified",

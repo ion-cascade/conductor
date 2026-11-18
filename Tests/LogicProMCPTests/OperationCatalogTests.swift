@@ -180,6 +180,9 @@ struct OperationCatalogTests {
         .pluginsGetHostParameterManifest: [
             "expected_build_fingerprint", "insert", "plugin", "plugin_id", "plugin_name",
         ],
+        .pluginsGetRetroSynthState: ["options_for"],
+        .pluginsInitializeRetroSynth: ["confirmed"],
+        .pluginsSetRetroSynthParameter: ["instrument_ref", "expected_snapshot", "param", "unit", "value"],
         .pluginsGetParamVerified: ["insert", "param", "plugin", "plugin_id", "plugin_name", "unit"],
         .pluginsGetChannelEQStateVerified: ["insert", "plugin", "plugin_id", "plugin_name", "project_expected_path"],
         .pluginsPlanParameterChanges: ["changes", "insert", "plugin", "plugin_id", "plugin_name"],

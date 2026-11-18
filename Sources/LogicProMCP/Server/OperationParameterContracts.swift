@@ -561,6 +561,21 @@ extension OperationRegistry {
                 "path": .enforced(.string, "02 Keyboards/Piano"),
                 "expected_current": .enforced(.string, "Factory Default"),
             ], required: [["target_ref"], ["path"], ["expected_current"]]),
+            "plugins.get_retro_synth_state": .init(params: [
+                "project_ref": .enforced(.string, "prj_lpm_reference"), "target_ref": trackReference,
+                "options_for": .enforced(.string, "amp_attack"),
+            ], required: [["project_ref"], ["target_ref"]]),
+            "plugins.initialize_retro_synth": .init(params: [
+                "project_ref": .enforced(.string, "prj_lpm_reference"), "target_ref": trackReference,
+                "confirmed": .enforced(.boolean, .bool(true)),
+            ], required: [["project_ref"], ["target_ref"], ["confirmed"]]),
+            "plugins.set_retro_synth_parameter": .init(params: [
+                "project_ref": .enforced(.string, "prj_lpm_reference"), "target_ref": trackReference,
+                "instrument_ref": .enforced(.string, "rsy_reference"),
+                "expected_snapshot": .enforced(.string, "snapshot"),
+                "param": .enforced(.string, "oscillator_mix"), "unit": .enforced(.string, "normalized"),
+                "value": .unconstrained("A parameter-specific native number, Boolean or choice string is required.", sample: .double(0.5)),
+            ], required: [["project_ref"], ["target_ref"], ["instrument_ref"], ["expected_snapshot"], ["param"], ["unit"], ["value"]]),
             "plugins.get_inventory": .init(params: Dictionary(uniqueKeysWithValues: ["index", "track", "track_index"].map {
                 ($0, ParamRule.unconstrained("omitted when it does not read as an integer; the channel then refuses the request",
                                              sample: .int(0)))

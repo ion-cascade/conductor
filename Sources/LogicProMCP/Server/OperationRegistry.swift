@@ -58,6 +58,9 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case systemSetupArmKey = "system.setup_arm_key"
     case systemSetupMIDIKeyCommands = "system.setup_midi_key_commands"
     case systemSetupControlSurface = "system.setup_control_surface"
+    case pluginsGetRetroSynthState = "plugins.get_retro_synth_state"
+    case pluginsInitializeRetroSynth = "plugins.initialize_retro_synth"
+    case pluginsSetRetroSynthParameter = "plugins.set_retro_synth_parameter"
     case pluginsGetInventory = "plugins.get_inventory"
     case pluginsGetHostParameterManifest = "plugins.get_host_parameter_manifest"
     case pluginsSetBypassVerified = "plugins.set_bypass_verified"
@@ -391,6 +394,7 @@ enum OperationRegistry {
             "system.setup_arm_key", "system.setup_midi_key_commands", "system.setup_control_surface",
         ],
         ToolID.logicPlugins.rawValue: [
+            "plugins.get_retro_synth_state", "plugins.initialize_retro_synth", "plugins.set_retro_synth_parameter",
             "plugins.get_inventory", "plugins.get_gain_automation", "plugins.set_gain_automation_point", "plugins.get_host_parameter_manifest", "plugins.get_param_verified", "plugins.get_sidechain_verified", "plugins.set_sidechain_verified", "plugins.get_preset_verified", "plugins.set_preset_verified", "plugins.set_bypass_verified", "plugins.get_channel_eq_state_verified", "plugins.plan_parameter_changes", "plugins.set_param_verified", "plugins.set_eq_band_verified", "plugins.insert_verified",
         ],
         ToolID.logicEdit.rawValue: [
@@ -454,6 +458,7 @@ enum OperationRegistry {
             "setup_arm_key", "setup_midi_key_commands", "setup_control_surface",
         ],
         ToolID.logicPlugins.rawValue: [
+            "get_retro_synth_state", "initialize_retro_synth", "set_retro_synth_parameter",
             "get_inventory", "get_gain_automation", "set_gain_automation_point", "get_host_parameter_manifest", "get_param_verified", "get_sidechain_verified", "set_sidechain_verified", "get_preset_verified", "set_preset_verified", "set_bypass_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
         ],
         ToolID.logicEdit.rawValue: [
@@ -551,7 +556,7 @@ enum OperationRegistry {
     /// contract instead of inheriting misleading legacy-index metadata. Existing
     /// legacy/corroborated commands are unchanged; the target-ref kill switch
     /// continues to refuse this physical-only command rather than invent a fallback.
-    static let refRequiredOperationIDs: Set<OperationID> = [.mixerSetInputBusVerified, .mixerSetSendOutputVerified, .mixerSetSendBypassVerified, .mixerSetSendLevelVerified, .mixerSetSendModeVerified, .midiExportTrackMIDI, .midiReadTrackNotes, .pluginsSetBypassVerified, .tracksCreatePanAutomation, .tracksSetPanAutomationPoint]
+    static let refRequiredOperationIDs: Set<OperationID> = [.pluginsInitializeRetroSynth, .pluginsSetRetroSynthParameter, .mixerSetInputBusVerified, .mixerSetSendOutputVerified, .mixerSetSendBypassVerified, .mixerSetSendLevelVerified, .mixerSetSendModeVerified, .midiExportTrackMIDI, .midiReadTrackNotes, .pluginsSetBypassVerified, .tracksCreatePanAutomation, .tracksSetPanAutomationPoint]
 
     /// The corroboration parameter. NOT `name`: several target-bearing ops
     /// already spend `name` on an operand (`tracks.rename`'s NEW name,
@@ -799,6 +804,13 @@ enum OperationRegistry {
             capability: CapabilityID(rawValue: entry.0.rawValue)
         )
     } + ([
+        (.pluginsGetRetroSynthState, "get_retro_synth_state", Mutability.readOnly, DeadlineClass.long,
+         VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["options_for"]),
+        (.pluginsInitializeRetroSynth, "initialize_retro_synth", Mutability.mutating, DeadlineClass.long,
+         VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget, ["confirmed"]),
+        (.pluginsSetRetroSynthParameter, "set_retro_synth_parameter", Mutability.mutating, DeadlineClass.long,
+         VerificationPolicy.readbackRequired, TargetPolicy.acceptsStableTarget,
+         ["instrument_ref", "expected_snapshot", "param", "unit", "value"]),
         (
             .pluginsGetInventory,
             "get_inventory",
@@ -915,7 +927,7 @@ enum OperationRegistry {
             tool: .logicPlugins,
             command: entry.1,
             mutability: entry.2,
-            confirmation: .none,
+            confirmation: entry.0 == .pluginsInitializeRetroSynth ? .l2 : .none,
             target: entry.5,
             verification: entry.4,
             retry: .neverAutomatic,

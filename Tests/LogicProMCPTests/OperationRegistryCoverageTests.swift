@@ -77,6 +77,7 @@ struct OperationRegistryCoverageTests {
             .mixerSetSendBypassVerified,
             .mixerSetSendLevelVerified,
             .mixerSetSendModeVerified,
+            .pluginsInitializeRetroSynth, .pluginsSetRetroSynthParameter,
             .pluginsSetParamVerified,
             .pluginsSetEQBandVerified,
             .pluginsInsertVerified,
@@ -125,7 +126,7 @@ struct OperationRegistryCoverageTests {
              .pluginsGetChannelEQStateVerified, .pluginsPlanParameterChanges,
              .mixerGetOutputVerified, .mixerGetInputBusVerified,
              .mixerGetSendDestinationVerified, .mixerGetSendBypassVerified,
-             .pluginsGetSidechainVerified, .pluginsGetPresetVerified, .pluginsGetGainAutomation,
+             .pluginsGetRetroSynthState, .pluginsGetSidechainVerified, .pluginsGetPresetVerified, .pluginsGetGainAutomation,
              .tracksGetPanAutomation, .tracksGetVolumeAutomation].contains($0.id)
                 ? $0.target == .acceptsStableTarget : $0.target == .none
         })

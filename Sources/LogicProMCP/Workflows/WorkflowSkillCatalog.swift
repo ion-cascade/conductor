@@ -526,6 +526,7 @@ enum WorkflowSkillCatalog {
         ],
         "logic_plugins": [
             "get_inventory", "get_host_parameter_manifest", "get_param_verified", "get_channel_eq_state_verified", "plan_parameter_changes", "set_param_verified", "set_eq_band_verified", "insert_verified",
+            "get_retro_synth_state", "initialize_retro_synth", "set_retro_synth_parameter",
             "get_gain_automation", "get_preset_verified", "get_sidechain_verified",
             "set_bypass_verified", "set_gain_automation_point", "set_preset_verified",
             "set_sidechain_verified",

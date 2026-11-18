@@ -326,6 +326,10 @@ enum SemanticOracleTable {
     /// mutating spec, is DISJOINT from the covered set, and carries a reason —
     /// and remains separate from `conductorWriteQualificationCases`.
     static let structurallyUnverifiedMutatingOperationIDs: [OperationID: String] = [
+        .pluginsInitializeRetroSynth:
+            "The generic sweep lacks an independent factory-initialized Retro Synth witness; qualification requires the native release fixture.",
+        .pluginsSetRetroSynthParameter:
+            "The generic sweep lacks independent instrument parameter and audio witnesses; qualification requires native readback, peer preservation and controlled release renders.",
         .projectExportADMBWF:
             "The installed release fixture independently checks ADM channel attribution, duration and PCM after reopening. The generic sweep lacks a spatial project fixture and independent ADM file witness.",
         .projectExportScoreMusicXML:
@@ -606,6 +610,7 @@ enum SemanticOracleTable {
         midiListPorts,
         midiReadSelectedRegionEvents,
         midiGetRegionNotes,
+        pluginsGetRetroSynthState,
         pluginsGetGainAutomation,
         tracksListLibrary,
         tracksScanLibrary,

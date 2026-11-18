@@ -72,7 +72,7 @@ struct IndexBindingCensusTests {
         // fallback. No legacy operation is promoted or loses compatibility.
         let expected: Set<OperationID> = [
             .mixerSetInputBusVerified, .mixerSetSendOutputVerified, .mixerSetSendBypassVerified, .mixerSetSendLevelVerified, .mixerSetSendModeVerified,
-            .midiExportTrackMIDI, .midiReadTrackNotes,
+            .midiExportTrackMIDI, .midiReadTrackNotes, .pluginsInitializeRetroSynth, .pluginsSetRetroSynthParameter,
             .pluginsSetBypassVerified, .tracksCreatePanAutomation, .tracksSetPanAutomationPoint,
         ]
         #expect(OperationRegistry.refRequiredOperationIDs == expected)

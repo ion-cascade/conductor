@@ -1,10 +1,29 @@
 extension SemanticOracleTable {
     static let conductorReceiptOnlyReadIDs: Set<OperationID> = [
-        .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep,
+        .pluginsGetRetroSynthState, .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep,
         .projectScanRegions, .projectGetRegionSmartTempo, .projectGetRegionGain, .projectGetRegionFade, .tracksGetPanAutomation, .tracksGetVolumeAutomation,
         .midiGetRegionNotes, .pluginsGetGainAutomation,
         .projectCapturePatternGrid, .projectGetChordTrack, .projectGetSessionPlayer, .projectSearchBrowserPatches,
     ]
+
+    static let pluginsGetRetroSynthState = receiptOnlyRead(
+        .pluginsGetRetroSynthState, operation: "plugin.get_retro_synth_state",
+        constraints: [
+            .valueEquals(key: "profile", expected: .string("logic13.retro_synth.analog.controls.v1")),
+            .valueEquals(key: "parameter_count", expected: .number(21)),
+            .valueEquals(key: "native_row_count", expected: .number(83)),
+            .typedField(key: "instrument_ref", type: .string),
+            .typedField(key: "snapshot_hash", type: .string),
+            .valueEquals(key: "ui_restored", expected: .bool(true)),
+            .nonEmptyArray(key: "parameters"),
+            .arrayElements(key: "parameters", constraints: [
+                .typedField(key: "param", type: .string),
+                .typedField(key: "unit", type: .string),
+                .typedField(key: "native_display", type: .string),
+            ]),
+        ],
+        reason: "The generic sweep has no independently bound Retro Synth instrument witness. The release fixture must verify native Controls rows, persistence and controlled renders."
+    )
 
     static let pluginsGetPresetVerified = receiptOnlyRead(
         .pluginsGetPresetVerified, operation: "logic_plugins.get_preset_verified",

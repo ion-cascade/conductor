@@ -15,6 +15,19 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
 
+## 1.16 Retro Synth Analog
+
+| Workflow | Bounded profile |
+| --- | --- |
+| Instrument state | Retro Synth on one selected, uniquely named software instrument track, Inspector visible, saved project stopped in the foreground. Existing editor must be unlinked. |
+| Initialization | Native Initialize Setting, checked against all 83 observed Controls rows. The user's saved default is unchanged. |
+| Sound design | 21 controls for oscillator waveforms/mix/tuning, normalized filter cutoff/resonance/depths, amplifier and filter ADSR, and LFO waveform/rate/sync/via amount. |
+| Targeting | Current project and physical track references, plus an issued instrument reference and expected snapshot for each parameter edit. Bare indices are refused. |
+
+The synthesis engine is **Analog** and the filter is **LP 24dB Lush**. Other engines, filter-type changes, global/FX parameters, preset loading and Alchemy sound-design controls are outside this profile. Native ADSR and LFO displays are quantized; request one advertised native choice. Cutoff is normalized, with no claimed Hz conversion. LFO Sync and Rate can change together through Logic's native conversion. Read bookends and preserved peers provide bounded verification, not an atomic host transaction.
+
+[Control matrix and beginner workflow](retro-synth.md)
+
 ## 1.15 Surround and spatial delivery
 
 | Workflow | Qualified Logic Pro 13.0 profile |

@@ -107,6 +107,8 @@ enum StockInstrumentCatalogValidator {
     static let idPattern = #"^logic\.(stock\.instrument|session_player)\.[a-z0-9_]+$"#
 
     static let supportedActionVocabulary: Set<String> = [
+        "logic_plugins.get_retro_synth_state", "logic_plugins.initialize_retro_synth",
+        "logic_plugins.set_retro_synth_parameter",
         "planning.recommend_instrument",
         "planning.recommend_session_player",
         "logic_tracks.create_instrument",
@@ -317,17 +319,22 @@ enum StockInstrumentCatalog {
                 "logic_tracks.set_instrument_after_track_selection",
                 "logic_tracks.resolve_path",
                 "logic_tracks.list_library",
-            ],
+            ] + (idSuffix == "retro_synth" ? [
+                "logic_plugins.get_retro_synth_state", "logic_plugins.initialize_retro_synth",
+                "logic_plugins.set_retro_synth_parameter",
+            ] : []),
             unsupportedActions: [
                 "automatic_factory_preset_load_without_path",
                 "claim_live_availability_without_readback",
-                "direct_stock_instrument_parameter_write",
                 "session_player_direct_performance_control",
-            ],
+            ] + (idSuffix == "retro_synth" ? [] : ["direct_stock_instrument_parameter_write"]),
             provenance: inferred("logic://stock-plugins/\(id)"),
             notes: notes + [
-                "Stock instrument identity is cataloged read-only; live menu availability and preset loading still require caller-side verification.",
-            ]
+                "Live menu availability and preset loading require native readback.",
+            ] + (idSuffix == "retro_synth" ? [
+                "A bounded Analog / LP 24dB Lush Controls profile supports 21 parameters on English Logic 13.0 build 7801. Read live state before each edit; other engines, filter types and unlisted controls remain unsupported.",
+                "Filter cutoff uses native normalized units, not Hz. ADSR and LFO rates accept measured native choices; changing LFO Sync also converts its rate.",
+            ] : ["Direct instrument parameter editing remains unsupported."])
         )
     }
 

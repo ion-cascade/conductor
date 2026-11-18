@@ -7,12 +7,16 @@ extension SemanticOracleFixtures {
         .mixerGetOutputVerified, .mixerGetSendDestinationVerified, .mixerGetInputBusVerified,
         .mixerGetSendBypassVerified, .pluginsPlanParameterChanges, .pluginsGetHostParameterManifest,
         .pluginsGetParamVerified, .pluginsGetChannelEQStateVerified, .pluginsGetGainAutomation,
-        .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep, .projectScanRegions,
+        .pluginsGetRetroSynthState, .pluginsGetPresetVerified, .pluginsGetSidechainVerified, .projectGetPatternStep, .projectScanRegions,
         .tracksGetPanAutomation, .tracksGetVolumeAutomation, .projectGetRegionSmartTempo, .projectGetRegionGain, .projectGetRegionFade,
         .projectReadScore, .projectReadLiveLoops, .projectCapturePatternGrid, .projectGetChordTrack, .projectGetSessionPlayer, .projectSearchBrowserPatches,
     ]
 
     static let conductorReads: [OperationID: SemanticOracleFixture] = [
+        .pluginsGetRetroSynthState: .init(
+            response: #"{"operation":"plugin.get_retro_synth_state","state":"A","success":true,"verified":true,"write_attempted":false,"profile":"logic13.retro_synth.analog.controls.v1","parameter_count":21,"native_row_count":83,"instrument_ref":"rsy_fixture","snapshot_hash":"fixture","ui_restored":true,"parameters":[{"param":"amp_attack","unit":"ms","native_display":"0.40 ms"}]}"#,
+            readback: #"{"independent_readback":false}"#
+        ),
         .pluginsGetPresetVerified: .init(
             response: #"{"operation":"logic_plugins.get_preset_verified","state":"A","success":true,"verified":true,"write_attempted":false,"plugin":"Compressor","before":"Piano","observed_preset":"Piano","changed":false,"verify_source":"ax_compressor_setting"}"#,
             readback: #"{"independent_readback":false}"#

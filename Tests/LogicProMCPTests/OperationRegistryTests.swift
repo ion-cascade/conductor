@@ -541,6 +541,9 @@ struct OperationRegistryTests {
         ("logic_plugins", "plugins.set_preset_verified", "set_preset_verified", .mutating, .medium, .readbackRequired),
         ("logic_plugins", "plugins.set_sidechain_verified", "set_sidechain_verified", .mutating, .medium, .readbackRequired),
         ("logic_plugins", "plugins.set_bypass_verified", "set_bypass_verified", .mutating, .medium, .readbackRequired),
+        ("logic_plugins", "plugins.get_retro_synth_state", "get_retro_synth_state", .readOnly, .long, .readbackRequired),
+        ("logic_plugins", "plugins.initialize_retro_synth", "initialize_retro_synth", .mutating, .long, .readbackRequired),
+        ("logic_plugins", "plugins.set_retro_synth_parameter", "set_retro_synth_parameter", .mutating, .long, .readbackRequired),
         ("logic_plugins", "plugins.get_gain_automation", "get_gain_automation", .readOnly, .medium, .readbackRequired),
         ("logic_plugins", "plugins.set_gain_automation_point", "set_gain_automation_point", .mutating, .medium, .readbackRequired),
     ]
@@ -579,7 +582,7 @@ struct OperationRegistryTests {
             #expect(spec.tool == tool)
             #expect(spec.command == entry.command)
             #expect(spec.mutability == entry.mutability)
-            #expect(spec.confirmation == (id == .systemClearTraces ? .l2 : .none))
+            #expect(spec.confirmation == (id == .systemClearTraces || id == .pluginsInitializeRetroSynth ? .l2 : .none))
             #expect(spec.target == (
                 id == .pluginsGetHostParameterManifest || id == .pluginsGetParamVerified
                     || id == .pluginsGetChannelEQStateVerified || id == .pluginsPlanParameterChanges
@@ -588,7 +591,8 @@ struct OperationRegistryTests {
                     || id == .pluginsGetPresetVerified || id == .pluginsGetSidechainVerified
                     || id == .pluginsSetPresetVerified || id == .pluginsSetSidechainVerified
                     || id == .pluginsSetBypassVerified || id == .pluginsGetGainAutomation
-                    || id == .pluginsSetGainAutomationPoint
+                    || id == .pluginsGetRetroSynthState || id == .pluginsInitializeRetroSynth
+                    || id == .pluginsSetRetroSynthParameter || id == .pluginsSetGainAutomationPoint
                     ? .acceptsStableTarget
                     : .none
             ))
