@@ -1,0 +1,62 @@
+{
+  "schema": 3,
+  "id": "2026-11-18-retro-synth-reconnect-power-readback",
+  "date": "2026-11-18",
+  "subject": "Post-reconnect instrument power readback",
+  "question": "Can the bound host instrument slot establish power state when the editor has no Boolean value?",
+  "verdict": "partial",
+  "issues": [
+    60,
+    63,
+    65
+  ],
+  "surface": "plugins.retro_synth",
+  "host": {
+    "app": "Logic Pro",
+    "version": "13.0",
+    "build": "7801",
+    "locale": "en-GB",
+    "os": "macOS 27.2.1 (26B131)"
+  },
+  "reverify": {
+    "kind": "manual",
+    "command": "In the owned synthetic project, compare the exact Inspector instrument-slot bypass checkbox with the editor power control before and after a managed bridge restart. Exercise both bypass states with immediate independent native reads, preserve all 83 parameter rows, and compare active/bypassed/restored fixed-phrase bounces. Never infer state from a plain button or AXEnabled.",
+    "expected": "The exact bound slot remains readable in both states; available editor values agree. Missing, mixed, contradictory or transport-failed observations refuse.",
+    "cost": "Exclusive native GUI custody and a bounded disposable-project power roundtrip; no production project changes."
+  },
+  "depends": [
+    "Sources/LogicProMCP/Instruments/RetroSynthPowerState.swift:observe",
+    "Sources/LogicProMCP/Instruments/RetroSynthNative.swift:snapshot"
+  ],
+  "evidence": [],
+  "method": "The aa3 candidate passed saved reopen and then refused a fresh read after managed bridge restart. Independent AX observation found the editor power as AXButton without AXValue (attributeUnsupported -25205), while the exact Inspector RetroSynth slot exposed its bypass checkbox. A native 0\u21921\u21920 roundtrip preserved all 83 parameter rows and restored the starting slot value; the editor remained an unvalued button in both states. These are feasibility observations; the revised MCP source and active/silent render qualification remain pending.",
+  "observations": [
+    {
+      "what": "Post-reconnect editor header",
+      "role": "AXButton",
+      "value_status": -25205,
+      "preset_readable": true
+    },
+    {
+      "what": "Bound instrument slot roundtrip",
+      "bypass_values": [
+        0,
+        1,
+        0
+      ],
+      "native_parameter_rows_preserved_each_transition": 83,
+      "restored": true,
+      "editor_value_available_during_roundtrip": false,
+      "probe_sha256": "d9d798bcc7b86ff2b0e8b3a037a271c6a1e5c9fafe7678ccee45db2dfe2da298"
+    }
+  ],
+  "conclusion": "Use the exact physically bound instrument-slot bypass Boolean as the power source and corroborate any readable editor power value. A measured plain-button absent-value variant may use that slot source; contradictions and read failures still refuse. New-source native and acoustic acceptance is pending.",
+  "limits": [
+    "Observed on one recorded Logic/macOS build and an owned two-track project.",
+    "The editor role change is recorded after the restart sequence; this does not establish its underlying platform cause.",
+    "No new-source MCP or silent/active render pass is claimed by this feasibility record."
+  ],
+  "canon_not_applicable": {
+    "reason": "This record describes API roles, status codes, numeric checkbox states, exact physical ownership and test postconditions. It introduces no translated label vocabulary or string-corpus claim."
+  }
+}

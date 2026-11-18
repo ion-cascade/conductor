@@ -14,7 +14,7 @@ extension SemanticOracleFixtures {
 
     static let conductorReads: [OperationID: SemanticOracleFixture] = [
         .pluginsGetRetroSynthState: .init(
-            response: #"{"operation":"plugin.get_retro_synth_state","state":"A","success":true,"verified":true,"write_attempted":false,"profile":"logic13.retro_synth.analog.controls.v1","parameter_count":22,"native_row_count":83,"instrument_ref":"rsy_fixture","snapshot_hash":"fixture","ui_restored":true,"editor_opened":false,"editor_closed":false,"editor_retained":true,"ui_policy_satisfied":true,"parameters":[{"param":"amp_attack","unit":"ms","native_display":"0.40 ms"}]}"#,
+            response: #"{"operation":"plugin.get_retro_synth_state","state":"A","success":true,"verified":true,"write_attempted":false,"profile":"logic13.retro_synth.analog.controls.v1","parameter_count":22,"native_row_count":83,"enabled":true,"enabled_source":"ax_bound_instrument_slot_bypass","instrument_ref":"rsy_fixture","snapshot_hash":"fixture","ui_restored":true,"editor_opened":false,"editor_closed":false,"editor_retained":true,"ui_policy_satisfied":true,"parameters":[{"param":"amp_attack","unit":"ms","native_display":"0.40 ms"}]}"#,
             readback: #"{"independent_readback":false}"#
         ),
         .pluginsGetPresetVerified: .init(

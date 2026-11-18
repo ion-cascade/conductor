@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Read and initialize a physically bound Retro Synth instrument and edit 22 measured Analog controls, including oscillator waveforms, filter, envelopes and LFO.
 - Expose the filter’s Active/Bypass state explicitly. Logic’s factory initialization bypasses the filter; enable it deliberately before shaping cutoff or filter modulation.
 - Keep one Controls window open for repeated sound-design edits. Explicit `open_editor:true` preparation leaves it visible; ordinary reads and writes refuse implicit editor recreation. Finish with a `close_editor:true` state read before export. Report that intentional UI change separately from restored layouts.
+- Read instrument power from its bound Inspector slot and corroborate readable editor values, including the post-reconnect editor button that has no Boolean value. Refuse unknown or contradictory states.
 - Require fresh instrument references and expected snapshots for parameter edits; verify native values and preserve untargeted controls.
 - Expose native quantization and explicit units. Cutoff is normalized; changing LFO sync also converts its rate.
 - Allow targeted MIDI sequence import onto the selected, physically verified Retro Synth track.

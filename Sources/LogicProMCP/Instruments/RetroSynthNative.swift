@@ -237,15 +237,12 @@ final class RetroSynthNative {
         guard holdsTarget() else { throw Failure.unavailable("target_lost") }
         let direct = try children(editor)
         let settings = direct.filter { AXHelpers.getRole($0, runtime: runtime.ax) == kAXPopUpButtonRole }
-        let power = direct.filter {
-            AXHelpers.getRole($0, runtime: runtime.ax) == kAXCheckBoxRole
-                && AXHelpers.getDescription($0, runtime: runtime.ax) == "bypass"
-        }
-        guard settings.count == 1, power.count == 1,
-              let preset = try string(settings[0], kAXValueAttribute, required: true),
-              case .success(.some(let enabled)) = AXValueExtractors.extractButtonStateResult(power[0], runtime: runtime.ax) else {
+        guard settings.count == 1,
+              let preset = try string(settings[0], kAXValueAttribute, required: true) else {
             throw Failure.unavailable("instrument_header")
         }
+        let enabled = try RetroSynthPowerState.observe(boundInstrumentGroup: slot.group,
+            editorChildren: direct, runtime: runtime.ax)
         var values: [RetroSynthSnapshot.Row] = []
         for row in try rows() {
             let label = try rowLabel(row)
