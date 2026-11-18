@@ -24,13 +24,15 @@ struct RetroSynthDispatchTests {
         ], gate: gate)
         #expect(body["state"] as? String == "C")
         #expect(body["error"] as? String == "invalid_params")
-        #expect(body["write_attempted"] as? Bool == false)
+        let attempted = try #require(body["write_attempted"] as? Bool)
+        #expect(!attempted)
     }
 
     @Test func factoryResetRequiresExplicitConsentBeforeAcquisition() async throws {
         let body = try await request("initialize_retro_synth", ["confirmed": .bool(false)], gate: VerifiedOpGate())
         #expect(body["state"] as? String == "C")
-        #expect(body["write_attempted"] as? Bool == false)
+        let attempted = try #require(body["write_attempted"] as? Bool)
+        #expect(!attempted)
     }
 
     @Test func concurrentReadCannotAcquireTheSharedEditor() async throws {
@@ -39,14 +41,17 @@ struct RetroSynthDispatchTests {
         defer { gate.release() }
         let body = try await request("get_retro_synth_state", [:], gate: gate)
         #expect(body["error"] as? String == "verified_op_in_progress")
-        #expect(body["write_attempted"] as? Bool == false)
+        let attempted = try #require(body["write_attempted"] as? Bool)
+        #expect(!attempted)
     }
 
     @Test func unresolvedProjectRetainsAnExplicitUnverifiedZeroWriteRefusal() async throws {
         let body = try await request("initialize_retro_synth", ["confirmed": .bool(true)], gate: VerifiedOpGate())
         #expect(body["state"] as? String == "C")
-        #expect(body["verified"] as? Bool == false)
-        #expect(body["write_attempted"] as? Bool == false)
+        let verified = try #require(body["verified"] as? Bool)
+        #expect(!verified)
+        let attempted = try #require(body["write_attempted"] as? Bool)
+        #expect(!attempted)
         #expect(body["operation"] as? String == "plugin.initialize_retro_synth")
     }
 
@@ -56,6 +61,7 @@ struct RetroSynthDispatchTests {
             targetRegistry: nil, gate: VerifiedOpGate(), liveTrackNames: nil, traceID: nil)
         let body = try #require(sharedJSONObject(sharedToolText(result)))
         #expect(body["error"] as? String == "invalid_params")
-        #expect(body["write_attempted"] as? Bool == false)
+        let attempted = try #require(body["write_attempted"] as? Bool)
+        #expect(!attempted)
     }
 }

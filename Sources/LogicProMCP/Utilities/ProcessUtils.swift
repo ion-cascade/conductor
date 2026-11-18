@@ -277,14 +277,7 @@ enum ProcessUtils {
     static func focusedApplicationPID() -> pid_t? {
         // Metadata only: this does not capture an image or request permission.
         _ = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-        var value: AnyObject?
-        guard AXUIElementCopyAttributeValue(
-            AXUIElementCreateSystemWide(), kAXFocusedApplicationAttribute as CFString, &value
-        ) == .success, let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
-        var pid: pid_t = 0
-        // swiftlint:disable:next force_cast
-        guard AXUIElementGetPid(value as! AXUIElement, &pid) == .success, pid > 0 else { return nil }
-        return pid
+        return FocusedApplicationOwnership.pid()
     }
 
     static func isKnownLogicPID(_ pid: pid_t) -> Bool {
