@@ -1031,6 +1031,8 @@ let additionalWriteCensusRoutes: [(OperationID, String)] = [
     (.pluginsSetBypassVerified, "plugin.set_bypass_verified"),
     (.pluginsSetPresetVerified, "plugin.set_preset_verified"),
     (.pluginsSetGainAutomationPoint, "plugin.set_gain_automation_point"),
+    (.pluginsInitializeRetroSynth, "plugin.initialize_retro_synth"),
+    (.pluginsSetRetroSynthParameter, "plugin.set_retro_synth_parameter"),
     (.projectSetRegionGain, "region.set_gain"), (.projectSetRegionFade, "region.set_fade"),
     (.projectEditRegion, "region.edit_by_reference"), (.projectSetPatternStepEnabled, "project.set_pattern_step_enabled"),
     (.projectExportADMBWF, "project.export_adm_bwf"),

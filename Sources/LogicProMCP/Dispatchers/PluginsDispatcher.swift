@@ -113,10 +113,31 @@ struct PluginsDispatcher: OperationTraceDispatching {
         // dispatch chokepoint.
         liveTrackNames: (@Sendable () -> [Int: String]?)? = nil
     ) async -> CallTool.Result {
-        // The instrument surface validates its strict typed input before live
-        // reference resolution. Its child resolver then verifies both project
-        // and physical track; no bare-index compatibility path is admitted.
-        if ["get_retro_synth_state", "initialize_retro_synth", "set_retro_synth_parameter"].contains(command) {
+        // Instruments validate their closed typed input before resolving either
+        // reference. Legacy insert routes retain their shared binding guards.
+        let instrumentCommand = ["get_retro_synth_state", "initialize_retro_synth", "set_retro_synth_parameter"].contains(command)
+        if !instrumentCommand {
+            if let projectFailure = await TargetRefResolver.validateProjectReference(
+                params,
+                targetRegistry: targetRegistry,
+                operation: "plugin.\(command)"
+            ) {
+                return projectFailure
+            }
+
+            // PRD-007: reject two competing bindings BEFORE ref resolution, so a
+            // stale ref cannot mask the caller's actual mistake.
+            if let conflict = IndexBindingGuard.conflictingBindingFailure(
+                policy: indexBindingPolicy(for: command),
+                operation: "logic_plugins.\(command)",
+                params: params
+            ) {
+                return conflict
+            }
+        }
+
+        switch command {
+        case "get_retro_synth_state", "initialize_retro_synth", "set_retro_synth_parameter":
             let writing = command != "get_retro_synth_state"
             let traceID = writing ? await startTraceIfEnabled(command: command) : nil
             let result = await withWriteBoundaryArmed(traceID) {
@@ -125,27 +146,7 @@ struct PluginsDispatcher: OperationTraceDispatching {
                     liveTrackNames: liveTrackNames, traceID: traceID)
             }
             return await finalizeTrace(result, traceID: traceID)
-        }
 
-        if let projectFailure = await TargetRefResolver.validateProjectReference(
-            params,
-            targetRegistry: targetRegistry,
-            operation: "plugin.\(command)"
-        ) {
-            return projectFailure
-        }
-
-        // PRD-007: reject two competing bindings BEFORE ref resolution, so a
-        // stale ref cannot mask the caller's actual mistake.
-        if let conflict = IndexBindingGuard.conflictingBindingFailure(
-            policy: indexBindingPolicy(for: command),
-            operation: "logic_plugins.\(command)",
-            params: params
-        ) {
-            return conflict
-        }
-
-        switch command {
         case "get_gain_automation", "set_gain_automation_point":
             let operation = "logic_plugins.\(command)"
             let routed = "plugin.\(command)"

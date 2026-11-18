@@ -39,6 +39,7 @@ debug_live_tests=(
     "runnerRejectsPartialStateObservedFromRealServer"
 )
 test_inventory="$(swift test list)"
+bash Scripts/release-preflight.sh
 for live_test in "${release_live_tests[@]}" "${debug_live_tests[@]}"; do
     match_count="$(
         printf '%s\n' "$test_inventory" | awk -v suffix="/${live_test}()" '

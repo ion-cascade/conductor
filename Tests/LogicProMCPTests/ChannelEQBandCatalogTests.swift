@@ -122,6 +122,7 @@ struct ChannelEQBandCatalogTests {
         #expect(operations == [
             "logic_plugins.set_param_verified",
             "logic_plugins.set_eq_band_verified",
+            "logic_plugins.set_retro_synth_parameter",
         ])
         #expect(!operations.contains("logic_plugins.insert_verified"))
     }
