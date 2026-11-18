@@ -181,7 +181,13 @@ final class MIDITrackExportPanel {
         }
         try assertOwned(panel, app: app)
         stage = "destination_selection"
-        guard try directorySelected(directory, in: panel) else { throw Failure.unavailable("destination_directory_not_confirmed") }
+        // GoToWindow retirement and ColumnView selection are separate AppKit
+        // transitions. Wait read-only for positive destination evidence; never
+        // repeat Return or Save, and keep the original panel custody checks.
+        _ = try await wait("destination_selection", allowingRetiringElement: true) {
+            try self.assertOwned(panel, app: app)
+            return try self.directorySelected(directory, in: panel) ? panel : nil
+        }
         let name = try required(identifier: "saveAsNameTextField", role: kAXTextFieldRole as String, in: panel)
         try setValue(destination.lastPathComponent, on: name)
         stage = "save"

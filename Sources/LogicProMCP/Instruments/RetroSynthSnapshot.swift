@@ -141,7 +141,8 @@ struct RetroSynthSnapshot: Codable, Equatable, Sendable {
         return zip(before.rows, rows).allSatisfy { old, new in
             if old.label.map(labels.contains) == true || old == new { return true }
             for oscillator in [1, 2] where labels.contains("Oscillator \(oscillator) Waveform:") {
-                if old.label == "Oscillator \(oscillator)  Pulse Width:",
+                let width = oscillator == 1 ? "Oscillator 1  Pulse Width:" : "Oscillator 2 Pulse Width:"
+                if old.label == width,
                    let a = Self.pulseWidthValue(old), let b = Self.pulseWidthValue(new) {
                     return a == b
                 }

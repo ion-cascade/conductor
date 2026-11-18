@@ -60,10 +60,15 @@ private struct MIDIExportPanelFixture {
             b.setAttribute(nestedFolder, kAXURLAttribute as String, destination.deletingLastPathComponent().appendingPathComponent("child", isDirectory: true) as NSURL)
         }
         b.setAttribute(list, kAXSelectedChildrenAttribute as String, [group])
-        b.setAttribute(folder, kAXURLAttribute as String, (fault == "wrong_folder" ? URL(fileURLWithPath: "/other") : destination.deletingLastPathComponent()) as NSURL)
+        b.setAttribute(folder, kAXURLAttribute as String, ((fault == "wrong_folder" || fault == "delayed_folder") ? URL(fileURLWithPath: "/other") : destination.deletingLastPathComponent()) as NSURL)
         b.setAttribute(name, kAXValueAttribute as String, "initial.mid")
         b.setAttribute(path, kAXValueAttribute as String, "")
         runtime = b.makeLogicRuntime(appElement: app, attributeValueHandler: { element, attribute in
+            if fault == "delayed_folder", CFEqual(element, folder), attribute == kAXURLAttribute as String {
+                let reads = (b.attributeValue(app, "directory_reads") as? Int ?? 0) + 1
+                b.setAttribute(app, "directory_reads", reads)
+                if reads >= 3 { b.setAttribute(folder, kAXURLAttribute as String, destination.deletingLastPathComponent() as NSURL) }
+            }
             if fault == "replaced_go", CFEqual(element, path), attribute == kAXValueAttribute as String,
                (b.attributeValue(path, attribute) as? String ?? "") != "" {
                 let replacement = b.element(23), replacementPath = b.element(24)
@@ -160,6 +165,16 @@ private struct MIDIExportPanelFixture {
     try await f.driver().exportAll(to: temporary.fileURL)
     #expect(f.savePresses == 1 && f.cancelPresses == 0)
     #expect(f.builder.attributeValue(f.app, "returns") as? Int == 1)
+}
+
+@MainActor @Test func midiExportPanelWaitsForTheDestinationWithoutRepeatingReturnOrSave() async throws {
+    let temporary = try ExportTemporaryFiles.temporaryExportFile()
+    defer { ExportTemporaryFiles.cleanupTemporaryExportFile(temporary) }
+    let f = MIDIExportPanelFixture(destination: temporary.fileURL, fault: "delayed_folder")
+    try await f.driver().exportAll(to: temporary.fileURL)
+    #expect(f.savePresses == 1 && f.cancelPresses == 0)
+    #expect(f.builder.attributeValue(f.app, "returns") as? Int == 1)
+    #expect((f.builder.attributeValue(f.app, "directory_reads") as? Int ?? 0) >= 3)
 }
 
 @MainActor @Test func midiExportPanelUsesFolderThenBasenameAndSavesOnlyOnce() async throws {

@@ -7,6 +7,10 @@ import Foundation
 @MainActor
 final class RetroSynthNative {
     typealias Failure = RetroSynthSnapshot.Failure
+    struct AcquisitionFailure: Error {
+        let reason: String
+        let uiRestored: Bool
+    }
     let slot: RetroSynthSlot
     let runtime: AXLogicProElements.Runtime
     let pid: pid_t
@@ -98,14 +102,17 @@ final class RetroSynthNative {
             // Once Open has been pressed, acquisition can be cancelled before
             // the editor is returned. Retire only the uniquely identified editor
             // created by this acquisition, under the original document guard.
-            if pressedOpen,
-               let current: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: runtime.ax) {
-                let owned = current.filter(candidate)
-                if owned.count == 1, let editor = owned.first {
-                    let cleanup = RetroSynthNative(slot: slot, pid: pid, app: app,
-                        editor: editor, opened: true, originalView: "")
-                    _ = await cleanup.cleanup()
+            if pressedOpen {
+                var restored = false
+                if let current: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: runtime.ax) {
+                    let owned = current.filter(candidate)
+                    if owned.count == 1, let editor = owned.first {
+                        let cleanup = RetroSynthNative(slot: slot, pid: pid, app: app,
+                            editor: editor, opened: true, originalView: "")
+                        restored = await cleanup.cleanup()
+                    }
                 }
+                throw AcquisitionFailure(reason: String(describing: error), uiRestored: restored)
             }
             throw error
         }
@@ -115,7 +122,10 @@ final class RetroSynthNative {
         guard !Task.isCancelled, runtime.logicProPID() == pid,
               ProjectScore.foreground(pid, runtime: runtime), slot.isCurrent(),
               let focused: AXUIElement = AXHelpers.getAttribute(app, kAXFocusedWindowAttribute, runtime: runtime.ax),
-              CFEqual(focused, editor), let windows: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: runtime.ax) else { return false }
+              CFEqual(focused, editor),
+              let activity = try? AXLogicProElements.observedTransportActivity(in: slot.physical.window, runtime: runtime, checking: {}),
+              !activity.isPlaying, !activity.isRecording,
+              let windows: [AXUIElement] = AXHelpers.getAttribute(app, kAXWindowsAttribute, runtime: runtime.ax) else { return false }
         let visible = windows.filter { AXHelpers.getRole($0, runtime: runtime.ax) != kAXHelpTagRole }
         guard case .success(let controls) = AXHelpers.childrenResult(editor, runtime: runtime.ax) else { return false }
         let links = controls.filter {

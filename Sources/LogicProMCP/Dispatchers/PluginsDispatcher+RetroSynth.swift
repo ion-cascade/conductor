@@ -106,6 +106,7 @@ extension PluginsDispatcher {
         }
         var source: RetroSynthNative?
         var attempted = false
+        var cleanupResult: Bool? = nil
         var recorded = false
         func didWrite() async {
             attempted = true
@@ -151,10 +152,12 @@ extension PluginsDispatcher {
             guard !Task.isCancelled, await targetRegistry.resolve(reference) != nil,
                   await targetRegistry.resolveCurrentProject(.init(rawValue: project)) != nil,
                   native.holdsTarget() else { throw RetroSynthSnapshot.Failure.unavailable("final_target_changed") }
-            guard await native.cleanup(), slot.isCurrent(), !Task.isCancelled else {
+            let cleaned = await native.cleanup()
+            cleanupResult = cleaned
+            source = nil
+            guard cleaned, slot.isCurrent(), !Task.isCancelled else {
                 throw RetroSynthSnapshot.Failure.unavailable("editor_restoration_unverified")
             }
-            source = nil
             let hash = try result.fingerprint
             let instrument = "rsy_" + UUID().uuidString.lowercased()
             RetroSynthSession.current = .init(reference: instrument, project: project, track: reference.rawValue, slot: slot.group, hash: hash)
@@ -169,7 +172,10 @@ extension PluginsDispatcher {
             ]))
         } catch {
             RetroSynthSession.current = nil
-            let cleaned = await source?.cleanup() ?? true
+            let cleaned: Bool
+            if let cleanupResult { cleaned = cleanupResult }
+            else if let acquisition = error as? RetroSynthNative.AcquisitionFailure { cleaned = acquisition.uiRestored }
+            else { cleaned = await source?.cleanup() ?? true }
             Log.debug("Retro Synth operation unverified: \(error)", subsystem: "plugins")
             if !attempted {
                 return refuse(.readbackUnavailable, "The bound instrument or its Controls view could not be verified. Read fresh state before another request.",

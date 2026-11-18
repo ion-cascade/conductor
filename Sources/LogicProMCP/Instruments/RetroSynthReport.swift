@@ -10,10 +10,10 @@ enum RetroSynthReport {
             row["value_precision"] = "native_display"
             row["supported_units"] = Array(Set(parameter.choices.map(\.unit))).sorted()
             switch parameter.kind {
-            case let .linear(maximum, scale, offset):
+            case let .linear(maximum, stepsPerUnit, offset):
                 row["minimum"] = offset
-                row["maximum"] = Double(maximum) * scale + offset
-                row["step"] = scale
+                row["maximum"] = Double(maximum + offset * stepsPerUnit) / Double(stepsPerUnit)
+                row["step"] = 1 / Double(stepsPerUnit)
             case .choices:
                 row["choices"] = parameter.choices.compactMap(\.text)
             case .sync: break

@@ -14,7 +14,7 @@ enum RetroSynthProfile {
     }
 
     enum Kind: Sendable {
-        case linear(maximum: Int, scale: Double, offset: Double)
+        case linear(maximum: Int, stepsPerUnit: Int, offset: Int)
         case curve([String])
         case choices([String])
         case lfoRate
@@ -49,9 +49,9 @@ enum RetroSynthProfile {
 
         var choices: [Choice] {
             switch kind {
-            case let .linear(maximum, scale, offset):
+            case let .linear(maximum, stepsPerUnit, offset):
                 return (0...maximum).map { position in
-                    let value = Double(position) * scale + offset
+                    let value = Double(position + offset * stepsPerUnit) / Double(stepsPerUnit)
                     return Choice(position: position, number: value, text: nil, boolean: nil,
                                   unit: unit, display: "", sync: nil)
                 }
@@ -120,17 +120,17 @@ enum RetroSynthProfile {
     static let parameters: [Parameter] = [
         .init(id: "osc1_waveform", label: "Oscillator 1 Waveform:", unit: "waveform", kind: .choices(["Noise", "Sawtooth", "Square"])),
         .init(id: "osc2_waveform", label: "Oscillator 2 Waveform:", unit: "waveform", kind: .choices(["Triangle", "Sawtooth", "Square"])),
-        .init(id: "oscillator_mix", label: "Oscillator Mix:", unit: "normalized", kind: .linear(maximum: 100, scale: 0.01, offset: 0)),
-        .init(id: "osc2_semitones", label: "Oscillator 2 Semitone:", unit: "semitones", kind: .linear(maximum: 48, scale: 1, offset: -24)),
-        .init(id: "osc2_detune", label: "Oscillator 2 Detune:", unit: "cents", kind: .linear(maximum: 100, scale: 1, offset: -50)),
-        .init(id: "filter_cutoff", label: "Cutoff:", unit: "normalized", kind: .linear(maximum: 500, scale: 0.002, offset: 0)),
-        .init(id: "filter_resonance", label: "Resonance:", unit: "normalized", kind: .linear(maximum: 100, scale: 0.01, offset: 0)),
-        .init(id: "filter_envelope_depth", label: "Cutoff by Env:", unit: "normalized", kind: .linear(maximum: 200, scale: 0.01, offset: -1)),
-        .init(id: "filter_lfo_depth", label: "Cutoff by LFO:", unit: "normalized", kind: .linear(maximum: 100, scale: 0.01, offset: 0)),
+        .init(id: "oscillator_mix", label: "Oscillator Mix:", unit: "normalized", kind: .linear(maximum: 100, stepsPerUnit: 100, offset: 0)),
+        .init(id: "osc2_semitones", label: "Oscillator 2 Semitone:", unit: "semitones", kind: .linear(maximum: 48, stepsPerUnit: 1, offset: -24)),
+        .init(id: "osc2_detune", label: "Oscillator 2 Detune:", unit: "cents", kind: .linear(maximum: 100, stepsPerUnit: 1, offset: -50)),
+        .init(id: "filter_cutoff", label: "Cutoff:", unit: "normalized", kind: .linear(maximum: 500, stepsPerUnit: 500, offset: 0)),
+        .init(id: "filter_resonance", label: "Resonance:", unit: "normalized", kind: .linear(maximum: 100, stepsPerUnit: 100, offset: 0)),
+        .init(id: "filter_envelope_depth", label: "Cutoff by Env:", unit: "normalized", kind: .linear(maximum: 200, stepsPerUnit: 100, offset: -1)),
+        .init(id: "filter_lfo_depth", label: "Cutoff by LFO:", unit: "normalized", kind: .linear(maximum: 100, stepsPerUnit: 100, offset: 0)),
         .init(id: "lfo_waveform", label: "LFO Waveform:", unit: "waveform", kind: .choices(["Sawtooth Down", "Sawtooth Up", "Triangle", "Rectangle Bipolar", "Rectangle Unipolar"])),
         .init(id: "lfo_rate", label: "LFO Rate:", unit: "Hz", kind: .lfoRate),
         .init(id: "lfo_sync", label: "LFO Sync:", unit: "bool", kind: .sync),
-        .init(id: "lfo_via_amount", label: "LFO Via Amount:", unit: "normalized", kind: .linear(maximum: 100, scale: 0.01, offset: 0)),
+        .init(id: "lfo_via_amount", label: "LFO Via Amount:", unit: "normalized", kind: .linear(maximum: 100, stepsPerUnit: 100, offset: 0)),
         .init(id: "amp_attack", label: "Amp Env Attack:", unit: "ms", kind: .curve(RetroSynthMeasuredValues.attack)),
         .init(id: "amp_decay", label: "Amp Env Decay:", unit: "ms", kind: .curve(RetroSynthMeasuredValues.decay)),
         .init(id: "amp_sustain", label: "Amp Env Sustain:", unit: "normalized", kind: .curve(RetroSynthMeasuredValues.sustain)),

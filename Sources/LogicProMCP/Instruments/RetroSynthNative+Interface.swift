@@ -131,17 +131,18 @@ extension RetroSynthNative {
             return false
         }
         do {
-            if originalView != "Controls" { try await showView("Editor", cleanup: true) }
-            else if let originalScroll {
+            if let originalScroll {
                 let bar = try scrollBar()
                 _ = AXHelpers.setAttribute(bar, kAXValueAttribute, NSNumber(value: originalScroll), runtime: runtime.ax)
+                var restored = false
                 for _ in 0..<10 {
                     if let now: Double = AXHelpers.getAttribute(bar, kAXValueAttribute, runtime: runtime.ax),
-                       abs(now - originalScroll) <= 0.000_001 { return true }
+                       abs(now - originalScroll) <= 0.000_001 { restored = true; break }
                     try? await interfacePause(cleanup: true, milliseconds: 40)
                 }
-                return false
+                guard restored else { return false }
             }
+            if originalView != "Controls" { try await showView("Editor", cleanup: true) }
             return cleanupPermitted()
         } catch { return false }
     }

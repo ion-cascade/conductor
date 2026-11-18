@@ -14,6 +14,13 @@ struct RetroSynthProfileTests {
         #expect(release.resolve(value: .number(0), unit: "ms") == nil)
     }
 
+    @Test func bipolarNativeValuesDoNotExposeArithmeticRoundoff() throws {
+        let depth = try #require(RetroSynthProfile.parameter("filter_envelope_depth"))
+        let choice = try #require(depth.resolve(value: .number(0.4), unit: "normalized"))
+        #expect(choice.position == 140)
+        #expect(choice.number == 0.4)
+    }
+
     @Test func normalizedCutoffNeverClaimsFrequencyUnits() throws {
         let cutoff = try #require(RetroSynthProfile.parameter("filter_cutoff"))
         #expect(cutoff.resolve(value: .number(0.4), unit: "normalized")?.position == 200)
@@ -108,7 +115,7 @@ struct RetroSynthProfileTests {
     func squareEnablesPulseWidthPresentationWithoutAuthorizingAValueChange(_ oscillator: Int) throws {
         let before = factory()
         let waveform = "Oscillator \(oscillator) Waveform:"
-        let width = "Oscillator \(oscillator)  Pulse Width:"
+        let width = oscillator == 1 ? "Oscillator 1  Pulse Width:" : "Oscillator 2 Pulse Width:"
         var rows = before.rows
         let waveIndex = try #require(rows.firstIndex { $0.label == waveform })
         let widthIndex = try #require(rows.firstIndex { $0.label == width })
