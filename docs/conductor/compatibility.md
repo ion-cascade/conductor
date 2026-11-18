@@ -20,11 +20,15 @@ Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, 
 | Workflow | Bounded profile |
 | --- | --- |
 | Instrument state | Retro Synth on one selected, uniquely named software instrument track, Inspector visible, saved project stopped in the foreground. Existing editor must be unlinked. |
-| Initialization | Native Initialize Setting, checked against all 83 observed Controls rows. The user's saved default is unchanged. |
-| Sound design | 21 controls for oscillator waveforms/mix/tuning, normalized filter cutoff/resonance/depths, amplifier and filter ADSR, and LFO waveform/rate/sync/via amount. |
+| Initialization | Native Initialize Setting, checked against all 83 observed Controls rows. The user's saved default is unchanged; the initialized filter is bypassed. Enable it explicitly for filter sound shaping. |
+| Sound design | 22 controls for oscillator waveforms/mix/tuning, explicit filter Active/Bypass, normalized cutoff/resonance/depths, amplifier and filter ADSR, and LFO waveform/rate/sync/via amount. |
 | Targeting | Current project and physical track references, plus an issued instrument reference and expected snapshot for each parameter edit. Bare indices are refused. |
 
 The synthesis engine is **Analog** and the filter is **LP 24dB Lush**. Other engines, filter-type changes, global/FX parameters, preset loading and Alchemy sound-design controls are outside this profile. Native ADSR and LFO displays are quantized; request one advertised native choice. Cutoff is normalized, with no claimed Hz conversion. LFO Sync and Rate can change together through Logic's native conversion. Read bookends and preserved peers provide bounded verification, not an atomic host transaction.
+
+Logic can normalize the synchronized 1/8 rate from raw position 88 to 90 when reopening while retaining the displayed division. That measured transition is recorded explicitly. Obtain fresh state after reopening; do not reuse the previous snapshot. Render comparisons measure each stereo channel’s power independently before averaging, so channel phase cannot cancel the measured energy. PCM identity is not promised.
+
+One long-running Logic process aborted during an Accessibility table enumeration in qualification. Its cause is undetermined. Subsequent checks used a fresh Logic process; these bounded workflows do not establish long-session stability.
 
 [Control matrix and beginner workflow](retro-synth.md)
 

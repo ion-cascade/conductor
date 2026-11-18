@@ -1,0 +1,172 @@
+{
+  "schema": 3,
+  "id": "2026-11-18-retro-synth-analog-readback-persistence",
+  "date": "2026-11-18",
+  "subject": "Retro Synth Analog guarded edits and saved numerical readback",
+  "question": "Can the bounded instrument profile preserve native peer values through explicit filter toggles and saved/reconnected state?",
+  "verdict": "works",
+  "issues": [
+    60,
+    61,
+    62,
+    63
+  ],
+  "surface": "plugins.retro_synth",
+  "host": {
+    "app": "Logic Pro",
+    "version": "13.0",
+    "build": "7801",
+    "locale": "en-GB",
+    "os": "macOS 27.2.1 (26B131)"
+  },
+  "reverify": {
+    "kind": "manual",
+    "command": "On the recorded host use a saved disposable project with one selected, uniquely named Retro Synth Analog track and a visible Inspector. Follow docs/conductor/retro-synth.md to initialize, obtain fresh references, toggle filter_enabled false/true/true, reject numeric/string/wrong-unit inputs and compare every native Controls row independently. Set the advertised oscillator/filter/envelope/LFO controls, save/close/reopen, restart the bridge and repeat fresh native readback. Export the fixed three notes with CC1=127 at tick zero; compare eight-second 48 kHz 24-bit stereo renders with independent channel powers.",
+    "expected": "The complete 83-row table agrees with all 22 projected values; filter toggles preserve the other 82 rows. Repeated enabled state is a no-op, invalid inputs preserve the table, and retired references refuse. Saved values persist with the explicitly recorded synchronized-rate raw normalization. Channel-power, level, envelope and synchronized-modulation comparisons meet the release receipt.",
+    "cost": "Owned disposable project, stopped foreground Logic, independent Accessibility inspection and synthetic renders; approximately 20 minutes."
+  },
+  "depends": [
+    "Sources/LogicProMCP/Instruments/RetroSynthProfile.swift:RetroSynthProfile",
+    "Sources/LogicProMCP/Instruments/RetroSynthNative.swift:RetroSynthNative",
+    "Sources/LogicProMCP/Instruments/RetroSynthNative+Write.swift:set",
+    "Sources/LogicProMCP/Instruments/RetroSynthSnapshot.swift:RetroSynthSnapshot"
+  ],
+  "evidence": [],
+  "method": "Installed candidate 0045f618e40bad78b6766971dbca79551ebd08f9; executable SHA-256 491b751b415d23971aa4f5ee9aebdd994b18a2159ccc00fdea6d688720b0a1fd. A separate native observer collected complete Controls tables independently from MCP responses. Only the named synthetic project was changed. The exact native initialization, filter toggles, refusals, full changed patch, save/reopen and bridge restart were observed. MIDI notes and controller were independently exported. Stereo analysis averages channel powers after Welch/STFT; phase inversion and real-tone controls validate that measurement. This record reports numerical state and runtime behavior, not localization vocabulary.",
+  "observations": [
+    {
+      "what": "Explicit filter roundtrip and no-op",
+      "api_parameter": "filter_enabled",
+      "requested_values": [
+        false,
+        true,
+        true
+      ],
+      "native_radio_values_before": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "native_radio_values_after": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "write_attempted": [
+        true,
+        true,
+        false
+      ],
+      "peer_rows_preserved": 82,
+      "invalid_inputs_preserved": true
+    },
+    {
+      "what": "Complete numerical readback before and after reopening",
+      "projected_parameter_count": 22,
+      "native_row_count": 83,
+      "native_before_sha256": "a717dbcaab09f022d1563e7085a99937a71b46ed91ed40368c5d596147fc40c4",
+      "native_after_sha256": "1fc41e60eefd01133c72e25e011c41b7bca47770aaef1284a39a8a9365d42bea",
+      "synchronized_rate_raw_before": 88,
+      "synchronized_rate_raw_after": 90,
+      "synchronized_rate_cycles_per_quarter_note": 2
+    },
+    {
+      "what": "Reopened stereo analysis",
+      "sync_brightness_modulation_hz": [
+        3.9794921875,
+        3.9794921875
+      ],
+      "profile": "c116-filter",
+      "rms_ratio": 1.0003658061199758,
+      "active_50ms_envelope_relative_error": 0.0075916817455791655,
+      "high_frequency_fractions": [
+        0.007107794884485887,
+        0.007117308672971305
+      ],
+      "high_frequency_fraction_ratio": 1.0013385007080302,
+      "pcm_equal_this_pair": false,
+      "limits": "Same fixed phrase and native settings. Bounded feature comparisons account for oscillator phase; no general deterministic-render claim."
+    },
+    {
+      "what": "Independent numerical analyser controls",
+      "phase_inversion_preserves_welch_and_stft_power_exactly": true,
+      "original_hf_ratio_gate_rejects_true_tone_change": true,
+      "ratios": {
+        "phase_inversion": 1.0,
+        "true_tone_change": 0.07692307692310511
+      },
+      "old_mono_hf_fractions": [
+        1.681656239457627e-19,
+        1.0000000000000002
+      ],
+      "antiphase_modulation_peak_hz": 3.9794921875
+    },
+    {
+      "what": "Exported synthetic performance retained after reopening and restart",
+      "midi_sha256": "02c3ce136efca3f538e844365427191eaa062e2c84f930894e2d400c16ee6622",
+      "ppq": 480,
+      "controller": {
+        "tick": 0,
+        "channel": 1,
+        "number": 1,
+        "value": 127
+      },
+      "notes": [
+        {
+          "channel": 1,
+          "duration_ticks": 3840,
+          "end_tick": 3840,
+          "pitch": 48,
+          "start_tick": 0,
+          "velocity": 80
+        },
+        {
+          "channel": 1,
+          "duration_ticks": 960,
+          "end_tick": 5280,
+          "pitch": 52,
+          "start_tick": 4320,
+          "velocity": 80
+        },
+        {
+          "channel": 1,
+          "duration_ticks": 960,
+          "end_tick": 6720,
+          "pitch": 55,
+          "start_tick": 5760,
+          "velocity": 80
+        }
+      ]
+    }
+  ],
+  "conclusion": "The bounded native edits, explicit filter toggles and saved/reconnected numerical readback pass. Initialization bypasses the filter, so filter sound shaping requires an explicit enable. The paired stereo energy and modulation checks pass with the observed rate normalization retained explicitly.",
+  "limits": [
+    "English Logic Pro 13.0 build 7801, Analog and LP 24dB Lush only; other engines, filter types and Alchemy sound-design controls are unqualified.",
+    "Complete read bookends are not an atomic host transaction. Uncertain writes must not be replayed automatically.",
+    "The displayed synchronized eighth-note division normalized from raw position 88 to 90 after reopening; exact raw-state and PCM identity are not promised.",
+    "An older long-running Logic process aborted during an independent Accessibility table read. Its cause is undetermined; these fresh/reopened checks do not establish long-session stability.",
+    "Controlled oscillator/filter/envelope/LFO contrasts are recorded separately in the release receipt. Acoustic verification of every advertised curve position is not claimed."
+  ],
+  "supersedes": null,
+  "canon_not_applicable": {
+    "reason": "This record measures numerical control state, peer preservation, action postconditions, persistence and stereo energy. It does not add localization vocabulary or claim a string-corpus value."
+  }
+}
