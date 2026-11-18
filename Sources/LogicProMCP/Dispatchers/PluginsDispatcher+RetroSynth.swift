@@ -71,7 +71,18 @@ extension PluginsDispatcher {
         defer { gate.release() }
         let resolved: TargetRefResolver.Resolved
         switch await resolveRetroSynthTarget(params, registry: targetRegistry, cache: cache, operation: operation) {
-        case .failure(let failure): return failure
+        case .failure(let failure):
+            let text = failure.content.compactMap { item -> String? in
+                if case .text(let text, _, _) = item { return text }
+                return nil
+            }.first
+            guard let text, var payload = decodedJSONObject(text), payload["state"] as? String == "C" else {
+                return refuse(.readbackUnavailable, "The project and instrument references could not be resolved.")
+            }
+            payload["verified"] = false
+            payload["write_attempted"] = false
+            payload["operation"] = operation
+            return toolTextResult(ResourceHandlers.encodeJSONObject(payload), isError: true)
         case .success(let value): resolved = value
         }
         guard let reference = resolved.reference, let binding = resolved.binding, let physical = binding.physicalTrack,

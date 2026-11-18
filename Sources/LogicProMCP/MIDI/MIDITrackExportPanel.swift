@@ -300,12 +300,18 @@ final class MIDITrackExportPanel {
     }
 
     private func currentApp() throws -> AXUIElement {
-        guard permittingAction(), let app = AXLogicProElements.appRoot(runtime: runtime),
-              try windows(app).filter({ CFEqual($0, window) }).count == 1,
-              case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime),
-              document.utf8.elementsEqual(current.utf8), permittingAction() else {
+        func lost(_ stage: String) throws -> Never {
+            Log.debug("Save panel project custody: \(stage)", subsystem: "midi")
             throw Failure.unavailable("project_custody_lost")
         }
+        guard permittingAction() else { try lost("caller_before_read") }
+        guard let app = AXLogicProElements.appRoot(runtime: runtime) else { try lost("application_unavailable") }
+        guard try windows(app).filter({ CFEqual($0, window) }).count == 1 else { try lost("original_window_unavailable") }
+        guard case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime) else {
+            try lost("original_document_unreadable")
+        }
+        guard document.utf8.elementsEqual(current.utf8) else { try lost("original_document_changed") }
+        guard permittingAction() else { try lost("caller_after_read") }
         return app
     }
 

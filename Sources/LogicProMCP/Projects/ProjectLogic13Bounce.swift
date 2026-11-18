@@ -440,11 +440,23 @@ struct ProjectLogic13Bounce {
         let ownership = ProcessUtils.keyboardOwnershipObservation(
             windowList: runtime.onScreenWindowList, focusedPID: runtime.focusedApplicationPID,
             bundleIDForPID: ProcessUtils.bundleIDForPID)
-        guard ownership.isReady, ownership.keyboardOwnerPID == pid,
-              windows()?.contains(window) == true,
-              case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime)
-        else { return false }
-        return current == document
+        guard ownership.isReady, ownership.keyboardOwnerPID == pid else {
+            Log.debug("PCM bounce project custody: keyboard \(ownership.diagnostic)", subsystem: "project")
+            return false
+        }
+        guard windows()?.contains(window) == true else {
+            Log.debug("PCM bounce project custody: original window unavailable", subsystem: "project")
+            return false
+        }
+        guard case .success(.some(let current)) = AXLogicProElements.projectPickerDocumentRead(window, runtime: runtime) else {
+            Log.debug("PCM bounce project custody: original document unreadable", subsystem: "project")
+            return false
+        }
+        guard current == document else {
+            Log.debug("PCM bounce project custody: original document changed", subsystem: "project")
+            return false
+        }
+        return true
     }
 
     private func windows() -> [AXUIElement]? {

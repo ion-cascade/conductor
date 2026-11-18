@@ -42,6 +42,14 @@ struct RetroSynthDispatchTests {
         #expect(body["write_attempted"] as? Bool == false)
     }
 
+    @Test func unresolvedProjectRetainsAnExplicitUnverifiedZeroWriteRefusal() async throws {
+        let body = try await request("initialize_retro_synth", ["confirmed": .bool(true)], gate: VerifiedOpGate())
+        #expect(body["state"] as? String == "C")
+        #expect(body["verified"] as? Bool == false)
+        #expect(body["write_attempted"] as? Bool == false)
+        #expect(body["operation"] as? String == "plugin.initialize_retro_synth")
+    }
+
     @Test func bareIndexCannotReplaceTheRequiredPhysicalReference() async throws {
         let result = await PluginsDispatcher.retroSynth(command: "get_retro_synth_state",
             params: ["project_ref": "prj_fixture", "index": .int(0)], cache: StateCache(),

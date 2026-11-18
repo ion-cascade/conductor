@@ -676,8 +676,9 @@ extension OperationTraceTests {
             eligible.count >= 40,
             Comment(rawValue: "presence census only saw \(eligible.count) channel-dispatching ops: \(eligible.sorted())")
         )
-        // These project commands use direct native access outside ChannelRouter.
+        // These project and instrument commands use direct native access outside ChannelRouter.
         let directNativeWrites: Set<OperationID> = [
+            .pluginsInitializeRetroSynth, .pluginsSetRetroSynthParameter,
             .projectSetPatternStepEnabled, .projectSetPatternStepsEnabled, .projectSetLiveLoopsCellPlaying, .projectExportADMBWF, .projectExportScoreMusicXML, .projectSetChordQuality,
             .projectSetSessionPlayerChordSource, .projectLoadBrowserPatch,
         ]
