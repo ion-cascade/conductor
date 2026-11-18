@@ -412,21 +412,51 @@ final class MIDITrackExportPanel {
 
     private func directorySelected(_ directory: String, in panel: AXUIElement) throws -> Bool {
         let browser = try required(identifier: "ColumnView", role: kAXBrowserRole as String, in: panel)
-        // ColumnView's AXList children can include thousands of unrelated
-        // files. Read only the column containers and each list's actual
-        // selection; file entries are not Save-panel control candidates.
-        let lists = try descendants(browser, stopAtLists: true, skipBrowserContents: false).filter {
-            try string(kAXRoleAttribute as String, of: $0) == kAXListRole as String
+        // AXColumns is the browser's column producer. Its semantic columns
+        // need not be physical descendants of the host's projected child tree.
+        // https://developer.apple.com/documentation/applicationservices/carbon_accessibility/attributes
+        // Never enumerate file entries to obtain a selection.
+        let columns: [AXUIElement]
+        switch AXHelpers.getAXUIElementArrayRead(browser, kAXColumnsAttribute as String, runtime: runtime.ax) {
+        case .success(.elements(let values)): columns = values
+        case .success(.absent): return false
+        case .failure(let error) where error.isDefinitiveAbsence: return false
+        case .failure(let error) where error.raw == AXError.invalidUIElement.rawValue:
+            throw AttributeReadError(attribute: kAXColumnsAttribute, status: error.raw)
+        default: throw Failure.unavailable("directory_columns_unreadable")
+        }
+        guard !columns.isEmpty else { return false }
+        guard columns.count <= 64 else { throw Failure.unavailable("directory_columns_limit") }
+        var lists: [AXUIElement] = []
+        var observedColumns: [AXUIElement] = []
+        for column in columns {
+            guard CFGetTypeID(column) == AXUIElementGetTypeID(),
+                  !observedColumns.contains(where: { CFEqual($0, column) }),
+                  try string(kAXRoleAttribute as String, of: column) == kAXScrollAreaRole as String else {
+                throw Failure.unavailable("directory_column_unavailable_or_ambiguous")
+            }
+            observedColumns.append(column)
+            let candidates = try descendants(column, stopAtLists: true, skipBrowserContents: false).filter {
+                try string(kAXRoleAttribute as String, of: $0) == kAXListRole as String
+            }
+            guard candidates.count == 1, let list = candidates.first else {
+                throw Failure.unavailable("directory_column_selection_unavailable_or_ambiguous")
+            }
+            lists.append(list)
         }
         var selectedDirectories: [URL] = []
+        var selectionCounts: [Int] = []
+        var selectedRoots: [AXUIElement] = []
         for list in lists {
             let selected: [AXUIElement]
             switch AXHelpers.getAXUIElementArrayRead(list, kAXSelectedChildrenAttribute as String, runtime: runtime.ax) {
             case .success(.elements(let values)): selected = values
-            case .success(.absent): continue
-            case .failure(let error) where error.isDefinitiveAbsence: continue
+            case .success(.absent): selectionCounts.append(-1); continue
+            case .failure(let error) where error.isDefinitiveAbsence: selectionCounts.append(-2); continue
             default: throw Failure.unavailable("directory_selection_unreadable")
             }
+            selectionCounts.append(selected.count)
+            selectedRoots.append(contentsOf: selected)
             for group in selected {
                 for field in try descendants(group) where try string(kAXRoleAttribute as String, of: field) == kAXTextFieldRole as String {
                     let raw: Result<AnyObject?, AXHelpers.AXStatusError> = AXHelpers.getAttributeResult(field, kAXURLAttribute as String, runtime: runtime.ax)
@@ -464,7 +494,7 @@ final class MIDITrackExportPanel {
             }
         }
         if !sawDestination {
-            Log.debug("MIDI directory not selected: destination=\(destination.absoluteString) columns=\(lists.count) selected=\(selectedDirectories.map(\.absoluteString))", subsystem: "midi")
+            Log.debug("MIDI directory not selected: destination=\(destination.absoluteString) canonical_columns=\(columns.count) selected_counts=\(selectionCounts) root_roles=\(selectedRoots.map { AXHelpers.getRole($0, runtime: runtime.ax) ?? "absent" }) selected=\(selectedDirectories.map(\.absoluteString))", subsystem: "midi")
         }
         return sawDestination
     }

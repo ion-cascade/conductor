@@ -58,7 +58,19 @@ private struct MIDIExportPanelFixture {
         b.setAttribute(export, kAXTitleAttribute as String, "Export")
         b.setAttribute(leaf, kAXTitleAttribute as String, "All MIDI Tracks as MIDI File…")
         for element in [file, export, leaf, save, cancel] { b.setAttribute(element, kAXEnabledAttribute as String, true) }
-        b.setChildren(panel, [name, save, cancel, browser]); b.setChildren(browser, [list])
+        let column = b.element(45)
+        b.setRole(column, "AXScrollArea")
+        b.setChildren(panel, [name, save, cancel, browser]); b.setChildren(browser, [column])
+        b.setChildren(column, [list])
+        b.setAttribute(browser, kAXColumnsAttribute as String, [column])
+        if fault == "stale_generic_columns" {
+            let stale = b.element(46)
+            b.setRole(stale, "AXScrollArea")
+            b.setChildren(browser, [stale])
+        }
+        if fault == "duplicate_canonical_columns" { b.setAttribute(browser, kAXColumnsAttribute as String, [column, column]) }
+        if fault == "empty_canonical_columns" { b.setAttribute(browser, kAXColumnsAttribute as String, [AXUIElement]()) }
+        if fault == "malformed_canonical_columns" { b.setAttribute(browser, kAXColumnsAttribute as String, "not columns") }
         b.setChildren(list, [group]); b.setChildren(group, [folder]); b.setChildren(go, [path])
         if fault == "unreadable_identifier" || fault == "unreadable_role" {
             let unread = b.element(18)
@@ -68,11 +80,15 @@ private struct MIDIExportPanelFixture {
         if fault == "deeper_selected" {
             let nestedList = b.element(19), nestedGroup = b.element(20), nestedFolder = b.element(21)
             b.setRole(nestedList, "AXList"); b.setRole(nestedGroup, "AXGroup"); b.setRole(nestedFolder, "AXTextField")
-            b.setChildren(browser, [list, nestedList]); b.setChildren(nestedList, [nestedGroup]); b.setChildren(nestedGroup, [nestedFolder])
+            let nestedColumn = b.element(46)
+            b.setRole(nestedColumn, "AXScrollArea")
+            b.setChildren(browser, [column, nestedColumn]); b.setChildren(nestedColumn, [nestedList])
+            b.setAttribute(browser, kAXColumnsAttribute as String, [column, nestedColumn])
+            b.setChildren(nestedList, [nestedGroup]); b.setChildren(nestedGroup, [nestedFolder])
             b.setAttribute(nestedList, kAXSelectedChildrenAttribute as String, [nestedGroup])
             b.setAttribute(nestedFolder, kAXURLAttribute as String, destination.deletingLastPathComponent().appendingPathComponent("child", isDirectory: true) as NSURL)
         }
-        b.setAttribute(list, kAXSelectedChildrenAttribute as String, [group])
+        b.setAttribute(list, kAXSelectedChildrenAttribute as String, fault == "unselected_columns" ? [AXUIElement]() : [group])
         b.setAttribute(folder, kAXURLAttribute as String, ((fault == "wrong_folder" || fault == "delayed_folder") ? URL(fileURLWithPath: "/other") : destination.deletingLastPathComponent()) as NSURL)
         b.setAttribute(name, kAXValueAttribute as String, "initial.mid")
         b.setAttribute(path, kAXValueAttribute as String, "")
@@ -104,6 +120,9 @@ private struct MIDIExportPanelFixture {
             }
             return nil
         }, attributeValueResultHandler: { element, attribute in
+            if fault == "canonical_columns_transport", CFEqual(element, browser), attribute == kAXColumnsAttribute as String {
+                return .failure(.init(raw: AXError.cannotComplete.rawValue))
+            }
             if (fault == "retiring_go" || fault == "persistent_retiring_go"), CFEqual(element, go), attribute == kAXRoleAttribute as String,
                b.attributeValue(app, "returns") as? Int == 1,
                (fault == "persistent_retiring_go" || b.attributeValue(app, "retired_read") == nil) {
@@ -119,6 +138,10 @@ private struct MIDIExportPanelFixture {
             }
             return nil
         }, childrenResultHandler: { element in
+            if fault == "stale_generic_columns", CFEqual(element, b.element(46)) {
+                b.setAttribute(app, "stale_column_reads", (b.attributeValue(app, "stale_column_reads") as? Int ?? 0) + 1)
+                return .failure(.init(raw: AXError.cannotComplete.rawValue))
+            }
             if fault.hasPrefix("unreadable_unrelated"), CFEqual(element, b.element(40)) {
                 b.setAttribute(element, "children_reads", (b.attributeValue(element, "children_reads") as? Int ?? 0) + 1)
                 return .failure(.init(raw: AXError.failure.rawValue))
@@ -209,7 +232,7 @@ private struct MIDIExportPanelFixture {
     #expect(f.savePresses == 1)
 }
 
-@MainActor @Test(arguments: ["preexisting", "wrong_folder", "changed_document", "replaced_panel", "keyboard_refused", "unreadable_identifier", "unreadable_role", "persistent_retiring_go", "deeper_selected", "other_focused_window", "replaced_go", "late_panel_replaced", "late_folder", "late_name", "duplicate_export"])
+@MainActor @Test(arguments: ["preexisting", "wrong_folder", "changed_document", "replaced_panel", "keyboard_refused", "unreadable_identifier", "unreadable_role", "persistent_retiring_go", "deeper_selected", "other_focused_window", "replaced_go", "late_panel_replaced", "late_folder", "late_name", "duplicate_export", "duplicate_canonical_columns", "empty_canonical_columns", "malformed_canonical_columns", "canonical_columns_transport"])
 func midiExportPanelRefusesWrongOwnershipAndDestination(fault: String) async throws {
     let temporary = try ExportTemporaryFiles.temporaryExportFile()
     defer { ExportTemporaryFiles.cleanupTemporaryExportFile(temporary) }
@@ -241,7 +264,11 @@ func midiExportPanelRefusesWrongOwnershipAndDestination(fault: String) async thr
     f.builder.setAttribute(f.builder.element(15), kAXURLAttribute as String, fresh)
     let ancestorList = f.builder.element(19), ancestorGroup = f.builder.element(20), ancestorField = f.builder.element(21)
     f.builder.setRole(ancestorList, "AXList"); f.builder.setRole(ancestorGroup, "AXGroup"); f.builder.setRole(ancestorField, "AXTextField")
-    f.builder.setChildren(f.builder.element(12), [ancestorList, f.builder.element(13)])
+    let ancestorColumn = f.builder.element(46)
+    f.builder.setRole(ancestorColumn, "AXScrollArea")
+    f.builder.setChildren(ancestorColumn, [ancestorList])
+    f.builder.setChildren(f.builder.element(12), [ancestorColumn, f.builder.element(45)])
+    f.builder.setAttribute(f.builder.element(12), kAXColumnsAttribute as String, [ancestorColumn, f.builder.element(45)])
     f.builder.setChildren(ancestorList, [ancestorGroup]); f.builder.setChildren(ancestorGroup, [ancestorField])
     f.builder.setAttribute(ancestorList, kAXSelectedChildrenAttribute as String, [ancestorGroup])
     f.builder.setAttribute(ancestorField, kAXURLAttribute as String, URL(fileURLWithPath: "/private", isDirectory: true) as NSURL)
@@ -282,4 +309,29 @@ func midiExportMenuPathDoesNotReadUnrelatedLazyBranches(fault: String) async thr
     try await fixture.driver().exportAll(to: temporary.fileURL)
     #expect(fixture.savePresses == 1 && fixture.cancelPresses == 0)
     #expect(fixture.builder.attributeValue(fixture.builder.element(40), "children_reads") as? Int == 0)
+}
+
+@MainActor @Test func midiExportPanelRefusesMissingNativeSelectionsAndClosesOnlyItsPanel() async throws {
+    let temporary = try ExportTemporaryFiles.temporaryExportFile()
+    defer { ExportTemporaryFiles.cleanupTemporaryExportFile(temporary) }
+    let f = MIDIExportPanelFixture(destination: temporary.fileURL, fault: "unselected_columns")
+    do {
+        try await f.driver().exportAll(to: temporary.fileURL)
+        Issue.record("Saved without positive native directory selection")
+    } catch {
+        #expect(error as? MIDITrackExportPanel.Failure == .recovered("destination_selection:panel_transition_not_observed:destination_selection"))
+    }
+    #expect(f.savePresses == 0 && f.cancelPresses == 1)
+    #expect(f.builder.attributeValue(f.app, "returns") as? Int == 1)
+    #expect(!FileManager.default.fileExists(atPath: temporary.fileURL.path))
+}
+
+@MainActor @Test func midiExportPanelUsesCanonicalColumnsWithoutTraversingStaleGenericChildren() async throws {
+    let temporary = try ExportTemporaryFiles.temporaryExportFile()
+    defer { ExportTemporaryFiles.cleanupTemporaryExportFile(temporary) }
+    let f = MIDIExportPanelFixture(destination: temporary.fileURL, fault: "stale_generic_columns")
+    try await f.driver().exportAll(to: temporary.fileURL)
+    #expect(f.savePresses == 1 && f.cancelPresses == 0)
+    #expect(f.builder.attributeValue(f.app, "stale_column_reads") == nil)
+    #expect(f.builder.attributeValue(f.app, "returns") as? Int == 1)
 }
