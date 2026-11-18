@@ -7,6 +7,8 @@ struct ProjectADMArtifactTests {
         let parsed = try inspect(fixture())
         #expect(parsed.channels == 11 && parsed.sampleRate == 48_000 && parsed.bitDepth == 24)
         #expect(parsed.frames == 4)
+        #expect(parsed.channelMapping.map(\.index) == Array(1...11))
+        #expect(parsed.channelMapping.map(\.name) == (1...11).map { "Channel \($0)" })
         #expect(parsed.objects.map(\.name) == ["Bed", "Conductor Object"])
         #expect(parsed.objects[0].channels == Array(1...10))
         #expect(parsed.objects[1].channels == [11])
