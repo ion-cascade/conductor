@@ -1,0 +1,66 @@
+{
+  "schema": 3,
+  "id": "2026-11-19-save-panel-canonical-columns",
+  "date": "2026-11-19",
+  "subject": "Read Save-panel destinations through the canonical browser columns",
+  "question": "Does the bound browser\u2019s AXColumns producer provide verified destination selection across the qualified MIDI and bounce transitions?",
+  "verdict": "works",
+  "issues": [
+    60,
+    63
+  ],
+  "surface": "midi.export",
+  "host": {
+    "app": "Logic Pro",
+    "version": "13.0",
+    "build": "7801",
+    "locale": "en-GB",
+    "os": "macOS 27.2.1 (26B131)"
+  },
+  "reverify": {
+    "kind": "manual",
+    "command": "On an owned saved project, read/export the exact MIDI phrase after closing retained Controls, after a stereo bounce, and after project reopening and managed bridge restart. Do not insert an external accessibility observer before MIDI. Inspect all83 synth rows afterward and check explicit destinations and SMF events.",
+    "expected": "Six verified MIDI operations, one verified eight-second stereo bounce, exact notes/controllers and all83 native rows preserved. Malformed/ambiguous canonical data refuses before Save.",
+    "cost": "Exclusive native GUI custody and three bounded synthetic-project contexts."
+  },
+  "depends": [
+    "Sources/LogicProMCP/MIDI/MIDITrackExportPanel.swift:directorySelected"
+  ],
+  "evidence": [],
+  "method": "Retained requests sometimes observed no selected directory through the generic AXChildren tree after view transitions. Independent native observation found AXColumns exposing eight semantic scroll-area columns and the expected selected ancestor/destination URLs. Direct parent/window equality to the host projection was not established, so the adapter binds the semantic producer through the owned browser rather than inventing a physical ancestry. Read only each column\u2019s one selection list; do not enumerate file entries. Keep positive filesystem directory identity and all existing panel, name, Save and recovery guards.",
+  "observations": [
+    {
+      "what": "Native canonical producer",
+      "columns": 8,
+      "column_role": "AXScrollArea",
+      "selected_ancestor_and_destination_columns": 7,
+      "empty_terminal_column": 1,
+      "physical_parent_equality_to_host_projection": "not_established"
+    },
+    {
+      "what": "Installed canonical candidate",
+      "source_commit": "01d39727b2c107ad4530579c827a8ed297696d23",
+      "contexts": [
+        "after-editor-close",
+        "after-bounce",
+        "after-reopen-and-reconnect"
+      ],
+      "midi_operations_verified": 6,
+      "stereo_bounce_verified": true,
+      "independent_native_rows_preserved": 83,
+      "proof_sha256": "57eaa212bc89de05abf3b2c29153e95d6234cefeb38db619c26ae9f4bf3accdd"
+    }
+  ],
+  "conclusion": "The canonical-column candidate passes exact MIDI reads and exports in all three fixed contexts, a stereo bounce and independent 83-row preservation. Missing, malformed, duplicated, transport-failed or unexpected canonical columns still refuse; the destination is positively verified before Save. The underlying AppKit projection/cache cause is not claimed fixed.",
+  "limits": [
+    "Recorded English Logic13.0 build7801/macOS27.2.1 only.",
+    "No automatic export replay or positive result from an empty selection.",
+    "Canonical column elements are semantic accessibility objects; physical-parent equality to the host\u2019s projected browser/window was not observed."
+  ],
+  "canon_not_applicable": {
+    "reason": "This record describes API roles, status codes, numeric checkbox states, exact physical ownership and test postconditions. It introduces no translated label vocabulary or string-corpus claim."
+  },
+  "references": [
+    "https://developer.apple.com/documentation/applicationservices/carbon_accessibility/attributes"
+  ]
+}

@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
-## [1.16.0] — 2026-11-18
+## [1.16.0] — 2026-11-19
 
 - Read and initialize a physically bound Retro Synth instrument and edit 22 measured Analog controls, including oscillator waveforms, filter, envelopes and LFO.
 - Expose the filter’s Active/Bypass state explicitly. Logic’s factory initialization bypasses the filter; enable it deliberately before shaping cutoff or filter modulation.
@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Require fresh instrument references and expected snapshots for parameter edits; verify native values and preserve untargeted controls.
 - Expose native quantization and explicit units. Cutoff is normalized; changing LFO sync also converts its rate.
 - Allow targeted MIDI sequence import onto the selected, physically verified Retro Synth track.
-- Wait for positive MIDI export destination readback after folder navigation, without repeating confirmation.
+- Read export destinations through the Save browser’s canonical columns and wait for positive folder identity without repeating Return or Save.
 - Verify track-selection keyboard ownership when the system-wide Accessibility focus read is unavailable.
 
 ## [1.15.0] — 2026-11-18

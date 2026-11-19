@@ -4,7 +4,7 @@
   "date": "2026-11-18",
   "subject": "Post-reconnect instrument power readback",
   "question": "Can the bound host instrument slot establish power state when the editor has no Boolean value?",
-  "verdict": "partial",
+  "verdict": "works",
   "issues": [
     60,
     63,
@@ -29,7 +29,7 @@
     "Sources/LogicProMCP/Instruments/RetroSynthNative.swift:snapshot"
   ],
   "evidence": [],
-  "method": "The aa3 candidate passed saved reopen and then refused a fresh read after managed bridge restart. Independent AX observation found the editor power as AXButton without AXValue (attributeUnsupported -25205), while the exact Inspector RetroSynth slot exposed its bypass checkbox. A native 0\u21921\u21920 roundtrip preserved all 83 parameter rows and restored the starting slot value; the editor remained an unvalued button in both states. These are feasibility observations; the revised MCP source and active/silent render qualification remain pending.",
+  "method": "The aa3 candidate passed saved reopen and then refused a fresh read after managed bridge restart. Independent AX observation found the editor power as AXButton without AXValue (attributeUnsupported -25205), while the exact Inspector RetroSynth slot exposed its bypass checkbox. A native 0\u21921\u21920 roundtrip preserved all 83 parameter rows and restored the starting slot value; the editor remained an unvalued button in both states. The frozen b1710690 candidate subsequently passed a managed bridge restart with fresh instrument references and independent 83-row observations. The fixed-phrase active and restored bounces were nonzero. The bypass bounce was independently checked as exactly zero PCM; export_run correctly returned B near_silent_output, and that existing file was verified without retrying its export.",
   "observations": [
     {
       "what": "Post-reconnect editor header",
@@ -48,13 +48,32 @@
       "restored": true,
       "editor_value_available_during_roundtrip": false,
       "probe_sha256": "d9d798bcc7b86ff2b0e8b3a037a271c6a1e5c9fafe7678ccee45db2dfe2da298"
+    },
+    {
+      "what": "Installed MCP reconnect and active/bypassed/restored render gate",
+      "source_commit": "b1710690eeb5c0be90fc57546f2f1f5d4d6c32f5",
+      "binary_sha256": "cde1e851de59e5f9c1ad6540ad96f119596b836f571b492c48809e305ea5a64d",
+      "managed_restart_readback": "A",
+      "native_parameter_rows_preserved": 83,
+      "bypassed_pcm_nonzero_samples": 0,
+      "expected_bypassed_export_state": "B: near_silent_output",
+      "uncertain_export_retried": false,
+      "restoration": {
+        "status": "power_audio_pass",
+        "bypassed_nonzero_samples": 0,
+        "rms_ratio": 0.9999594590950319,
+        "envelope_relative_error": 0.007554816685454958,
+        "high_frequency_ratio": 1.0045550628845004,
+        "limits": "Exact silence under bypass; active/restored fixed-phrase comparison uses the same bounded gates as reopened renders. No deterministic PCM or general project claim."
+      },
+      "result_sha256": "197b015ca0629d6d0875702874080963747be5d03a48884b0eeac4ab837b3df7"
     }
   ],
-  "conclusion": "Use the exact physically bound instrument-slot bypass Boolean as the power source and corroborate any readable editor power value. A measured plain-button absent-value variant may use that slot source; contradictions and read failures still refuse. New-source native and acoustic acceptance is pending.",
+  "conclusion": "The exact physically bound instrument-slot bypass Boolean established power in both states after a managed reconnect. Readable editor values are corroborated. Active and restored audio passed the fixed-phrase gates; bypass PCM was exactly zero. Mixed or contradictory states and transport failures still refuse. This bounded power gate passes; complete release qualification is separate.",
   "limits": [
     "Observed on one recorded Logic/macOS build and an owned two-track project.",
     "The editor role change is recorded after the restart sequence; this does not establish its underlying platform cause.",
-    "No new-source MCP or silent/active render pass is claimed by this feasibility record."
+    "The deliberately silent negative export remains B near_silent_output under the normal delivery safeguard. Independent zero-PCM verification is a qualification check, not a change to that safeguard."
   ],
   "canon_not_applicable": {
     "reason": "This record describes API roles, status codes, numeric checkbox states, exact physical ownership and test postconditions. It introduces no translated label vocabulary or string-corpus claim."

@@ -1,0 +1,265 @@
+{
+  "schema": 3,
+  "id": "2026-11-19-retro-synth-retained-controls-qualified",
+  "date": "2026-11-19",
+  "subject": "Bounded Retro Synth retained Controls qualification",
+  "question": "Does the explicit retained-window workflow complete sound-design, persistence and acoustic qualification on the recorded host?",
+  "verdict": "works",
+  "issues": [
+    60,
+    61,
+    62,
+    63,
+    65
+  ],
+  "surface": "plugins.retro_synth",
+  "host": {
+    "app": "Logic Pro",
+    "version": "13.0",
+    "build": "7801",
+    "locale": "en-GB",
+    "os": "macOS 27.2.1 (26B131)"
+  },
+  "reverify": {
+    "kind": "manual",
+    "command": "On the recorded host, use an owned synthetic project. Run the explicit retained editor 40-operation policy, then the 25-stage parameter/refusal/interruption/reopen/reconnect/MIDI/render sequence and independent audio analyses. Keep compilation separate and stop before the next stage on unexpected state or a resource budget.",
+    "expected": "Every stage passes with native peer preservation, fresh references, the exact MIDI phrase and the predeclared acoustic gates. Bypass silence is independently checked while the ordinary export safeguard remains B.",
+    "cost": "Exclusive native GUI custody and a bounded disposable-project power roundtrip; no production project changes."
+  },
+  "depends": [
+    "Sources/LogicProMCP/Instruments/RetroSynthNative.swift:acquire",
+    "Sources/LogicProMCP/Instruments/RetroSynthNative.swift:snapshot",
+    "Sources/LogicProMCP/Instruments/RetroSynthNative+Interface.swift:cleanup"
+  ],
+  "evidence": [],
+  "method": "Record exact installed source identities and retain unchanged synthesis-component evidence across the shared Save-panel fix. Use one owned synthetic project without compilation overlap. Explicitly prepare Controls, retain it through repeated edits and reads, and close it deliberately before native export. Independently observe all 83 native parameter rows, check guarded refusals and interruption recovery, then reopen/reconnect and compare the fixed MIDI phrase and controlled audio conditions. A controlled Logic process handoff preserved the saved snapshot and all 83 native rows during the audio sequence. Earlier completed checks were retained; the interrupted parameter edits were not replayed.",
+  "observations": [
+    {
+      "what": "Retained editor policy",
+      "completed_operations": 40,
+      "edits": 30,
+      "reads": 10,
+      "baseline_rss_kib": 625088,
+      "final_rss_kib": 624048,
+      "peak_rss_kib": 624144,
+      "all83rows_restored": true,
+      "proof_sha256": "289374848ffa93fb309ecbedd758403b4b0e32c6f8e1a3c9df547856778b110f"
+    },
+    {
+      "what": "Complete serial native workflow",
+      "stages": 25,
+      "all_stages_pass": true,
+      "proof_sha256": "87957facc3c349cd5385c8a356005ec37e10c7f7694bf99de024f32ecc25fec1"
+    },
+    {
+      "what": "Power reconnect and audio gate",
+      "proof_sha256": "e1c9a37d87535632a0cfe59ea4c09976c55f614af58a79b51c438c22b3967bda",
+      "restoration": {
+        "status": "power_audio_pass",
+        "bypassed_nonzero_samples": 0,
+        "rms_ratio": 0.9999594590950319,
+        "envelope_relative_error": 0.007554816685454958,
+        "high_frequency_ratio": 1.0045550628845004,
+        "limits": "Exact silence under bypass; active/restored fixed-phrase comparison uses the same bounded gates as reopened renders. No deterministic PCM or general project claim."
+      }
+    },
+    {
+      "what": "Acoustic comparisons",
+      "result": {
+        "square_even_harmonic_ratio": {
+          "saw": 0.19395764305122445,
+          "square": 0.0003040219498884337
+        },
+        "oscillator2_pitch_hz": {
+          "five_semitones": 174.31640625,
+          "five_semitones_plus_50_cents": 181.640625
+        },
+        "oscillator_mix_transposed_carrier_fraction": {
+          "baseline": 1.0993357766856443e-09,
+          "mix": 0.4830854199284438,
+          "pitch": 0.9999999996032781
+        },
+        "filter_high_frequency_fraction": {
+          "baseline": 0.0007025186694050669,
+          "filter": 3.862969721296344e-09
+        },
+        "amp_envelope": {
+          "attack_early_to_sustain_rms": {
+            "baseline": 1.0027726383566888,
+            "envelope": 0.5033271598559069
+          },
+          "sustain_to_baseline_rms": 0.5021678209425581,
+          "release_tail_rms": {
+            "baseline": 0.000780878071805018,
+            "envelope": 0.016097702245583097
+          }
+        },
+        "lfo_filter_modulation": {
+          "lfo-control": {
+            "requested_hz": null,
+            "measured_brightness_modulation_hz": 7.861328125,
+            "brightness_std": 0.00039315603832929994
+          },
+          "lfo-slow": {
+            "requested_hz": 2,
+            "measured_brightness_modulation_hz": 2.001953125,
+            "brightness_std": 4.536239757888761
+          },
+          "lfo-fast": {
+            "requested_hz": 6.4,
+            "measured_brightness_modulation_hz": 6.396484375,
+            "brightness_std": 4.030838089956174
+          }
+        },
+        "filter_release_heldout": {
+          "status": "filter_release_holdout_pass",
+          "protocol_sha256": "13e1af15ce521ee7ad567d6709e10176ba482b99eac88b85d10b92dd88f99b4c",
+          "values_ms": [
+            97,
+            2000
+          ],
+          "pre_rms": [
+            0.08338026263302531,
+            0.08338026263302531
+          ],
+          "pre_harmonic_fraction": [
+            0.13311964060166798,
+            0.13311964060166798
+          ],
+          "tail_rms": [
+            0.0037670122498956542,
+            0.05393774480860208
+          ],
+          "tail_harmonic_fraction": [
+            0.0020186646021057015,
+            0.07285388501704128
+          ],
+          "ratios": {
+            "pre_rms": 1.0,
+            "pre_harmonic": 1.0,
+            "tail_rms": 14.318441573981117,
+            "tail_harmonic": 36.0901384712677
+          },
+          "uniform_gain_negative_control_rejected": true,
+          "limits": "The original >4kHz release metric was below observability and remains a retained failed measurement. This separate held-out pair uses the prospectively fixed energy and second/third-harmonic gates; other native parameters and pre-noteoff signal are preserved.",
+          "changed_parameter_ids": [
+            "filter_release"
+          ],
+          "native_row_difference_source_sha256": "ef3dece7d4602a87e52d0f6d0732b9777d49fb76782dffb2978e17add3b6b027"
+        },
+        "retained_initial_release_metric": {
+          "original_observed": {
+            "filter-env-fast": {
+              "early_hf": 0.0003207397054203322,
+              "sustain_hf": 0.00032073418275137586,
+              "release_hf": 1.075748514922789e-10
+            },
+            "filter-env-shaped": {
+              "early_hf": 1.7246980754108725e-10,
+              "sustain_hf": 4.019729333418416e-10,
+              "release_hf": 1.2551430631237918e-10
+            },
+            "filter-env-release": {
+              "early_hf": 1.7246980754108725e-10,
+              "sustain_hf": 4.019729333418416e-10,
+              "release_hf": 2.1579290329760914e-11
+            }
+          },
+          "original_gate": "release >max(short*2,1e-8) above4kHz",
+          "original_gate_pass": false,
+          "reason": "Both release tails lie below the original absolute observability floor in this frequency band. No original waveform or threshold was changed."
+        },
+        "filter_envelope": {
+          "filter-env-fast": {
+            "early_hf": 0.0003207397054203322,
+            "sustain_hf": 0.00032073418275137586,
+            "release_hf": 1.075748514922789e-10
+          },
+          "filter-env-shaped": {
+            "early_hf": 1.7246980754108725e-10,
+            "sustain_hf": 4.019729333418416e-10,
+            "release_hf": 1.2551430631237918e-10
+          },
+          "filter-env-release": {
+            "early_hf": 1.7246980754108725e-10,
+            "sustain_hf": 4.019729333418416e-10,
+            "release_hf": 2.1579290329760914e-11
+          }
+        }
+      }
+    },
+    {
+      "what": "Controlled process handoff during audio qualification",
+      "old_logic_pid": 28730,
+      "new_logic_pid": 77375,
+      "all83rows_preserved": true,
+      "snapshot_hash": "413caa94459a9db4845813d40e51278777cc676b95f8d0044f4618bda4ba85ac",
+      "parameter_edits_replayed": false,
+      "reason": "SSH transport reset during Save while the older Logic process was approaching the test resource cap. Fresh readback, explicit save, owned-project backup and independent post-restart native rows preceded further rendering."
+    },
+    {
+      "what": "Final shared Save-panel candidate",
+      "source_commit": "01d39727b2c107ad4530579c827a8ed297696d23",
+      "native_contexts": [
+        "after-editor-close",
+        "after-bounce",
+        "after-reopen-and-reconnect"
+      ],
+      "midi_operations_verified": 6,
+      "independent_final_native_rows": 83,
+      "proof_sha256": "57eaa212bc89de05abf3b2c29153e95d6234cefeb38db619c26ae9f4bf3accdd"
+    },
+    {
+      "what": "Independent held-out filter release",
+      "result": {
+        "status": "filter_release_holdout_pass",
+        "protocol_sha256": "13e1af15ce521ee7ad567d6709e10176ba482b99eac88b85d10b92dd88f99b4c",
+        "values_ms": [
+          97,
+          2000
+        ],
+        "pre_rms": [
+          0.08338026263302531,
+          0.08338026263302531
+        ],
+        "pre_harmonic_fraction": [
+          0.13311964060166798,
+          0.13311964060166798
+        ],
+        "tail_rms": [
+          0.0037670122498956542,
+          0.05393774480860208
+        ],
+        "tail_harmonic_fraction": [
+          0.0020186646021057015,
+          0.07285388501704128
+        ],
+        "ratios": {
+          "pre_rms": 1.0,
+          "pre_harmonic": 1.0,
+          "tail_rms": 14.318441573981117,
+          "tail_harmonic": 36.0901384712677
+        },
+        "uniform_gain_negative_control_rejected": true,
+        "limits": "The original >4kHz release metric was below observability and remains a retained failed measurement. This separate held-out pair uses the prospectively fixed energy and second/third-harmonic gates; other native parameters and pre-noteoff signal are preserved.",
+        "changed_parameter_ids": [
+          "filter_release"
+        ],
+        "native_row_difference_source_sha256": "ef3dece7d4602a87e52d0f6d0732b9777d49fb76782dffb2978e17add3b6b027"
+      }
+    }
+  ],
+  "conclusion": "The explicit retained Controls workflow passes the recorded 40-operation policy and complete 25-stage native qualification on the recorded build. The mitigation removes implicit editor recreation from ordinary parameter calls. Earlier host abort reports and the measured recreation growth remain preserved; their exact platform root cause and long-session behavior are not established.",
+  "limits": [
+    "One named synthetic project on English Logic Pro 13.0 build 7801 / macOS 27.2.1; no claim for arbitrary projects, other builds or languages.",
+    "Retain Controls between parameter operations. Avoid repeated editor recreation. Explicit open/close changes the visible layout and is reported separately from restored UI.",
+    "Two earlier SIGABRT reports remain unresolved as to platform root cause. Passing bounded mitigation qualification is not a general Logic stability guarantee.",
+    "Other Retro Synth engines, filter types, pulse width/global/FX editing and Alchemy remain outside this profile.",
+    "The longer render qualification used two Logic processes after a controlled resource handoff. This does not qualify unlimited editor recreation, patch initialization or export cycles in one process.",
+    "The initial filter-release metric above4kHz failed below its absolute observability floor. Its recordings and result remain retained. A separately declared97ms/2000ms pair passed native peer, pre-noteoff stability, tail energy and harmonic gates without changing earlier thresholds."
+  ],
+  "canon_not_applicable": {
+    "reason": "This record describes API roles, status codes, numeric checkbox states, exact physical ownership and test postconditions. It introduces no translated label vocabulary or string-corpus claim."
+  },
+  "supersedes": "2026-11-18-retro-synth-controls-recurring-host-abort"
+}

@@ -15,9 +15,9 @@ The support target is the desktop version of Logic Pro on a logged-in Apple sili
 Intel Macs, other Logic and macOS versions, Creator Studio, other UI languages, and operation without a GUI session are outside this qualification.
 
 
-## 1.16 Retro Synth Analog — candidate
+## 1.16 Retro Synth Analog
 
-**Release qualification is blocked by [#65](https://github.com/ion-cascade/conductor/issues/65).** Individual native control and render checks have passed, but repeated access has preceded two Logic host aborts. The following profile remains under investigation.
+The explicit retained Controls workflow passes native parameter, refusal, interruption, reopened/reconnected MIDI and controlled render checks on the recorded host. Keep Controls open between sound-design operations and close it deliberately before export.
 
 | Workflow | Bounded profile |
 | --- | --- |
@@ -30,7 +30,9 @@ The synthesis engine is **Analog** and the filter is **LP 24dB Lush**. Other eng
 
 Logic can normalize the synchronized 1/8 rate from raw position 88 to 90 when reopening while retaining the displayed division. That measured transition is recorded explicitly. Obtain fresh state after reopening; do not reuse the previous snapshot. Render comparisons measure each stereo channel’s power independently before averaging, so channel phase cannot cancel the measured energy. PCM identity is not promised.
 
-Two Logic processes aborted during qualification, after 30 hours 40 minutes and 2 hours 34 minutes respectively. Both reports end in AttributeGraph table growth through SwiftUICore/AppKit; their cause is undetermined. Restarting Logic has not resolved the recurring failure. Automatic Controls acquisition remains unqualified for release while #65 is open.
+Two Logic processes aborted during qualification, after 30 hours 40 minutes and 2 hours 34 minutes respectively. Both reports end in AttributeGraph table growth through SwiftUICore/AppKit; their cause is undetermined. Repeated automatic editor recreation showed memory growth and is excluded from ordinary reads and edits. The explicit retained workflow passed 30 edits and 10 reads with preserved native values, followed by the complete native sequence. The longer audio sequence used a controlled process handoff near the test memory cap, with the exact saved state and all 83 native rows verified afterward. This is a bounded mitigation for [#65](https://github.com/ion-cascade/conductor/issues/65), not a root-cause fix or long-session stability guarantee. The [qualification observation](../observations/2026-11-19-retro-synth-retained-controls-qualified.json) preserves those limits.
+
+If Logic does not expose positive native folder selection during a MIDI read, Conductor refuses before Save and closes only its owned panel. The shared Save-panel adapter now reads the browser’s canonical columns. After the fix, MIDI reads and exports passed after closing Controls, after a stereo bounce, and after project reopening and bridge restart. Earlier refusals remain retained; no automatic export replay is added.
 
 [Control matrix and beginner workflow](retro-synth.md)
 

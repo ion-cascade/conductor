@@ -1,6 +1,6 @@
 # Retro Synth sound design
 
-The Conductor 1.16 candidate provides a bounded Analog profile for Retro Synth on English Logic Pro 13.0, build 7801. Alchemy, the other Retro Synth engines and unlisted parameters remain outside this profile.
+Conductor 1.16 provides a bounded Analog profile for Retro Synth on English Logic Pro 13.0, build 7801. Alchemy, the other Retro Synth engines and unlisted parameters remain outside this profile.
 
 Open a saved disposable project, load Retro Synth on one uniquely named software instrument track, select that track and leave its Inspector visible. Stop playback and recording. Close other plug-in windows and dialogs. The Retro Synth window must be unlinked if already open. Keep one unlinked Retro Synth window open in **Controls** view throughout your edits. Recreating that window for every request showed rapid host memory growth in qualification. Conductor therefore refuses a closed window by default and does not switch an existing graphical Editor.
 
@@ -17,7 +17,7 @@ First read `logic://project/info` and `logic://tracks` for fresh project and sel
 }
 ```
 
-If the project is reopened, obtain fresh project and track references and prepare its window again. Closing the window deliberately ends the editing session; a later read without `open_editor:true` refuses safely. The recurring host abort remains a release blocker until this revised workflow passes native qualification.
+If the project is reopened, obtain fresh project and track references and prepare its window again. Closing the window deliberately ends the editing session; a later read without `open_editor:true` refuses safely. The retained workflow passed bounded native qualification. Earlier Logic aborts and editor-recreation memory growth remain documented; avoid recreating the window between edits. See the [compatibility limits](compatibility.md#116-retro-synth-analog).
 
 ## Start with a native setting
 
